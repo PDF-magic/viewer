@@ -24,6 +24,7 @@ await Promise.all([
   build({
     entryPoints: [
       "src/viewer/viewer.js",
+      "src/viewer/search/search-bootstrap.js",
       "src/viewer/navigation/minimap.js",
     ],
     bundle: true,
