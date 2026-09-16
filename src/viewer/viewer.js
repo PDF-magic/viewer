@@ -2,6 +2,7 @@ import { AnnotationLayer, createValidAbsoluteUrl, getDocument, GlobalWorkerOptio
 import { EventBus, PDFLinkService } from "../../node_modules/pdfjs-dist/web/pdf_viewer.mjs";
 import { abandonPdfDocumentSession, publishPdfDocument } from "./pdf-document-session.js";
 import { resolvePdfSource } from "./pdf-source.js";
+import { mergeWrappedUrlTextItems } from "./search/search-text-normalization.js";
 
 const sourceMode = window.location.pathname.includes("/src/");
 
@@ -894,8 +895,9 @@ async function getPageSearchText(pageNumber) {
 
   const page = await pdfDocument.getPage(pageNumber);
   const textContent = await page.getTextContent();
+  const searchableItems = mergeWrappedUrlTextItems(textContent.items);
   const text = normalizeSearchText(
-    textContent.items.map((item) => ("str" in item ? item.str : "")).join(" "),
+    searchableItems.map((item) => ("str" in item ? item.str : "")).join(" "),
   );
 
   pageTextCache.set(pageNumber, text);
