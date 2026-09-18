@@ -31,6 +31,7 @@ let thumbnailGeneration = 0;
 let thumbnailLoadGeneration = 0;
 let thumbnailRotation = 0;
 let thumbnailPreparationStarted = false;
+let thumbnailPreparationCancel;
 
 function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
@@ -176,9 +177,7 @@ function yieldToBrowser() {
 function finishMinimapPreparation() {
   const root = document.documentElement;
   root.classList.add("minimap-ready");
-  if (root.classList.contains("document-ready")) {
-    requestAnimationFrame(() => root.classList.toggle("minimap-preparing", false));
-  }
+  requestAnimationFrame(() => root.classList.toggle("minimap-preparing", false));
 }
 
 async function loadThumbnailDocument(loadGeneration) {
@@ -377,6 +376,40 @@ async function renderAllThumbnails(preparedGeneration, preparedCachedStrip) {
   void cacheThumbnailStrip(strip);
 }
 
+function cancelScheduledThumbnailPreparation() {
+  thumbnailPreparationCancel?.();
+  thumbnailPreparationCancel = undefined;
+}
+
+function scheduleThumbnailPreparation() {
+  if (
+    !document.documentElement.classList.contains("document-ready") ||
+    thumbnailPreparationStarted ||
+    thumbnailPreparationCancel ||
+    !minimapEnabled() ||
+    window.innerWidth <= 700
+  ) {
+    return;
+  }
+
+  const root = document.documentElement;
+  root.classList.add("minimap-preparing");
+  root.classList.toggle("minimap-ready", false);
+
+  const start = () => {
+    thumbnailPreparationCancel = undefined;
+    startThumbnailPreparation();
+  };
+
+  if (typeof window.requestIdleCallback === "function") {
+    const handle = window.requestIdleCallback(start, { timeout: 1200 });
+    thumbnailPreparationCancel = () => window.cancelIdleCallback?.(handle);
+  } else {
+    const handle = setTimeout(start, 0);
+    thumbnailPreparationCancel = () => clearTimeout(handle);
+  }
+}
+
 function startThumbnailPreparation() {
   if (thumbnailPreparationStarted || !minimapEnabled() || window.innerWidth <= 700) {
     return;
@@ -394,12 +427,14 @@ function startThumbnailPreparation() {
 }
 
 function stopThumbnailPreparation() {
+  cancelScheduledThumbnailPreparation();
   thumbnailLoadGeneration += 1;
   thumbnailGeneration += 1;
   thumbnailPreparationStarted = false;
   minimapPages.replaceChildren();
   thumbnailDocument = undefined;
   thumbnailFingerprint = undefined;
+  document.documentElement.classList.toggle("minimap-preparing", false);
 }
 
 function rerenderThumbnails(delta) {
@@ -515,7 +550,7 @@ rotateRightButton?.addEventListener("click", () => rerenderThumbnails(90));
 minimapToggle.addEventListener("change", () => {
   setMinimapEnabled(minimapToggle.checked);
   if (minimapToggle.checked) {
-    startThumbnailPreparation();
+    scheduleThumbnailPreparation();
   } else {
     stopThumbnailPreparation();
   }
@@ -535,11 +570,13 @@ const resizeObserver = new ResizeObserver(scheduleSync);
 resizeObserver.observe(viewer);
 
 window.addEventListener("scroll", scheduleSync, { passive: true });
+window.addEventListener("pdf-viewer-document-ready", scheduleThumbnailPreparation);
 window.addEventListener("resize", () => {
   scheduleSync();
-  startThumbnailPreparation();
+  scheduleThumbnailPreparation();
 });
 window.addEventListener("pagehide", () => {
+  cancelScheduledThumbnailPreparation();
   thumbnailLoadGeneration += 1;
   thumbnailGeneration += 1;
   thumbnailDocument = undefined;
@@ -547,4 +584,4 @@ window.addEventListener("pagehide", () => {
 });
 
 scheduleSync();
-startThumbnailPreparation();
+scheduleThumbnailPreparation();

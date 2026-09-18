@@ -147,18 +147,25 @@ test('minimap toggle persists visibility and updates accessibility state', () =>
   assert.match(toggleStyles, /\.checkbox-input:checked\s*\{/);
 });
 
-test('the loading screen remains until concurrent thumbnails and the first two pages are ready', () => {
-  assert.match(source, /MINIMAP_RENDER_CONCURRENCY\s*=\s*4/);
-  assert.match(source, /await Promise\.all\(/);
-  assert.match(source, /void loadThumbnailDocument\(loadGeneration\)[\s\S]*?\.finally\(finishMinimapPreparation\)/);
-  assert.match(source, /classList\.add\("minimap-ready"\)/);
-  assert.match(viewerSource, /requiredPageCount\s*=\s*Math\.min\(2, pdfDocument\.numPages\)/);
-  assert.match(viewerSource, /classList\.add\("document-ready"\)/);
-  assert.match(viewerSource, /goToPage\(currentPage, "auto"\);\s*keepRenderWindow\(currentPage\);/);
-  assert.doesNotMatch(viewerSource, /status\.remove\(\)/);
-  assert.match(viewerStyles, /\.minimap-preparing \.minimap\s*\{[\s\S]*?visibility:\s*hidden/);
-  assert.match(viewerStyles, /html:not\(\.minimap-preparing\) \.status:not\(\.error\)\s*\{[\s\S]*?display:\s*none/);
-  assert.doesNotMatch(viewerStyles, /\.page,\s*\.minimap\s*\{[\s\S]*?transition:\s*opacity/);
+test('the document becomes ready before the minimap finishes in the background', () => {
+  assert.match(source, /MINIMAP_RENDER_CONCURRENCY\\s*=\\s*4/);
+  assert.match(source, /await Promise\\.all\\(/);
+  assert.match(source, /requestIdleCallback\\(start, \\{ timeout: 1200 \\}\\)/);
+  assert.match(source, /window\\.addEventListener\\("pdf-viewer-document-ready", scheduleThumbnailPreparation\\)/);
+  assert.match(source, /void loadThumbnailDocument\\(loadGeneration\\)[\\s\\S]*?\\.finally\\(finishMinimapPreparation\\)/);
+  assert.match(source, /classList\\.add\\("minimap-ready"\\)/);
+  assert.match(source, /classList\\.toggle\\("minimap-preparing", false\\)/);
+  assert.match(viewerSource, /requiredPageCount\\s*=\\s*Math\\.min\\(2, pdfDocument\\.numPages\\)/);
+  assert.match(viewerSource, /classList\\.add\\("document-ready"\\)/);
+  assert.match(viewerSource, /dispatchEvent\\(new Event\\("pdf-viewer-document-ready"\\)\\)/);
+  assert.doesNotMatch(viewerSource, /minimap-ready/);
+  assert.match(viewerSource, /goToPage\\(currentPage, "auto"\\);\\s*keepRenderWindow\\(currentPage\\);/);
+  assert.doesNotMatch(viewerSource, /status\\.remove\\(\\)/);
+  assert.match(viewerStyles, /html:not\\(\\.document-ready\\) \\.page\\s*\\{[\\s\\S]*?visibility:\\s*hidden/);
+  assert.match(viewerStyles, /\\.document-ready \\.status:not\\(\\.error\\)\\s*\\{[\\s\\S]*?display:\\s*none/);
+  assert.doesNotMatch(viewerStyles, /\\.minimap-preparing \\.page/);
+  assert.match(styles, /\\.minimap-preparing \\.minimap\\s*\\{[\\s\\S]*?translateX\\(110%\\)/);
+  assert.match(styles, /transform 1100ms cubic-bezier/);
 });
 
 test('thumbnail edges fade softly into the minimap background', () => {

@@ -639,10 +639,12 @@ function markDocumentReady() {
   }
 
   const root = document.documentElement;
-  root.classList.add("document-ready");
-  if (root.classList.contains("minimap-ready")) {
-    requestAnimationFrame(() => root.classList.toggle("minimap-preparing", false));
+  if (root.classList.contains("document-ready")) {
+    return;
   }
+
+  root.classList.add("document-ready");
+  window.dispatchEvent(new Event("pdf-viewer-document-ready"));
 }
 
 function pageIsInRenderWindow(pageNumber) {
