@@ -1050,9 +1050,40 @@ function stepSearch(delta) {
   }
 }
 
+function getSelectedPdfText() {
+  const selection = window.getSelection();
+
+  if (
+    !selection ||
+    selection.isCollapsed ||
+    !selection.anchorNode ||
+    !selection.focusNode ||
+    !viewer.contains(selection.anchorNode) ||
+    !viewer.contains(selection.focusNode)
+  ) {
+    return "";
+  }
+
+  return selection.toString().replace(/\s+/g, " ").trim();
+}
+
 function focusSearch() {
   searchInput.focus();
   searchInput.select();
+}
+
+function focusSearchFromSelection() {
+  const selectedText = getSelectedPdfText();
+
+  if (selectedText) {
+    searchInput.value = selectedText;
+  }
+
+  focusSearch();
+
+  if (selectedText) {
+    void runSearch(selectedText);
+  }
 }
 
 async function rotatePages(delta) {
@@ -1183,7 +1214,7 @@ function bindControls() {
       if (modifier && key === "f") {
         event.preventDefault();
         event.stopPropagation();
-        focusSearch();
+        focusSearchFromSelection();
         return;
       }
 
