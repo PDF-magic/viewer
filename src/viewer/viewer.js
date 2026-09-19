@@ -884,7 +884,11 @@ function createPagePlaceholders(sampleViewport) {
 }
 
 function normalizeSearchText(value) {
-  return value.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g, " ").trim();
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[\s\u200B-\u200D\u2060\uFEFF]+/gu, " ")
+    .trim();
 }
 
 async function getPageSearchText(pageNumber) {
@@ -1015,7 +1019,7 @@ function scheduleSearch() {
   clearTimeout(searchTimer);
   searchRequestId += 1;
 
-  const query = searchInput.value.trim();
+  const query = normalizeSearchText(searchInput.value);
   if (!query) {
     resetSearchResults();
     return;
