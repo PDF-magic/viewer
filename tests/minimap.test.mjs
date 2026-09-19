@@ -107,6 +107,35 @@ test('dragging to the end reaches the document end for short and long maps', () 
 });
 
 
+test('dragging the viewport follows the latest pointer position immediately', () => {
+  const f = fixture(100);
+  f.track.getBoundingClientRect = () => ({ top: 0, height: f.track.clientHeight });
+  f.track.setPointerCapture = () => {};
+
+  let prevented = false;
+  f.listeners.pointerdown({
+    button: 0,
+    clientY: 9,
+    pointerId: 1,
+    preventDefault() { prevented = true; },
+  });
+  f.listeners.pointermove({
+    clientY: 100,
+    getCoalescedEvents() {
+      return [{ clientY: 400 }];
+    },
+  });
+
+  const viewportTop = 391;
+  const viewportTravel = vm.runInContext('mapHeight - viewportHeight', f.context);
+  const maximum = 100 * 1420 - f.window.innerHeight;
+  assert.ok(prevented);
+  assert.equal(parseFloat(f.viewport.style.top), viewportTop);
+  assert.ok(Math.abs(f.window.scrollY - viewportTop / viewportTravel * maximum) < 0.00001);
+  assert.match(source, /function scheduleSync\(\) \{[\s\S]*?syncFrame \|\| dragging/);
+});
+
+
 test('wheel navigation uses compact map travel and current scroll position in every delta mode', () => {
   for (const count of [2, 100]) {
     for (const deltaMode of [0, 1, 2]) {
