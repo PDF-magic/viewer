@@ -1,39 +1,59 @@
 @media (min-width: 701px) {
-  html:not(.minimap-disabled) {
+  html:not(.minimap-disabled):not(.minimap-collapsed) {
     scrollbar-width: none;
   }
 
-  html:not(.minimap-disabled)::-webkit-scrollbar,
-  html:not(.minimap-disabled) body::-webkit-scrollbar {
+  html:not(.minimap-disabled):not(.minimap-collapsed)::-webkit-scrollbar,
+  html:not(.minimap-disabled):not(.minimap-collapsed) body::-webkit-scrollbar {
     display: none;
     width: 0;
     height: 0;
   }
 
-  html:not(.minimap-disabled) .viewer {
+  html:not(.minimap-disabled):not(.minimap-collapsed) .viewer {
     padding-right: 112px;
   }
 
-  html:not(.minimap-disabled) .page {
+  html.minimap-left:not(.minimap-disabled):not(.minimap-collapsed) .viewer {
+    padding-right: 16px;
+    padding-left: 112px;
+  }
+
+  html:not(.minimap-disabled):not(.minimap-collapsed) .page {
     width: min(1100px, calc(100vw - 128px));
   }
 }
 
-.minimap {
+.minimap-shell {
   --minimap-accent: #43af49;
   position: fixed;
   inset: 52px 0 0 auto;
   z-index: 9;
+  display: flex;
   width: 96px;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--toolbar-bg);
+  user-select: none;
+}
+
+.minimap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
   outline: 0;
   background: var(--toolbar-bg);
   cursor: pointer;
-  user-select: none;
   touch-action: none;
 }
 
-.minimap-disabled .minimap {
+.minimap-left .minimap-shell {
+  right: auto;
+  left: 0;
+}
+
+.minimap-disabled .minimap-shell {
   display: none;
 }
 
@@ -41,11 +61,17 @@
   box-shadow: inset 2px 0 0 var(--muted);
 }
 
+.minimap-left .minimap:focus-visible {
+  box-shadow: inset -2px 0 0 var(--muted);
+}
+
 .minimap-pages {
   position: absolute;
   inset: 0;
   overflow: hidden;
   pointer-events: none;
+  transform: translateY(0);
+  will-change: transform;
 }
 
 .minimap-page {
@@ -83,10 +109,11 @@
     transparent
   );
   opacity: 0.82;
+  filter: var(--page-filter);
 }
 
-.minimap-strip {
-  filter: var(--page-filter);
+.minimap-local .minimap-strip {
+  opacity: 0.94;
 }
 
 .minimap-viewport {
@@ -107,14 +134,90 @@
   background: color-mix(in srgb, var(--minimap-accent) 30%, transparent);
 }
 
+.minimap-controls {
+  display: flex;
+  flex: 0 0 36px;
+  align-items: stretch;
+  justify-content: space-between;
+  border-top: 1px solid var(--border);
+  background: var(--toolbar-bg);
+}
+
+.minimap-left .minimap-controls {
+  flex-direction: row-reverse;
+}
+
+.minimap-control {
+  display: grid;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 16px;
+}
+
+.minimap-control:hover,
+.minimap-control:focus-visible {
+  outline: 0;
+  background: var(--control-hover);
+  color: var(--text);
+}
+
+.minimap-mode[aria-pressed="true"] {
+  color: var(--minimap-accent);
+}
+
+.minimap-collapsed .minimap-shell {
+  top: auto;
+  right: 8px;
+  bottom: 8px;
+  width: 36px;
+  height: 36px;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  overflow: hidden;
+  box-shadow: 0 8px 22px rgb(0 0 0 / 24%);
+}
+
+.minimap-left.minimap-collapsed .minimap-shell {
+  right: auto;
+  left: 8px;
+}
+
+.minimap-collapsed .minimap {
+  display: none;
+}
+
+.minimap-collapsed .minimap-controls {
+  flex: 1 1 auto;
+  border-top: 0;
+}
+
+.minimap-collapsed .minimap-control:not(.minimap-collapse) {
+  display: none;
+}
+
+.minimap-collapsed .minimap-collapse {
+  display: grid;
+  flex: 1 1 auto;
+  width: 34px;
+  height: 34px;
+}
+
 @media (max-width: 700px) {
-  .minimap {
+  .minimap-shell {
     display: none;
   }
 }
 
 @media print {
-  .minimap {
+  .minimap-shell {
     display: none !important;
   }
 }

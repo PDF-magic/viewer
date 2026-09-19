@@ -323,13 +323,15 @@ function fitWidthBase() {
 }
 
 function viewportPageWidth() {
-  const minimapLeft = document.querySelector("#minimap")?.getBoundingClientRect().left;
-  const viewportRight =
-    Number.isFinite(minimapLeft) && minimapLeft > 0
-      ? Math.min(window.innerWidth, minimapLeft)
-      : window.innerWidth;
+  const root = document.documentElement;
+  const minimapShell = document.querySelector("#minimap-shell");
+  const minimapWidth =
+    !root.classList.contains("minimap-disabled") &&
+    !root.classList.contains("minimap-collapsed")
+      ? minimapShell?.getBoundingClientRect().width || 0
+      : 0;
 
-  return Math.max(160, viewportRight - PAGE_HORIZONTAL_GUTTER);
+  return Math.max(160, window.innerWidth - minimapWidth - PAGE_HORIZONTAL_GUTTER);
 }
 
 function viewportPageHeight() {
