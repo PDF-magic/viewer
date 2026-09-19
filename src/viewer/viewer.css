@@ -507,6 +507,69 @@ input {
   flex: 1;
 }
 
+.tool-footnote-jump {
+  display: grid;
+  gap: 5px;
+  padding: 6px 9px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tool-footnote-row {
+  display: flex;
+  gap: 6px;
+}
+
+.tool-footnote-row input {
+  width: 0;
+  min-width: 0;
+  flex: 1 1 auto;
+  height: 30px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  outline: 0;
+  background: var(--control-bg);
+  color: var(--text);
+}
+
+.tool-footnote-row input:focus {
+  border-color: var(--search-focus-border);
+  box-shadow: 0 0 0 2px var(--search-ring);
+}
+
+.tool-footnote-button {
+  flex: 0 0 38px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--control-bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.tool-footnote-button:hover,
+.tool-footnote-button:focus-visible {
+  outline: 0;
+  background: var(--control-hover);
+}
+
+.tool-footnote-status {
+  min-height: 14px;
+  color: var(--search-muted);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.tool-footnote-status[data-state="error"] {
+  color: var(--search-empty);
+}
+
+.tool-footnote-status[data-state="success"] {
+  color: var(--page-border);
+}
+
 .menu-separator {
   height: 1px;
   margin: 5px 4px;

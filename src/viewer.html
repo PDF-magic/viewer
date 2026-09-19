@@ -108,6 +108,23 @@
           </button>
           <button id="qr-file-url" class="tool-button" type="button" role="menuitem">▦ <span>QR file URL</span></button>
           <div class="menu-separator" role="separator"></div>
+          <form id="footnote-jump" class="tool-footnote-jump" aria-label="Jump to footnote">
+            <label for="footnote-number">Footnote</label>
+            <div class="tool-footnote-row">
+              <input
+                id="footnote-number"
+                type="text"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                autocomplete="off"
+                placeholder="#"
+                aria-label="Footnote number"
+              />
+              <button id="footnote-jump-button" class="tool-footnote-button" type="submit">Go</button>
+            </div>
+            <span id="footnote-jump-status" class="tool-footnote-status" aria-live="polite"></span>
+          </form>
+          <div class="menu-separator" role="separator"></div>
           <label class="tool-toggle" title="Use the document minimap instead of the browser scrollbar">
             <span>Show minimap</span>
             <input id="show-minimap" class="checkbox-input" type="checkbox" checked />
@@ -163,6 +180,7 @@
     <script type="module" src="viewer/search/search-highlight-cues.js"></script>
     <script type="module" src="viewer/navigation/minimap.js"></script>
     <script type="module" src="viewer/navigation/page-number-input.js"></script>
+    <script type="module" src="viewer/navigation/footnote-jump.js"></script>
     <script type="module" src="viewer/sharing/copy-file-url.js"></script>
     <script type="module" src="viewer/sharing/summarize-with-chatgpt.js"></script>
     <script type="module" src="viewer/sharing/qr-file-url.js"></script>
