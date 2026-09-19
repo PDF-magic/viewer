@@ -576,13 +576,126 @@ input {
   background: var(--border);
 }
 
+.document-scrubber {
+  position: fixed;
+  inset: auto 0 0;
+  z-index: 11;
+  display: grid;
+  grid-template-columns: minmax(24px, auto) minmax(0, 1fr) minmax(24px, auto);
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 4px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--toolbar-bg);
+  backdrop-filter: blur(14px);
+}
+
+.document-scrubber-edge {
+  color: var(--search-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: center;
+}
+
+.document-scrubber-track {
+  position: relative;
+  min-width: 0;
+  height: 36px;
+  --scrubber-progress: 0;
+}
+
+.document-scrubber-current {
+  position: absolute;
+  top: 0;
+  left: clamp(14px, calc(var(--scrubber-progress) * 100%), calc(100% - 14px));
+  transform: translateX(-50%);
+  min-width: 28px;
+  padding: 1px 5px;
+  border-radius: 999px;
+  background: var(--control-bg);
+  color: var(--text);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  line-height: 15px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.document-scrubber-input {
+  position: absolute;
+  inset: auto 0 2px;
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.document-scrubber-input::-webkit-slider-runnable-track {
+  height: 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      to right,
+      var(--page-border) 0,
+      var(--page-border) calc(var(--scrubber-progress) * 100%),
+      var(--control-bg) calc(var(--scrubber-progress) * 100%),
+      var(--control-bg) 100%
+    );
+}
+
+.document-scrubber-input::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border: 2px solid var(--page-border);
+  border-radius: 50%;
+  appearance: none;
+  background: var(--body-bg);
+  box-shadow: 0 0 0 2px var(--toolbar-bg);
+}
+
+.document-scrubber-input::-moz-range-track {
+  height: 4px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--control-bg);
+}
+
+.document-scrubber-input::-moz-range-progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--page-border);
+}
+
+.document-scrubber-input::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--page-border);
+  border-radius: 50%;
+  background: var(--body-bg);
+}
+
+.document-scrubber-input:focus-visible {
+  outline: 0;
+}
+
+.document-scrubber-input:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 2px var(--toolbar-bg), 0 0 0 4px var(--search-focus-border);
+}
+
 .viewer {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
   min-height: 100vh;
-  padding: 76px 16px 28px;
+  padding: 76px 16px 64px;
 }
 
 .page {
@@ -690,7 +803,7 @@ input {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 24px;
+  bottom: 56px;
   z-index: 20;
   transform: translate(-50%, 12px);
   padding: 9px 12px;
@@ -745,6 +858,7 @@ input {
   }
 
   .toolbar,
+  .document-scrubber,
   .toast {
     display: none !important;
   }

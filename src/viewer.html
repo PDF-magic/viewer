@@ -158,6 +158,24 @@
       <div id="minimap-viewport" class="minimap-viewport" aria-hidden="true"></div>
     </aside>
 
+    <nav id="document-scrubber" class="document-scrubber" aria-label="Document position">
+      <span class="document-scrubber-edge" aria-hidden="true">1</span>
+      <div class="document-scrubber-track">
+        <output id="document-scrubber-current" class="document-scrubber-current" for="document-scrubber-range">1</output>
+        <input
+          id="document-scrubber-range"
+          class="document-scrubber-input"
+          type="range"
+          min="1"
+          max="1"
+          step="1"
+          value="1"
+          aria-label="Document page"
+        />
+      </div>
+      <span id="document-scrubber-end" class="document-scrubber-edge document-scrubber-end" aria-hidden="true">—</span>
+    </nav>
+
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
     <dialog id="qr-file-url-dialog" class="qr-file-url-dialog" aria-labelledby="qr-file-url-title">
@@ -180,6 +198,7 @@
     <script type="module" src="viewer/search/search-highlight-cues.js"></script>
     <script type="module" src="viewer/navigation/minimap.js"></script>
     <script type="module" src="viewer/navigation/page-number-input.js"></script>
+    <script type="module" src="viewer/navigation/document-scrubber.js"></script>
     <script type="module" src="viewer/navigation/footnote-jump.js"></script>
     <script type="module" src="viewer/sharing/copy-file-url.js"></script>
     <script type="module" src="viewer/sharing/summarize-with-chatgpt.js"></script>
