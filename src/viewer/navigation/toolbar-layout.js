@@ -5,6 +5,36 @@ const PAGE_GAP = 24;
 const twoRowToolbar = window.matchMedia(`(max-width: ${TOOLBAR_ROW_BREAKPOINT}px)`);
 const pageNumberInput = document.querySelector("#page-number");
 const viewer = document.querySelector("#viewer");
+const searchControl = document.querySelector(".search-control");
+const searchInput = document.querySelector("#search-input");
+const searchCount = document.querySelector("#search-count");
+const searchTextCanvas = document.createElement("canvas");
+const searchTextContext = searchTextCanvas.getContext("2d");
+
+function updateSearchCountVisibility() {
+  searchControl.classList.remove("search-count-crowded");
+
+  if (!searchInput.value || !searchCount.textContent.trim()) {
+    return;
+  }
+
+  const inputStyle = getComputedStyle(searchInput);
+  searchTextContext.font = inputStyle.font;
+
+  const queryWidth = searchTextContext.measureText(searchInput.value).width;
+  const clearButtonAllowance = 18;
+  const queryNeedsCountSpace = queryWidth + clearButtonAllowance > searchInput.clientWidth;
+
+  searchControl.classList.toggle("search-count-crowded", queryNeedsCountSpace);
+}
+
+searchInput.addEventListener("input", updateSearchCountVisibility);
+new MutationObserver(updateSearchCountVisibility).observe(searchCount, {
+  childList: true,
+  characterData: true,
+  subtree: true,
+});
+new ResizeObserver(updateSearchCountVisibility).observe(searchControl);
 
 function updateToolbarRows() {
   document.documentElement.classList.toggle("toolbar-two-rows", twoRowToolbar.matches);

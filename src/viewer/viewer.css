@@ -668,7 +668,6 @@ input {
 
 @media (max-width: 560px) {
   .search-icon,
-  .search-count,
   .search-nav-button {
     display: none;
   }
