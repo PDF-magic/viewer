@@ -125,20 +125,47 @@
       <div id="status" class="status">Loading PDF…</div>
     </main>
 
-    <aside
-      id="minimap"
-      class="minimap"
-      role="scrollbar"
-      aria-label="Document minimap"
-      aria-controls="viewer"
-      aria-orientation="vertical"
-      aria-valuemin="0"
-      aria-valuemax="0"
-      aria-valuenow="0"
-      tabindex="0"
-    >
-      <div id="minimap-pages" class="minimap-pages" aria-hidden="true"></div>
-      <div id="minimap-viewport" class="minimap-viewport" aria-hidden="true"></div>
+    <aside id="minimap-shell" class="minimap-shell" aria-label="Document minimap">
+      <div
+        id="minimap"
+        class="minimap"
+        role="scrollbar"
+        aria-label="Document minimap"
+        aria-controls="viewer"
+        aria-orientation="vertical"
+        aria-valuemin="0"
+        aria-valuemax="0"
+        aria-valuenow="0"
+        tabindex="0"
+      >
+        <div id="minimap-pages" class="minimap-pages" aria-hidden="true"></div>
+        <div id="minimap-viewport" class="minimap-viewport" aria-hidden="true"></div>
+      </div>
+      <div id="minimap-controls" class="minimap-controls" role="group" aria-label="Minimap controls">
+        <button
+          id="minimap-swap-side"
+          class="minimap-control minimap-swap-side"
+          type="button"
+          aria-label="Move minimap to the left"
+          title="Move minimap to the left"
+        >⇆</button>
+        <button
+          id="minimap-mode"
+          class="minimap-control minimap-mode"
+          type="button"
+          aria-label="Use local page navigator"
+          aria-pressed="false"
+          title="Use local page navigator"
+        ><span id="minimap-mode-icon" aria-hidden="true">▥</span></button>
+        <button
+          id="minimap-collapse"
+          class="minimap-control minimap-collapse"
+          type="button"
+          aria-label="Collapse minimap"
+          aria-expanded="true"
+          title="Collapse minimap"
+        >☰</button>
+      </div>
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>

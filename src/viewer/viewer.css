@@ -65,7 +65,7 @@ html {
 }
 
 .minimap-preparing .page,
-.minimap-preparing .minimap {
+.minimap-preparing .minimap-shell {
   visibility: hidden;
   opacity: 0;
 }

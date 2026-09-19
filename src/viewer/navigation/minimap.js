@@ -6,25 +6,34 @@ import {
 } from "./minimap-cache.js";
 
 const viewer = document.querySelector("#viewer");
+const minimapShell = document.querySelector("#minimap-shell");
 const minimap = document.querySelector("#minimap");
 const minimapPages = document.querySelector("#minimap-pages");
 const minimapViewport = document.querySelector("#minimap-viewport");
 const rotateLeftButton = document.querySelector("#rotate-left");
 const rotateRightButton = document.querySelector("#rotate-right");
 const minimapToggle = document.querySelector("#show-minimap");
+const minimapModeButton = document.querySelector("#minimap-mode");
+const minimapModeIcon = document.querySelector("#minimap-mode-icon");
+const minimapSwapSideButton = document.querySelector("#minimap-swap-side");
+const minimapCollapseButton = document.querySelector("#minimap-collapse");
 
 const MINIMAP_STORAGE_KEY = "pdf-viewer-show-minimap";
+const MINIMAP_MODE_STORAGE_KEY = "pdf-viewer-minimap-mode";
+const MINIMAP_SIDE_STORAGE_KEY = "pdf-viewer-minimap-side";
+const MINIMAP_COLLAPSED_STORAGE_KEY = "pdf-viewer-minimap-collapsed";
 const MINIMAP_RENDER_CONCURRENCY = 4;
 const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
 const MINIMAP_THUMBNAIL_WIDTH = 80;
 const MINIMAP_THUMBNAIL_RENDER_WIDTH = 40;
-const MINIMAP_STRIP_MAX_HEIGHT = 2048;
+const MINIMAP_STRIP_MAX_HEIGHT = 32767;
 const WHEEL_LINE_HEIGHT = 16;
 let syncFrame;
 let dragging = false;
 let dragOffset = 0;
 let viewportHeight = 18;
 let mapHeight = 0;
+let mapOffset = 0;
 let thumbnailDocument;
 let thumbnailFingerprint;
 let thumbnailGeneration = 0;
@@ -40,21 +49,93 @@ function minimapEnabled() {
   return !document.documentElement.classList.contains("minimap-disabled");
 }
 
+function minimapCollapsed() {
+  return document.documentElement.classList.contains("minimap-collapsed");
+}
+
+function minimapMode() {
+  return document.documentElement.classList.contains("minimap-local") ? "local" : "overview";
+}
+
+function setMinimapAccessibility() {
+  const interactive = minimapEnabled() && !minimapCollapsed();
+  minimap.setAttribute("aria-hidden", String(!interactive));
+  minimap.tabIndex = interactive ? 0 : -1;
+  minimapShell?.setAttribute("data-collapsed", String(minimapCollapsed()));
+}
+
 function setMinimapEnabled(enabled, persist = true) {
   document.documentElement.classList.toggle("minimap-disabled", !enabled);
   minimapToggle.checked = enabled;
-  minimap.setAttribute("aria-hidden", String(!enabled));
-  minimap.tabIndex = enabled ? 0 : -1;
+  setMinimapAccessibility();
 
   if (persist) {
     localStorage.setItem(MINIMAP_STORAGE_KEY, String(enabled));
   }
 
-  if (enabled) {
+  if (enabled && !minimapCollapsed()) {
     scheduleSync();
   }
 
   window.dispatchEvent(new Event("resize"));
+}
+
+function setMinimapMode(mode, persist = true) {
+  const local = mode === "local";
+  document.documentElement.classList.toggle("minimap-local", local);
+  minimapModeButton?.setAttribute("aria-pressed", String(local));
+  if (minimapModeIcon) {
+    minimapModeIcon.textContent = local ? "☷" : "▥";
+  }
+  if (minimapModeButton) {
+    const label = local ? "Use full-document minimap" : "Use local page navigator";
+    minimapModeButton.setAttribute("aria-label", label);
+    minimapModeButton.title = label;
+  }
+
+  if (persist) {
+    localStorage.setItem(MINIMAP_MODE_STORAGE_KEY, local ? "local" : "overview");
+    window.dispatchEvent(new Event("resize"));
+  }
+
+  scheduleSync();
+}
+
+function setMinimapSide(side, persist = true) {
+  const left = side === "left";
+  document.documentElement.classList.toggle("minimap-left", left);
+  if (minimapSwapSideButton) {
+    const label = left ? "Move minimap to the right" : "Move minimap to the left";
+    minimapSwapSideButton.setAttribute("aria-label", label);
+    minimapSwapSideButton.title = label;
+  }
+
+  if (persist) {
+    localStorage.setItem(MINIMAP_SIDE_STORAGE_KEY, left ? "left" : "right");
+    window.dispatchEvent(new Event("resize"));
+  }
+
+  scheduleSync();
+}
+
+function setMinimapCollapsed(collapsed, persist = true) {
+  document.documentElement.classList.toggle("minimap-collapsed", collapsed);
+  if (minimapCollapseButton) {
+    const label = collapsed ? "Expand minimap" : "Collapse minimap";
+    minimapCollapseButton.setAttribute("aria-label", label);
+    minimapCollapseButton.setAttribute("aria-expanded", String(!collapsed));
+    minimapCollapseButton.title = label;
+  }
+  setMinimapAccessibility();
+
+  if (persist) {
+    localStorage.setItem(MINIMAP_COLLAPSED_STORAGE_KEY, String(collapsed));
+    window.dispatchEvent(new Event("resize"));
+  }
+
+  if (!collapsed) {
+    scheduleSync();
+  }
 }
 
 function scheduleSync() {
@@ -101,7 +182,7 @@ function viewportTopFromScrollPosition() {
 }
 
 function syncMinimap() {
-  if (!minimap || minimap.clientHeight === 0) {
+  if (!minimap || minimap.clientHeight === 0 || minimapCollapsed()) {
     return;
   }
 
@@ -110,23 +191,26 @@ function syncMinimap() {
   const trackHeight = minimap.clientHeight;
   const { scrollMaximum } = documentMetrics();
 
-  // Keep page thumbnails contiguous and compress long documents to the available track height.
   const pageWidth = pages[0]?.getBoundingClientRect().width || 1;
   const thumbnailWidth = tiles[0]?.clientWidth || MINIMAP_THUMBNAIL_WIDTH;
   const widthScale = thumbnailWidth / pageWidth;
   const widthScaledHeights = pages.map((page) => page.getBoundingClientRect().height * widthScale);
   const widthScaledHeight = widthScaledHeights.reduce((total, height) => total + height, 0);
-  const heightCompression = widthScaledHeight > trackHeight ? trackHeight / widthScaledHeight : 1;
+  const heightCompression =
+    minimapMode() === "overview" && widthScaledHeight > trackHeight
+      ? trackHeight / widthScaledHeight
+      : 1;
   const scale = widthScale * heightCompression;
   const tileHeights = pages.map((page) => page.getBoundingClientRect().height * scale);
   const contentHeight = tileHeights.reduce((total, height) => total + height, 0);
-  mapHeight = Math.min(trackHeight, contentHeight);
+  mapHeight = minimapMode() === "overview" ? Math.min(trackHeight, contentHeight) : contentHeight;
+
   const strip = minimapPages.querySelector(".minimap-strip");
   if (strip) {
     strip.style.height = `${mapHeight}px`;
   }
-  const scrollRatio = scrollMaximum > 0 ? clamp(window.scrollY / scrollMaximum, 0, 1) : 0;
 
+  const scrollRatio = scrollMaximum > 0 ? clamp(window.scrollY / scrollMaximum, 0, 1) : 0;
   let packedTop = 0;
   pages.forEach((page, index) => {
     const tile = tiles[index];
@@ -138,13 +222,19 @@ function syncMinimap() {
   });
 
   viewportHeight = Math.min(
-    mapHeight,
+    Math.max(mapHeight, 0),
     Math.max(18, window.innerHeight * scale),
   );
   const viewportTravel = Math.max(mapHeight - viewportHeight, 0);
   const viewportTop = clamp(scrollRatio, 0, 1) * viewportTravel;
+  const mapTravel = Math.max(mapHeight - trackHeight, 0);
+  mapOffset =
+    minimapMode() === "local"
+      ? clamp(viewportTop + viewportHeight / 2 - trackHeight / 2, 0, mapTravel)
+      : 0;
 
-  minimapViewport.style.top = `${viewportTop}px`;
+  minimapPages.style.transform = `translateY(${-mapOffset}px)`;
+  minimapViewport.style.top = `${viewportTop - mapOffset}px`;
   minimapViewport.style.height = `${viewportHeight}px`;
   minimap.setAttribute("aria-valuemax", String(Math.round(scrollMaximum)));
   minimap.setAttribute("aria-valuenow", String(Math.round(window.scrollY)));
@@ -433,13 +523,17 @@ function pointerPosition(event) {
   return clamp(event.clientY - rect.top, 0, rect.height);
 }
 
+function pointerMapPosition(event) {
+  return pointerPosition(event) + mapOffset;
+}
+
 minimap.addEventListener("pointerdown", (event) => {
   if (event.button !== 0) {
     return;
   }
 
-  const y = pointerPosition(event);
-  const currentTop = Number.parseFloat(minimapViewport.style.top) || 0;
+  const y = pointerMapPosition(event);
+  const currentTop = viewportTopFromScrollPosition();
   const currentBottom = currentTop + viewportHeight;
 
   dragging = true;
@@ -454,7 +548,7 @@ minimap.addEventListener("pointermove", (event) => {
     return;
   }
 
-  scrollFromViewportTop(pointerPosition(event) - dragOffset);
+  scrollFromViewportTop(pointerMapPosition(event) - dragOffset);
 });
 
 function endDrag(event) {
@@ -512,6 +606,15 @@ minimap.addEventListener("keydown", (event) => {
 
 rotateLeftButton?.addEventListener("click", () => rerenderThumbnails(-90));
 rotateRightButton?.addEventListener("click", () => rerenderThumbnails(90));
+minimapModeButton?.addEventListener("click", () => {
+  setMinimapMode(minimapMode() === "overview" ? "local" : "overview");
+});
+minimapSwapSideButton?.addEventListener("click", () => {
+  setMinimapSide(document.documentElement.classList.contains("minimap-left") ? "right" : "left");
+});
+minimapCollapseButton?.addEventListener("click", () => {
+  setMinimapCollapsed(!minimapCollapsed());
+});
 minimapToggle.addEventListener("change", () => {
   setMinimapEnabled(minimapToggle.checked);
   if (minimapToggle.checked) {
@@ -522,6 +625,12 @@ minimapToggle.addEventListener("change", () => {
 });
 
 const storedMinimapPreference = localStorage.getItem(MINIMAP_STORAGE_KEY);
+const storedMinimapMode = localStorage.getItem(MINIMAP_MODE_STORAGE_KEY);
+const storedMinimapSide = localStorage.getItem(MINIMAP_SIDE_STORAGE_KEY);
+const storedMinimapCollapsed = localStorage.getItem(MINIMAP_COLLAPSED_STORAGE_KEY);
+setMinimapMode(storedMinimapMode === "local" ? "local" : "overview", false);
+setMinimapSide(storedMinimapSide === "left" ? "left" : "right", false);
+setMinimapCollapsed(storedMinimapCollapsed === "true", false);
 setMinimapEnabled(storedMinimapPreference !== "false", false);
 
 if (!minimapEnabled() || window.innerWidth <= 700) {
