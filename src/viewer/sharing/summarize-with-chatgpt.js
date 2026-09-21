@@ -1,24 +1,10 @@
+import { resolveDocumentReferenceUrl } from "../document-reference-url.js";
+
 const summarizeButton = document.querySelector("#summarize-chatgpt");
-const source = new URLSearchParams(window.location.search).get("url");
 const STORAGE_PREFIX = "pdf-viewer-chatgpt-summary:";
 const CHATGPT_URL = "https://chatgpt.com/";
 const defaultTitle = summarizeButton.title;
 let titleResetTimer;
-
-async function resolveOriginalFileUrl() {
-  if (chrome.mimeHandler?.getStreamInfo) {
-    try {
-      const streamInfo = await chrome.mimeHandler.getStreamInfo();
-      if (streamInfo?.originalUrl) {
-        return new URL(streamInfo.originalUrl).href;
-      }
-    } catch {
-      // Fall back to an explicit viewer URL below.
-    }
-  }
-
-  return source ? new URL(source).href : null;
-}
 
 function showTemporaryTitle(title) {
   clearTimeout(titleResetTimer);
@@ -79,7 +65,7 @@ summarizeButton.addEventListener("click", async () => {
   summarizeButton.disabled = true;
 
   try {
-    const fileUrl = await resolveOriginalFileUrl();
+    const fileUrl = await resolveDocumentReferenceUrl();
     if (!fileUrl) {
       showTemporaryTitle("No PDF URL available");
       return;
