@@ -1,3 +1,5 @@
+import "./accent-color.js";
+
 const PRESERVE_IMAGE_COLORS_STORAGE_KEY = "pdf-viewer-preserve-image-colors";
 const IMAGE_CORNER_RADIUS_CSS_PX = 8;
 const preserveImageColorsToggle = document.querySelector("#preserve-image-colors");
