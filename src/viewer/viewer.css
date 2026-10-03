@@ -526,6 +526,7 @@ input {
   position: relative;
   width: min(1100px, calc(100vw - 32px));
   aspect-ratio: var(--page-ratio, 8.5 / 11);
+  border-radius: 8px;
   overflow: hidden;
   background: var(--page-bg);
 }
