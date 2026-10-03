@@ -15,6 +15,7 @@ A Chrome Manifest V3 extension that replaces the normal PDF tab with a local PDF
 - Places Download beside the page-link icon and keeps rotate left/right and print in the **More tools** menu.
 - Keeps the More tools menu open across repeated rotate actions.
 - Lazy-renders nearby pages so long filings do not render every page up front.
+- Shows a PDF Enhancer button in the top-left section slot when a document has no section navigator; enhanced local copies retain the original web reference URL for link copying and ChatGPT summaries.
 
 ## Load directly in Chrome
 
@@ -32,6 +33,20 @@ Then:
 4. Select the repository root — the folder containing `manifest.json`.
 
 The root manifest points directly at the source files and local `node_modules`, so a separate build step is not required for normal local development.
+
+## PDF enhancer integration
+
+The viewer can hand the current PDF to the local [PDF-magic/enhancer](https://github.com/PDF-magic/enhancer) workflow. The enhancer button occupies the top-left section-control slot only when the PDF has no section navigator.
+
+Chrome extensions cannot start local processes directly, so register the included native-messaging host after loading the unpacked extension. Copy the extension ID from `chrome://extensions`, then run:
+
+```sh
+./native/install-host.sh CHROME_EXTENSION_ID /path/to/PDF-magic/enhancer
+```
+
+The host runs `ocr-scanned-pdf.sh`, writes a new local `*-enhanced-ocr.pdf` copy, and stamps the original reference URL into the PDF as `PDFMagicSourceURL` metadata. The current tab is replaced with the enhanced local copy. Copy File URL, Copy Page Link, and Summarize with ChatGPT then use the preserved reference URL instead of the local `file://` path.
+
+Chrome may require **Allow access to file URLs** for the unpacked extension so the enhanced local PDF reopens in this viewer.
 
 ## Build a standalone extension folder
 

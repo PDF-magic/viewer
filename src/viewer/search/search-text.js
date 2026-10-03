@@ -1,5 +1,5 @@
 export function normalizeSearchText(value) {
-  return value.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g, " ").trim();
+  return value.normalize("NFKC").toLocaleLowerCase().replace(/[\s\u200B-\u200D\u2060\uFEFF]+/gu, " ").trim();
 }
 
 export function prepareSearchText(value, normalizedQuery) {
