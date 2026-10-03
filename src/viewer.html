@@ -108,6 +108,10 @@
           </button>
           <button id="qr-file-url" class="tool-button" type="button" role="menuitem">▦ <span>QR file URL</span></button>
           <div class="menu-separator" role="separator"></div>
+          <button id="choose-loading-image" class="tool-button" type="button" role="menuitem">▧ <span>Custom loading image…</span></button>
+          <button id="reset-loading-image" class="tool-button" type="button" role="menuitem" hidden>↺ <span>Use default loading image</span></button>
+          <input id="custom-loading-image" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
+          <div class="menu-separator" role="separator"></div>
           <label class="tool-toggle" title="Use the document minimap instead of the browser scrollbar">
             <span>Show minimap</span>
             <input id="show-minimap" class="checkbox-input" type="checkbox" checked />
@@ -155,6 +159,7 @@
 
     <script src="viewer/navigation/toolbar-layout.js"></script>
     <script src="viewer/network-fallback.js"></script>
+    <script type="module" src="viewer/loading-image-setting.js"></script>
     <script type="module" src="viewer/theme/image-color-toggle.js"></script>
     <script type="module" src="viewer/document-identity.js"></script>
     <script type="module" src="viewer/viewer.js"></script>
