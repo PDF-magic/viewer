@@ -1,6 +1,7 @@
 import { AnnotationLayer, createValidAbsoluteUrl, getDocument, GlobalWorkerOptions, TextLayer, VerbosityLevel } from "../../node_modules/pdfjs-dist/build/pdf.mjs";
 import { EventBus, PDFLinkService } from "../../node_modules/pdfjs-dist/web/pdf_viewer.mjs";
 import { abandonPdfDocumentSession, publishPdfDocument } from "./pdf-document-session.js";
+import { resolveDocumentReferenceUrl } from "./document-reference-url.js";
 import { resolvePdfSource } from "./pdf-source.js";
 import { mergeWrappedUrlTextItems } from "./search/search-text-normalization.js";
 
@@ -1113,7 +1114,12 @@ async function rotatePages(delta) {
 }
 
 async function shareCurrentPage() {
-  const shareUrl = new URL(originalUrl.href);
+  const referenceUrl = await resolveDocumentReferenceUrl();
+  if (!referenceUrl) {
+    return;
+  }
+
+  const shareUrl = new URL(referenceUrl);
   shareUrl.hash = `page=${currentPage}`;
 
   try {

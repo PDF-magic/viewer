@@ -16,6 +16,15 @@
   </head>
   <body>
     <header class="toolbar" aria-label="PDF controls">
+      <div id="enhance-nav" class="section-nav" hidden>
+        <button
+          id="enhance-pdf"
+          class="mark-button section-toggle"
+          type="button"
+          aria-label="Enhance PDF"
+          title="Enhance PDF"
+        >✦</button>
+      </div>
       <div id="section-nav" class="section-nav" hidden>
         <button
           id="section-toggle"
@@ -224,6 +233,7 @@
     <script src="viewer/clipboard-fallback.js"></script>
     <script type="module" src="viewer/theme/image-color-toggle.js"></script>
     <script type="module" src="viewer/document-identity.js"></script>
+    <script type="module" src="viewer/enhance-pdf.js"></script>
     <script type="module" src="viewer/viewer.js"></script>
     <script type="module" src="viewer/navigation/rapid-page-navigation.js"></script>
     <script type="module" src="viewer/selection/text-selection.js"></script>

@@ -1,26 +1,12 @@
+import { resolveDocumentReferenceUrl } from "../document-reference-url.js";
+
 const copyFileUrlButton = document.querySelector("#copy-file-url");
-const source = new URLSearchParams(window.location.search).get("url");
 const defaultTitle = copyFileUrlButton.title;
 let titleResetTimer;
 
-async function resolveOriginalFileUrl() {
-  if (globalThis.chrome?.mimeHandler?.getStreamInfo) {
-    try {
-      const streamInfo = await chrome.mimeHandler.getStreamInfo();
-      if (streamInfo?.originalUrl) {
-        return new URL(streamInfo.originalUrl).href;
-      }
-    } catch {
-      // Explicit viewer URLs remain usable outside the MIME handler.
-    }
-  }
-
-  return source ? new URL(source).href : null;
-}
-
 copyFileUrlButton.addEventListener("click", async () => {
   try {
-    const fileUrl = await resolveOriginalFileUrl();
+    const fileUrl = await resolveDocumentReferenceUrl();
     if (!fileUrl) {
       throw new Error("File URL unavailable");
     }

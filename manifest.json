@@ -7,7 +7,8 @@
     "tabs",
     "webRequest",
     "clipboardWrite",
-    "storage"
+    "storage",
+    "nativeMessaging"
   ],
   "host_permissions": [
     "<all_urls>"
