@@ -4,6 +4,7 @@ const ARROW_CLASS = "search-line-arrow";
 const ACTIVE_CLASS = "search-highlight-active";
 
 let arrowFrame;
+let lastScrolledMatchKey = "";
 
 function parseSearchPosition() {
   const match = searchCount.textContent.match(/^\s*(\d+)\s*\/\s*(\d+)\s*$/);
@@ -40,12 +41,27 @@ function refreshActiveSearchCue() {
 
   removeSearchCues();
 
-  if (!searchPosition || !page || !highlights[activeOrdinal]) {
+  if (!searchPosition || !page) {
+    lastScrolledMatchKey = "";
+    return;
+  }
+
+  if (!highlights[activeOrdinal]) {
     return;
   }
 
   const activeHighlight = highlights[activeOrdinal];
+  const scrollKey = `${page.dataset.page ?? ""}:${activeOrdinal}:${searchPosition.position}/${searchPosition.total}`;
   activeHighlight.classList.add(ACTIVE_CLASS);
+
+  if (scrollKey !== lastScrolledMatchKey) {
+    lastScrolledMatchKey = scrollKey;
+    activeHighlight.scrollIntoView({
+      behavior: "instant",
+      block: "center",
+      inline: "nearest",
+    });
+  }
 
   const pageRect = page.getBoundingClientRect();
   const rect = activeHighlight.getBoundingClientRect();
