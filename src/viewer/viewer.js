@@ -4,6 +4,7 @@ import { abandonPdfDocumentSession, publishPdfDocument } from "./pdf-document-se
 import { resolveDocumentReferenceUrl } from "./document-reference-url.js";
 import { resolvePdfSource } from "./pdf-source.js";
 import { mergeWrappedUrlTextItems } from "./search/search-text-normalization.js";
+import { normalizeSearchText, prepareSearchText } from "./search/search-text.js";
 
 const sourceMode = window.location.pathname.includes("/src/");
 
@@ -887,14 +888,6 @@ function createPagePlaceholders(sampleViewport) {
   viewer.append(fragment);
 }
 
-function normalizeSearchText(value) {
-  return value
-    .normalize("NFKC")
-    .toLocaleLowerCase()
-    .replace(/[\s\u200B-\u200D\u2060\uFEFF]+/gu, " ")
-    .trim();
-}
-
 async function getPageSearchText(pageNumber) {
   if (pageTextCache.has(pageNumber)) {
     return pageTextCache.get(pageNumber);
@@ -959,6 +952,7 @@ function showSearchMatch(index, behavior = "auto") {
 
 async function runSearch(rawQuery) {
   const query = normalizeSearchText(rawQuery);
+  const comparableQuery = prepareSearchText(query, query);
   const requestId = ++searchRequestId;
   const searchStartPage = currentPage;
 
@@ -980,6 +974,7 @@ async function runSearch(rawQuery) {
 
   for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
     const pageText = await getPageSearchText(pageNumber);
+    const comparablePageText = prepareSearchText(pageText, query);
 
     if (requestId !== searchRequestId) {
       return;
@@ -987,14 +982,14 @@ async function runSearch(rawQuery) {
 
     let offset = 0;
     let ordinal = 0;
-    while (offset <= pageText.length - query.length) {
-      const matchOffset = pageText.indexOf(query, offset);
+    while (offset <= comparablePageText.length - comparableQuery.length) {
+      const matchOffset = comparablePageText.indexOf(comparableQuery, offset);
       if (matchOffset === -1) {
         break;
       }
 
       matches.push({ pageNumber, offset: matchOffset, ordinal: ordinal++ });
-      offset = matchOffset + Math.max(query.length, 1);
+      offset = matchOffset + Math.max(comparableQuery.length, 1);
     }
   }
 

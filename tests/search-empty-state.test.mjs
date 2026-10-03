@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const viewerSource = readFileSync(new URL("../src/viewer/viewer.js", import.meta.url), "utf8");
+const normalizerSource = readFileSync(new URL('../src/viewer/search/search-text.js', import.meta.url), 'utf8');
 const viewerStyles = readFileSync(new URL("../src/viewer/viewer.css", import.meta.url), "utf8");
 
 test("zero-result searches use a distinct error-colored state", () => {
@@ -18,7 +19,7 @@ test("search scheduling normalizes leading and invisible whitespace", () => {
     "scheduleSearch should use the shared search normalizer",
   );
   assert.ok(
-    viewerSource.includes('.replace(/[\\s\\u200B-\\u200D\\u2060\\uFEFF]+/gu, " ")'),
+    normalizerSource.includes('.replace(/[\\s\\u200B-\\u200D\\u2060\\uFEFF]+/gu, " ")'),
     "search normalization should collapse invisible whitespace separators",
   );
   assert.ok(
