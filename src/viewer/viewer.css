@@ -64,13 +64,12 @@ html {
   scroll-behavior: smooth;
 }
 
-.minimap-preparing .page,
-.minimap-preparing .minimap {
+html:not(.document-ready) .page {
   visibility: hidden;
   opacity: 0;
 }
 
-html:not(.minimap-preparing) .status:not(.error) {
+.document-ready .status:not(.error) {
   display: none;
 }
 
