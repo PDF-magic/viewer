@@ -3,20 +3,35 @@
   "name": "✨",
   "version": "0.1.0",
   "description": "Dark-mode PDF viewer with shareable current-page links.",
-  "permissions": ["tabs", "webRequest", "clipboardWrite", "storage"],
-  "host_permissions": ["<all_urls>"],
+  "permissions": [
+    "tabs",
+    "webRequest",
+    "clipboardWrite",
+    "storage"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "background": {
     "service_worker": "src/background.js"
   },
   "content_scripts": [
     {
-      "matches": ["https://www.sec.gov/*"],
-      "js": ["src/content/sec-comment.js"],
+      "matches": [
+        "https://www.sec.gov/*"
+      ],
+      "js": [
+        "src/content/sec-comment.js"
+      ],
       "run_at": "document_start"
     },
     {
-      "matches": ["https://chatgpt.com/*"],
-      "js": ["src/content/chatgpt-summary.js"],
+      "matches": [
+        "https://chatgpt.com/*"
+      ],
+      "js": [
+        "src/content/chatgpt-summary.js"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -38,5 +53,15 @@
   },
   "content_security_policy": {
     "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
-  }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/assets/sweetie-bot.png"
+      ],
+      "matches": [
+        "https://www.sec.gov/*"
+      ]
+    }
+  ]
 }

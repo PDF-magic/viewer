@@ -107,6 +107,35 @@ test('dragging to the end reaches the document end for short and long maps', () 
 });
 
 
+test('dragging the viewport follows the latest pointer position immediately', () => {
+  const f = fixture(100);
+  f.track.getBoundingClientRect = () => ({ top: 0, height: f.track.clientHeight });
+  f.track.setPointerCapture = () => {};
+
+  let prevented = false;
+  f.listeners.pointerdown({
+    button: 0,
+    clientY: 9,
+    pointerId: 1,
+    preventDefault() { prevented = true; },
+  });
+  f.listeners.pointermove({
+    clientY: 100,
+    getCoalescedEvents() {
+      return [{ clientY: 400 }];
+    },
+  });
+
+  const viewportTop = 391;
+  const viewportTravel = vm.runInContext('mapHeight - viewportHeight', f.context);
+  const maximum = 100 * 1420 - f.window.innerHeight;
+  assert.ok(prevented);
+  assert.equal(parseFloat(f.viewport.style.top), viewportTop);
+  assert.ok(Math.abs(f.window.scrollY - viewportTop / viewportTravel * maximum) < 0.00001);
+  assert.match(source, /function scheduleSync\(\) \{[\s\S]*?syncFrame \|\| dragging/);
+});
+
+
 test('wheel navigation uses compact map travel and current scroll position in every delta mode', () => {
   for (const count of [2, 100]) {
     for (const deltaMode of [0, 1, 2]) {
@@ -148,23 +177,23 @@ test('minimap toggle persists visibility and updates accessibility state', () =>
 });
 
 test('the document becomes ready before the minimap finishes in the background', () => {
-  assert.match(source, /MINIMAP_RENDER_CONCURRENCY\\s*=\\s*4/);
-  assert.match(source, /await Promise\\.all\\(/);
-  assert.match(source, /requestIdleCallback\\(start, \\{ timeout: 1200 \\}\\)/);
-  assert.match(source, /window\\.addEventListener\\("pdf-viewer-document-ready", scheduleThumbnailPreparation\\)/);
-  assert.match(source, /void loadThumbnailDocument\\(loadGeneration\\)[\\s\\S]*?\\.finally\\(finishMinimapPreparation\\)/);
-  assert.match(source, /classList\\.add\\("minimap-ready"\\)/);
-  assert.match(source, /classList\\.toggle\\("minimap-preparing", false\\)/);
-  assert.match(viewerSource, /requiredPageCount\\s*=\\s*Math\\.min\\(2, pdfDocument\\.numPages\\)/);
-  assert.match(viewerSource, /classList\\.add\\("document-ready"\\)/);
-  assert.match(viewerSource, /dispatchEvent\\(new Event\\("pdf-viewer-document-ready"\\)\\)/);
+  assert.match(source, /MINIMAP_RENDER_CONCURRENCY\s*=\s*4/);
+  assert.match(source, /await Promise\.all\(/);
+  assert.match(source, /requestIdleCallback\(start, \{ timeout: 1200 \}\)/);
+  assert.match(source, /window\.addEventListener\("pdf-viewer-document-ready", scheduleThumbnailPreparation\)/);
+  assert.match(source, /void loadThumbnailDocument\(loadGeneration\)[\s\S]*?\.finally\(finishMinimapPreparation\)/);
+  assert.match(source, /classList\.add\("minimap-ready"\)/);
+  assert.match(source, /classList\.toggle\("minimap-preparing", false\)/);
+  assert.match(viewerSource, /requiredPageCount\s*=\s*Math\.min\(2, pdfDocument\.numPages\)/);
+  assert.match(viewerSource, /classList\.add\("document-ready"\)/);
+  assert.match(viewerSource, /dispatchEvent\(new Event\("pdf-viewer-document-ready"\)\)/);
   assert.doesNotMatch(viewerSource, /minimap-ready/);
-  assert.match(viewerSource, /goToPage\\(currentPage, "auto"\\);\\s*keepRenderWindow\\(currentPage\\);/);
-  assert.doesNotMatch(viewerSource, /status\\.remove\\(\\)/);
-  assert.match(viewerStyles, /html:not\\(\\.document-ready\\) \\.page\\s*\\{[\\s\\S]*?visibility:\\s*hidden/);
-  assert.match(viewerStyles, /\\.document-ready \\.status:not\\(\\.error\\)\\s*\\{[\\s\\S]*?display:\\s*none/);
-  assert.doesNotMatch(viewerStyles, /\\.minimap-preparing \\.page/);
-  assert.match(styles, /\\.minimap-preparing \\.minimap\\s*\\{[\\s\\S]*?translateX\\(110%\\)/);
+  assert.match(viewerSource, /goToPage\(currentPage, "auto"\);\s*keepRenderWindow\(currentPage\);/);
+  assert.doesNotMatch(viewerSource, /status\.remove\(\)/);
+  assert.match(viewerStyles, /html:not\(\.document-ready\) \.page\s*\{[\s\S]*?visibility:\s*hidden/);
+  assert.match(viewerStyles, /\.document-ready \.status:not\(\.error\)\s*\{[\s\S]*?display:\s*none/);
+  assert.doesNotMatch(viewerStyles, /\.minimap-preparing \.page/);
+  assert.match(styles, /\.minimap-preparing \.minimap\s*\{[\s\S]*?translateX\(110%\)/);
   assert.match(styles, /transform 1100ms cubic-bezier/);
 });
 
@@ -172,7 +201,7 @@ test('thumbnail edges fade softly into the minimap background', () => {
   assert.doesNotMatch(styles, /\.minimap\s*\{[\s\S]*?border-left:/);
   assert.match(styles, /\.minimap-strip\s*\{[\s\S]*?-webkit-mask-image:\s*linear-gradient\(/);
   assert.match(styles, /\.minimap-strip\s*\{[\s\S]*?mask-image:\s*linear-gradient\(/);
-  assert.match(styles, /transparent[\s\S]*?#000 10%[\s\S]*?#000 90%[\s\S]*?transparent/);
+  assert.match(styles, /transparent[\s\S]*?#000 6%[\s\S]*?#000 94%[\s\S]*?transparent/);
 });
 
 test('thumbnail canvases render below their displayed width', () => {
@@ -190,7 +219,7 @@ test('persistent thumbnails and their work follow the global minimap preference'
   assert.match(source, /if \(thumbnailPreparationStarted \|\| !minimapEnabled\(\) \|\| window\.innerWidth <= 700\)/);
   assert.match(source, /else \{\s*stopThumbnailPreparation\(\);/);
   assert.match(source, /thumbnailLoadGeneration \+= 1;[\s\S]*?thumbnailDocument = undefined/);
-  assert.match(source, /startThumbnailPreparation\(\);\s*$/);
+  assert.match(source, /scheduleThumbnailPreparation\(\);\s*$/);
   assert.doesNotMatch(source, /void loadThumbnailDocument\(\)\.catch/);
 });
 

@@ -59,12 +59,15 @@ function setMinimapEnabled(enabled, persist = true) {
 }
 
 function scheduleSync() {
-  if (!minimapEnabled() || syncFrame) {
+  if (!minimapEnabled() || syncFrame || dragging) {
     return;
   }
 
   syncFrame = requestAnimationFrame(() => {
     syncFrame = undefined;
+    if (dragging) {
+      return;
+    }
     syncMinimap();
   });
 }
@@ -451,6 +454,13 @@ function scrollFromViewportTop(viewportTop) {
   window.scrollTo({ top: ratio * scrollMaximum, behavior: "auto" });
 }
 
+function dragViewportTo(viewportTop) {
+  const viewportTravel = Math.max(mapHeight - viewportHeight, 0);
+  const clampedTop = clamp(viewportTop, 0, viewportTravel);
+  minimapViewport.style.top = `${clampedTop}px`;
+  scrollFromViewportTop(clampedTop);
+}
+
 function normalizedWheelDelta(event) {
   if (event.deltaMode === WheelEvent.DOM_DELTA_LINE) {
     return event.deltaY * WHEEL_LINE_HEIGHT;
@@ -480,7 +490,7 @@ minimap.addEventListener("pointerdown", (event) => {
   dragging = true;
   dragOffset = y >= currentTop && y <= currentBottom ? y - currentTop : viewportHeight / 2;
   minimap.setPointerCapture(event.pointerId);
-  scrollFromViewportTop(y - dragOffset);
+  dragViewportTo(y - dragOffset);
   event.preventDefault();
 });
 
@@ -489,7 +499,11 @@ minimap.addEventListener("pointermove", (event) => {
     return;
   }
 
-  scrollFromViewportTop(pointerPosition(event) - dragOffset);
+  const coalescedEvents = event.getCoalescedEvents?.();
+  const pointerEvent = coalescedEvents?.length
+    ? coalescedEvents[coalescedEvents.length - 1]
+    : event;
+  dragViewportTo(pointerPosition(pointerEvent) - dragOffset);
 });
 
 function endDrag(event) {
@@ -501,6 +515,7 @@ function endDrag(event) {
   if (minimap.hasPointerCapture(event.pointerId)) {
     minimap.releasePointerCapture(event.pointerId);
   }
+  scheduleSync();
 }
 
 minimap.addEventListener("pointerup", endDrag);
