@@ -9,6 +9,7 @@ test("the standalone preview keeps the loading state visible", () => {
   assert.match(preview, /<html lang="en" class="minimap-preparing">/);
   assert.match(preview, /<div class="status">Loading PDF…<\/div>/);
   assert.match(styles, /\.status:not\(\.error\)::before/);
-  assert.match(styles, /rainbow-dash-wonderbolt-loader\.svg/);
+  assert.match(styles, /rainbow-dash-speedster\.png/);
+  assert.match(styles, /background: var\(--loading-image\) center \/ contain no-repeat/);
   assert.doesNotMatch(styles, /content:\s*"Loading PDF…"/);
 });

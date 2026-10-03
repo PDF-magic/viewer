@@ -70,15 +70,15 @@
           <button id="search-next" class="search-nav-button" type="button" aria-label="Next search result" title="Next result" disabled>↓</button>
         </div>
       </div>
-      <div class="search-actions" role="group" aria-label="Document actions">
+      <div class="search-actions" role="group" aria-label="Actions">
         <button id="summarize-chatgpt" class="mark-button" type="button" aria-label="Summarize with ChatGPT" title="Summarize with ChatGPT">
           <img src="assets/sweetie-bot.png" alt="" aria-hidden="true" />
         </button>
-        <button id="download-pdf" class="mark-button" type="button" aria-label="Download PDF" title="Download PDF">
-          <img src="assets/download-icon.png" alt="" aria-hidden="true" />
-        </button>
       </div>
       <div class="spacer"></div>
+      <button id="download-pdf" class="mark-button" type="button" aria-label="Download PDF" title="Download PDF">
+        <img src="assets/download-icon.png" alt="" aria-hidden="true" />
+      </button>
       <button id="theme-toggle" class="mark-button theme-button" type="button" aria-label="Switch theme" title="Switch theme">
         <img id="theme-icon" alt="" aria-hidden="true" />
       </button>
@@ -107,6 +107,10 @@
             <span>Print</span>
           </button>
           <button id="qr-file-url" class="tool-button" type="button" role="menuitem">▦ <span>QR file URL</span></button>
+          <div class="menu-separator" role="separator"></div>
+          <button id="choose-loading-image" class="tool-button" type="button" role="menuitem">▧ <span>Custom loading image…</span></button>
+          <button id="reset-loading-image" class="tool-button" type="button" role="menuitem" hidden>↺ <span>Use default loading image</span></button>
+          <input id="custom-loading-image" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
           <div class="menu-separator" role="separator"></div>
           <label class="tool-toggle" title="Use the document minimap instead of the browser scrollbar">
             <span>Show minimap</span>
@@ -182,6 +186,8 @@
 
     <script src="viewer/navigation/toolbar-layout.js"></script>
     <script src="viewer/network-fallback.js"></script>
+    <script type="module" src="viewer/loading-image-setting.js"></script>
+    <script src="viewer/clipboard-fallback.js"></script>
     <script type="module" src="viewer/theme/image-color-toggle.js"></script>
     <script type="module" src="viewer/document-identity.js"></script>
     <script type="module" src="viewer/viewer.js"></script>

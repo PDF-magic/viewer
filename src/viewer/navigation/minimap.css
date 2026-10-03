@@ -25,7 +25,7 @@
 }
 
 .minimap-shell {
-  --minimap-accent: #43af49;
+  --minimap-accent: var(--accent, #43af49);
   position: fixed;
   inset: 52px 0 0 auto;
   z-index: 9;
@@ -34,6 +34,11 @@
   min-height: 0;
   flex-direction: column;
   background: var(--toolbar-bg);
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    transform 1100ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 800ms ease;
   user-select: none;
 }
 
@@ -46,6 +51,13 @@
   background: var(--toolbar-bg);
   cursor: pointer;
   touch-action: none;
+}
+
+.minimap-preparing .minimap-shell {
+  visibility: hidden;
+  opacity: 0;
+  transform: translateX(110%);
+  pointer-events: none;
 }
 
 .minimap-left .minimap-shell {
@@ -93,27 +105,23 @@
   -webkit-mask-image: linear-gradient(
     to right,
     transparent,
-    rgb(0 0 0 / 35%) 4%,
-    #000 10%,
-    #000 90%,
-    rgb(0 0 0 / 35%) 96%,
+    rgb(0 0 0 / 70%) 2%,
+    #000 6%,
+    #000 94%,
+    rgb(0 0 0 / 70%) 98%,
     transparent
   );
   mask-image: linear-gradient(
     to right,
     transparent,
-    rgb(0 0 0 / 35%) 4%,
-    #000 10%,
-    #000 90%,
-    rgb(0 0 0 / 35%) 96%,
+    rgb(0 0 0 / 70%) 2%,
+    #000 6%,
+    #000 94%,
+    rgb(0 0 0 / 70%) 98%,
     transparent
   );
-  opacity: 0.82;
-  filter: var(--page-filter);
-}
-
-.minimap-local .minimap-strip {
-  opacity: 0.94;
+  opacity: 1;
+  filter: var(--page-filter) contrast(1.18);
 }
 
 .minimap-viewport {
@@ -216,8 +224,18 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .minimap-shell {
+    transition: none;
+  }
+}
+
 @media print {
   .minimap-shell {
     display: none !important;
   }
+}
+
+.minimap-left.minimap-preparing .minimap-shell {
+  transform: translateX(-110%);
 }
