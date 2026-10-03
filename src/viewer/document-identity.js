@@ -1,3 +1,5 @@
+import { formatMetadataDate } from "./metadata-date.js";
+
 const params = new URLSearchParams(window.location.search);
 const explicitSource = params.get("url");
 
@@ -37,6 +39,39 @@ async function resolveOriginalUrl() {
   }
 
   return explicitSource;
+}
+
+function formatVisibleMetadataDates() {
+  const metadataList = document.querySelector("#section-metadata-list");
+  if (!metadataList) {
+    return;
+  }
+
+  for (const row of metadataList.querySelectorAll(".section-metadata-row")) {
+    const label = row.querySelector("dt")?.textContent?.trim();
+    if (label !== "Created" && label !== "Modified") {
+      continue;
+    }
+
+    const description = row.querySelector("dd");
+    if (!description) {
+      continue;
+    }
+
+    const formatted = formatMetadataDate(description.textContent);
+    if (formatted !== description.textContent) {
+      description.textContent = formatted;
+    }
+  }
+}
+
+const metadataList = document.querySelector("#section-metadata-list");
+if (metadataList) {
+  new MutationObserver(formatVisibleMetadataDates).observe(metadataList, {
+    childList: true,
+    subtree: true,
+  });
+  formatVisibleMetadataDates();
 }
 
 const fileName = fileNameFromUrl(await resolveOriginalUrl());
