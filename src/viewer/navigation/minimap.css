@@ -67,26 +67,26 @@
   -webkit-mask-image: linear-gradient(
     to right,
     transparent,
-    rgb(0 0 0 / 35%) 4%,
-    #000 10%,
-    #000 90%,
-    rgb(0 0 0 / 35%) 96%,
+    rgb(0 0 0 / 70%) 2%,
+    #000 6%,
+    #000 94%,
+    rgb(0 0 0 / 70%) 98%,
     transparent
   );
   mask-image: linear-gradient(
     to right,
     transparent,
-    rgb(0 0 0 / 35%) 4%,
-    #000 10%,
-    #000 90%,
-    rgb(0 0 0 / 35%) 96%,
+    rgb(0 0 0 / 70%) 2%,
+    #000 6%,
+    #000 94%,
+    rgb(0 0 0 / 70%) 98%,
     transparent
   );
-  opacity: 0.82;
+  opacity: 1;
 }
 
 .minimap-strip {
-  filter: var(--page-filter);
+  filter: var(--page-filter) contrast(1.18);
 }
 
 .minimap-viewport {

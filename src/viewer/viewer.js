@@ -2,6 +2,7 @@ import { AnnotationLayer, createValidAbsoluteUrl, getDocument, GlobalWorkerOptio
 import { EventBus, PDFLinkService } from "../../node_modules/pdfjs-dist/web/pdf_viewer.mjs";
 import { abandonPdfDocumentSession, publishPdfDocument } from "./pdf-document-session.js";
 import { resolvePdfSource } from "./pdf-source.js";
+import { mergeWrappedUrlTextItems } from "./search/search-text-normalization.js";
 
 const sourceMode = window.location.pathname.includes("/src/");
 
@@ -884,7 +885,11 @@ function createPagePlaceholders(sampleViewport) {
 }
 
 function normalizeSearchText(value) {
-  return value.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g, " ").trim();
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[\s\u200B-\u200D\u2060\uFEFF]+/gu, " ")
+    .trim();
 }
 
 async function getPageSearchText(pageNumber) {
@@ -894,8 +899,9 @@ async function getPageSearchText(pageNumber) {
 
   const page = await pdfDocument.getPage(pageNumber);
   const textContent = await page.getTextContent();
+  const searchableItems = mergeWrappedUrlTextItems(textContent.items);
   const text = normalizeSearchText(
-    textContent.items.map((item) => ("str" in item ? item.str : "")).join(" "),
+    searchableItems.map((item) => ("str" in item ? item.str : "")).join(" "),
   );
 
   pageTextCache.set(pageNumber, text);
@@ -1015,7 +1021,7 @@ function scheduleSearch() {
   clearTimeout(searchTimer);
   searchRequestId += 1;
 
-  const query = searchInput.value.trim();
+  const query = normalizeSearchText(searchInput.value);
   if (!query) {
     resetSearchResults();
     return;
@@ -1050,9 +1056,40 @@ function stepSearch(delta) {
   }
 }
 
+function getSelectedPdfText() {
+  const selection = window.getSelection();
+
+  if (
+    !selection ||
+    selection.isCollapsed ||
+    !selection.anchorNode ||
+    !selection.focusNode ||
+    !viewer.contains(selection.anchorNode) ||
+    !viewer.contains(selection.focusNode)
+  ) {
+    return "";
+  }
+
+  return selection.toString().replace(/\s+/g, " ").trim();
+}
+
 function focusSearch() {
   searchInput.focus();
   searchInput.select();
+}
+
+function focusSearchFromSelection() {
+  const selectedText = getSelectedPdfText();
+
+  if (selectedText) {
+    searchInput.value = selectedText;
+  }
+
+  focusSearch();
+
+  if (selectedText) {
+    void runSearch(selectedText);
+  }
 }
 
 async function rotatePages(delta) {
@@ -1183,7 +1220,7 @@ function bindControls() {
       if (modifier && key === "f") {
         event.preventDefault();
         event.stopPropagation();
-        focusSearch();
+        focusSearchFromSelection();
         return;
       }
 
