@@ -184,12 +184,22 @@ function addZoomStyles() {
     .viewer {
       width: max-content;
       min-width: 100%;
+      --zoom-page-width: min(1100px, calc(100vw - 32px));
     }
 
     .page {
       flex: 0 0 auto;
-      width: var(--page-width, min(1100px, calc(100vw - 32px)));
+      width: var(--zoom-page-width);
       max-width: none;
+    }
+
+    .viewer[data-zoom-mode="fit-height"] .page {
+      width: auto;
+      height: var(--zoom-page-height);
+    }
+
+    .viewer:not([data-zoom-mode="fit-height"]) .page {
+      height: auto;
     }
 
     @media (max-width: 720px) {
@@ -215,6 +225,7 @@ function addZoomStyles() {
 
       .page {
         width: 100% !important;
+        height: auto !important;
       }
     }
   `;
@@ -336,45 +347,24 @@ function viewportPageHeight() {
   return Math.max(160, window.innerHeight - TOOLBAR_HEIGHT - PAGE_VERTICAL_GUTTER);
 }
 
-function pageRatio(pageElement) {
-  const rect = pageElement.getBoundingClientRect();
-  if (rect.width > 0 && rect.height > 0) {
-    return rect.width / rect.height;
+function applyZoomLayout() {
+  const viewer = document.querySelector("#viewer");
+  if (!viewer) {
+    return;
   }
 
-  const [width, height] = getComputedStyle(pageElement)
-    .aspectRatio.split("/")
-    .map((value) => Number.parseFloat(value.trim()));
-
-  if (Number.isFinite(width) && Number.isFinite(height) && height > 0) {
-    return width / height;
-  }
-
-  return 8.5 / 11;
-}
-
-function targetPageWidth(pageElement) {
-  const baseWidth = fitWidthBase();
+  viewer.dataset.zoomMode = zoomMode;
 
   if (zoomMode === "fit-height") {
-    return viewportPageHeight() * pageRatio(pageElement);
+    viewer.style.setProperty("--zoom-page-height", `${viewportPageHeight()}px`);
+    return;
   }
 
-  if (zoomMode === "custom") {
-    return baseWidth * zoomScale;
-  }
-
-  return viewportPageWidth();
-}
-
-function applyPageZoom(pageElement) {
-  pageElement.style.setProperty("--page-width", `${Math.max(160, targetPageWidth(pageElement))}px`);
-}
-
-function applyZoomLayout() {
-  for (const pageElement of document.querySelectorAll(".page")) {
-    applyPageZoom(pageElement);
-  }
+  viewer.style.removeProperty("--zoom-page-height");
+  const pageWidth = zoomMode === "custom"
+    ? fitWidthBase() * zoomScale
+    : viewportPageWidth();
+  viewer.style.setProperty("--zoom-page-width", `${Math.max(160, pageWidth)}px`);
 }
 
 function currentRelativeScale() {
@@ -495,7 +485,6 @@ if (zoomControls) {
       for (const mutation of mutations) {
         for (const node of mutation.addedNodes) {
           if (node instanceof HTMLElement && node.matches(".page")) {
-            applyPageZoom(node);
             addedPage = true;
           }
         }
