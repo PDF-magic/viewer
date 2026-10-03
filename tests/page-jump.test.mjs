@@ -25,9 +25,11 @@ function fixture({ value = '900', max = '2000', pageTop = 900000, pageHeight = 7
       return page;
     },
   };
+  const searchElement = { value: '', textContent: '', addEventListener() {}, classList: { remove() {}, toggle() {} } };
   const document = {
+    createElement() { return { getContext() { return { measureText() { return { width: 0 }; } }; } }; },
     querySelector(selector) {
-      return selector === '#page-number' ? pageNumberInput : viewer;
+      return selector === '#page-number' ? pageNumberInput : selector === '#viewer' ? viewer : searchElement;
     },
     documentElement: { classList: { toggle() {} } },
   };
@@ -38,7 +40,7 @@ function fixture({ value = '900', max = '2000', pageTop = 900000, pageHeight = 7
     matchMedia() { return media; },
     scrollTo(options) { events.push(['scroll', options]); },
   };
-  vm.runInContext(source, vm.createContext({ document, window }));
+  vm.runInContext(source, vm.createContext({ document, window, MutationObserver: class { observe() {} }, ResizeObserver: class { observe() {} } }));
   return { changeListeners, events, pageNumberInput };
 }
 

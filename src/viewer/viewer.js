@@ -3,6 +3,7 @@ import { EventBus, PDFLinkService } from "../../node_modules/pdfjs-dist/web/pdf_
 import { abandonPdfDocumentSession, publishPdfDocument } from "./pdf-document-session.js";
 import { resolveDocumentReferenceUrl } from "./document-reference-url.js";
 import { resolvePdfSource } from "./pdf-source.js";
+import { mergeWrappedUrlTextItems } from "./search/search-text-normalization.js";
 
 const sourceMode = window.location.pathname.includes("/src/");
 
@@ -640,10 +641,12 @@ function markDocumentReady() {
   }
 
   const root = document.documentElement;
-  root.classList.add("document-ready");
-  if (root.classList.contains("minimap-ready")) {
-    requestAnimationFrame(() => root.classList.toggle("minimap-preparing", false));
+  if (root.classList.contains("document-ready")) {
+    return;
   }
+
+  root.classList.add("document-ready");
+  window.dispatchEvent(new Event("pdf-viewer-document-ready"));
 }
 
 function pageIsInRenderWindow(pageNumber) {
@@ -885,7 +888,11 @@ function createPagePlaceholders(sampleViewport) {
 }
 
 function normalizeSearchText(value) {
-  return value.normalize("NFKC").toLocaleLowerCase().replace(/\s+/g, " ").trim();
+  return value
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[\s\u200B-\u200D\u2060\uFEFF]+/gu, " ")
+    .trim();
 }
 
 async function getPageSearchText(pageNumber) {
@@ -895,8 +902,9 @@ async function getPageSearchText(pageNumber) {
 
   const page = await pdfDocument.getPage(pageNumber);
   const textContent = await page.getTextContent();
+  const searchableItems = mergeWrappedUrlTextItems(textContent.items);
   const text = normalizeSearchText(
-    textContent.items.map((item) => ("str" in item ? item.str : "")).join(" "),
+    searchableItems.map((item) => ("str" in item ? item.str : "")).join(" "),
   );
 
   pageTextCache.set(pageNumber, text);
@@ -1016,7 +1024,7 @@ function scheduleSearch() {
   clearTimeout(searchTimer);
   searchRequestId += 1;
 
-  const query = searchInput.value.trim();
+  const query = normalizeSearchText(searchInput.value);
   if (!query) {
     resetSearchResults();
     return;
@@ -1051,9 +1059,40 @@ function stepSearch(delta) {
   }
 }
 
+function getSelectedPdfText() {
+  const selection = window.getSelection();
+
+  if (
+    !selection ||
+    selection.isCollapsed ||
+    !selection.anchorNode ||
+    !selection.focusNode ||
+    !viewer.contains(selection.anchorNode) ||
+    !viewer.contains(selection.focusNode)
+  ) {
+    return "";
+  }
+
+  return selection.toString().replace(/\s+/g, " ").trim();
+}
+
 function focusSearch() {
   searchInput.focus();
   searchInput.select();
+}
+
+function focusSearchFromSelection() {
+  const selectedText = getSelectedPdfText();
+
+  if (selectedText) {
+    searchInput.value = selectedText;
+  }
+
+  focusSearch();
+
+  if (selectedText) {
+    void runSearch(selectedText);
+  }
 }
 
 async function rotatePages(delta) {
@@ -1189,7 +1228,7 @@ function bindControls() {
       if (modifier && key === "f") {
         event.preventDefault();
         event.stopPropagation();
-        focusSearch();
+        focusSearchFromSelection();
         return;
       }
 
