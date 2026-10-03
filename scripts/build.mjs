@@ -20,6 +20,12 @@ for (const contentScript of manifest.content_scripts || []) {
   contentScript.css = contentScript.css?.map((stylesheet) => stylesheet.replace(/^src\//, ""));
 }
 
+for (const resourceGroup of manifest.web_accessible_resources || []) {
+  resourceGroup.resources = resourceGroup.resources?.map((resource) =>
+    resource.replace(/^src\//, ""),
+  );
+}
+
 await Promise.all([
   build({
     entryPoints: [
