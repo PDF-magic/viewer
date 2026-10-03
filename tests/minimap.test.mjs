@@ -25,6 +25,7 @@ function fixture(count, height = 900) {
   const toggle = { checked: true, addEventListener(type, callback) { listeners[`toggle-${type}`] = callback; } };
   const minimapPageContainer = {
     children: tiles,
+    style: {},
     querySelectorAll: selector => selector === '.minimap-page' ? tiles : [],
     querySelector: () => null,
     replaceChildren(...children) { this.children = children; },
@@ -193,7 +194,7 @@ test('the document becomes ready before the minimap finishes in the background',
   assert.match(viewerStyles, /html:not\(\.document-ready\) \.page\s*\{[\s\S]*?visibility:\s*hidden/);
   assert.match(viewerStyles, /\.document-ready \.status:not\(\.error\)\s*\{[\s\S]*?display:\s*none/);
   assert.doesNotMatch(viewerStyles, /\.minimap-preparing \.page/);
-  assert.match(styles, /\.minimap-preparing \.minimap\s*\{[\s\S]*?translateX\(110%\)/);
+  assert.match(styles, /\.minimap-preparing \.minimap-shell\s*\{[\s\S]*?translateX\(110%\)/);
   assert.match(styles, /transform 1100ms cubic-bezier/);
 });
 
@@ -237,4 +238,23 @@ test('minimap shares the viewer document and its cached fingerprint', () => {
   assert.doesNotMatch(source, /getDocument\(/);
   assert.doesNotMatch(source, /resolvePdfSource\(/);
   assert.match(viewerSource, /publishPdfDocument\(pdfDocument\)/);
+});
+
+
+test('minimap exposes persistent local, side-swap, and collapse controls', () => {
+  assert.match(viewerMarkup, /id="minimap-swap-side"[\s\S]*id="minimap-mode"[\s\S]*id="minimap-collapse"/);
+  assert.match(source, /MINIMAP_MODE_STORAGE_KEY = "pdf-viewer-minimap-mode"/);
+  assert.match(source, /MINIMAP_SIDE_STORAGE_KEY = "pdf-viewer-minimap-side"/);
+  assert.match(source, /MINIMAP_COLLAPSED_STORAGE_KEY = "pdf-viewer-minimap-collapsed"/);
+  assert.match(source, /setMinimapMode\(minimapMode\(\) === "overview" \? "local" : "overview"\)/);
+  assert.match(source, /setMinimapCollapsed\(!minimapCollapsed\(\)\)/);
+  assert.match(styles, /\.minimap-left \.minimap-controls\s*\{[\s\S]*?flex-direction:\s*row-reverse/);
+  assert.match(styles, /\.minimap-collapsed \.minimap-collapse\s*\{[\s\S]*?display:\s*grid/);
+});
+
+test('local minimap keeps natural thumbnail scale and moves the page background', () => {
+  assert.match(source, /minimapMode\(\) === "overview"[\s\S]*?trackHeight \/ widthScaledHeight[\s\S]*?: 1/);
+  assert.match(source, /mapOffset =[\s\S]*?minimapMode\(\) === "local"[\s\S]*?viewportTop \+ viewportHeight \/ 2 - trackHeight \/ 2/);
+  assert.match(source, /minimapPages\.style\.transform = `translateY\(\$\{\-mapOffset\}px\)`/);
+  assert.match(source, /function pointerMapPosition\(event\)[\s\S]*?\+ mapOffset/);
 });
