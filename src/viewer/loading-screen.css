@@ -1,3 +1,7 @@
+:root {
+  --loading-image: url("../assets/rainbow-dash-speedster.png");
+}
+
 .status:not(.error) {
   --loading-streak: rgb(255 255 255 / 13%);
   position: relative;
@@ -30,7 +34,7 @@
   left: 50%;
   width: clamp(210px, 42vw, 320px);
   aspect-ratio: 160 / 84;
-  background: url("../assets/rainbow-dash-wonderbolt-loader.svg") center / contain no-repeat;
+  background: var(--loading-image) center / contain no-repeat;
   image-rendering: pixelated;
   filter: drop-shadow(10px 8px 0 rgb(0 0 0 / 16%));
   transform-origin: 50% 50%;

@@ -183,7 +183,8 @@ function scrollToTarget(target) {
       const toolbarHeight = document.querySelector(".toolbar")?.getBoundingClientRect().height || 52;
       const pageRect = page.getBoundingClientRect();
       const targetTop = window.scrollY + pageRect.top + pageRect.height * target.yRatio;
-      const readableHeight = Math.max(1, window.innerHeight - toolbarHeight);
+      const scrubberHeight = document.querySelector("#document-scrubber")?.getBoundingClientRect().height || 0;
+      const readableHeight = Math.max(1, window.innerHeight - toolbarHeight - scrubberHeight);
       window.scrollTo({
         top: Math.max(0, targetTop - toolbarHeight - readableHeight / 2),
         behavior: "smooth",

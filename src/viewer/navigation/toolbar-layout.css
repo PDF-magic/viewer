@@ -271,5 +271,8 @@
 
 @media (max-width: 1130px) {
   :where(:root:not(.toolbar-two-rows)) .search-control input { min-width: 0; }
-  :where(:root:not(.toolbar-two-rows)) .search-count { display: none; }
+}
+
+.search-control.search-count-crowded .search-count {
+  display: none;
 }
