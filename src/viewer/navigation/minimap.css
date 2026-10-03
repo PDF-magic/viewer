@@ -27,7 +27,7 @@
 .minimap-shell {
   --minimap-accent: var(--accent, #43af49);
   position: fixed;
-  inset: 52px 0 0 auto;
+  inset: 52px 0 var(--document-scrubber-height, 0px) auto;
   z-index: 9;
   display: flex;
   width: 96px;
@@ -124,6 +124,10 @@
   filter: var(--page-filter) contrast(1.18);
 }
 
+.minimap-local .minimap-strip {
+  opacity: 0.94;
+}
+
 .minimap-viewport {
   position: absolute;
   right: 3px;
@@ -183,7 +187,7 @@
 .minimap-collapsed .minimap-shell {
   top: auto;
   right: 8px;
-  bottom: 8px;
+  bottom: calc(8px + var(--document-scrubber-height, 0px));
   width: 36px;
   height: 36px;
   min-height: 36px;
