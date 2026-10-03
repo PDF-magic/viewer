@@ -70,15 +70,15 @@
           <button id="search-next" class="search-nav-button" type="button" aria-label="Next search result" title="Next result" disabled>↓</button>
         </div>
       </div>
-      <div class="search-actions" role="group" aria-label="Document actions">
+      <div class="search-actions" role="group" aria-label="Actions">
         <button id="summarize-chatgpt" class="mark-button" type="button" aria-label="Summarize with ChatGPT" title="Summarize with ChatGPT">
           <img src="assets/sweetie-bot.png" alt="" aria-hidden="true" />
         </button>
-        <button id="download-pdf" class="mark-button" type="button" aria-label="Download PDF" title="Download PDF">
-          <img src="assets/download-icon.png" alt="" aria-hidden="true" />
-        </button>
       </div>
       <div class="spacer"></div>
+      <button id="download-pdf" class="mark-button" type="button" aria-label="Download PDF" title="Download PDF">
+        <img src="assets/download-icon.png" alt="" aria-hidden="true" />
+      </button>
       <button id="theme-toggle" class="mark-button theme-button" type="button" aria-label="Switch theme" title="Switch theme">
         <img id="theme-icon" alt="" aria-hidden="true" />
       </button>
@@ -108,6 +108,9 @@
           </button>
           <button id="qr-file-url" class="tool-button" type="button" role="menuitem">▦ <span>QR file URL</span></button>
           <div class="menu-separator" role="separator"></div>
+          <button id="choose-loading-image" class="tool-button" type="button" role="menuitem">▧ <span>Custom loading image…</span></button>
+          <button id="reset-loading-image" class="tool-button" type="button" role="menuitem" hidden>↺ <span>Use default loading image</span></button>
+          <input id="custom-loading-image" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
           <form id="footnote-jump" class="tool-footnote-jump" aria-label="Jump to footnote">
             <label for="footnote-number">Footnote</label>
             <div class="tool-footnote-row">
@@ -142,20 +145,47 @@
       <div id="status" class="status">Loading PDF…</div>
     </main>
 
-    <aside
-      id="minimap"
-      class="minimap"
-      role="scrollbar"
-      aria-label="Document minimap"
-      aria-controls="viewer"
-      aria-orientation="vertical"
-      aria-valuemin="0"
-      aria-valuemax="0"
-      aria-valuenow="0"
-      tabindex="0"
-    >
-      <div id="minimap-pages" class="minimap-pages" aria-hidden="true"></div>
-      <div id="minimap-viewport" class="minimap-viewport" aria-hidden="true"></div>
+    <aside id="minimap-shell" class="minimap-shell" aria-label="Document minimap">
+      <div
+        id="minimap"
+        class="minimap"
+        role="scrollbar"
+        aria-label="Document minimap"
+        aria-controls="viewer"
+        aria-orientation="vertical"
+        aria-valuemin="0"
+        aria-valuemax="0"
+        aria-valuenow="0"
+        tabindex="0"
+      >
+        <div id="minimap-pages" class="minimap-pages" aria-hidden="true"></div>
+        <div id="minimap-viewport" class="minimap-viewport" aria-hidden="true"></div>
+      </div>
+      <div id="minimap-controls" class="minimap-controls" role="group" aria-label="Minimap controls">
+        <button
+          id="minimap-swap-side"
+          class="minimap-control minimap-swap-side"
+          type="button"
+          aria-label="Move minimap to the left"
+          title="Move minimap to the left"
+        >⇆</button>
+        <button
+          id="minimap-mode"
+          class="minimap-control minimap-mode"
+          type="button"
+          aria-label="Use local page navigator"
+          aria-pressed="false"
+          title="Use local page navigator"
+        ><span id="minimap-mode-icon" aria-hidden="true">▥</span></button>
+        <button
+          id="minimap-collapse"
+          class="minimap-control minimap-collapse"
+          type="button"
+          aria-label="Collapse minimap"
+          aria-expanded="true"
+          title="Collapse minimap"
+        >☰</button>
+      </div>
     </aside>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -172,6 +202,8 @@
 
     <script src="viewer/navigation/toolbar-layout.js"></script>
     <script src="viewer/network-fallback.js"></script>
+    <script type="module" src="viewer/loading-image-setting.js"></script>
+    <script src="viewer/clipboard-fallback.js"></script>
     <script type="module" src="viewer/theme/image-color-toggle.js"></script>
     <script type="module" src="viewer/document-identity.js"></script>
     <script type="module" src="viewer/viewer.js"></script>
