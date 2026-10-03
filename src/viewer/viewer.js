@@ -5,6 +5,7 @@ import { resolveDocumentReferenceUrl } from "./document-reference-url.js";
 import { resolvePdfSource } from "./pdf-source.js";
 import { mergeWrappedUrlTextItems } from "./search/search-text-normalization.js";
 import { normalizeSearchText, prepareSearchText } from "./search/search-text.js";
+import { PagePreviews } from "./page-previews.js";
 
 const sourceMode = window.location.pathname.includes("/src/");
 
@@ -93,6 +94,8 @@ let sectionHighlightRequestId = 0;
 let renderGeneration = 0;
 let renderingAllPages = false;
 let renderQueuePromise;
+let pagePreviews;
+let sharpRenderTimer;
 const priorityRenderQueue = new Set();
 const backgroundRenderQueue = new Set();
 const renderedPages = new Set();
@@ -178,7 +181,7 @@ function getInitialPage(...urls) {
   return 1;
 }
 
-function setCurrentPage(pageNumber) {
+function setCurrentPage(pageNumber, deferSharpRender = false) {
   if (!pdfDocument) {
     return;
   }
@@ -189,11 +192,25 @@ function setCurrentPage(pageNumber) {
   }
 
   currentPage = nextPage;
+  pagePreviews?.update(currentPage);
   pageNumberInput.value = String(currentPage);
   previousButton.disabled = currentPage <= 1;
   nextButton.disabled = currentPage >= pdfDocument.numPages;
-  void queuePageRender(currentPage, true);
-  keepRenderWindow(currentPage);
+  clearTimeout(sharpRenderTimer);
+  if (deferSharpRender && !renderingAllPages) {
+    // Cached previews follow scrolling immediately. Avoid spending time on
+    // sharp pages that the reader is already scrolling past.
+    priorityRenderQueue.clear();
+    backgroundRenderQueue.clear();
+    keepRenderWindow(currentPage, false);
+    sharpRenderTimer = setTimeout(() => {
+      void queuePageRender(currentPage, true);
+      keepRenderWindow(currentPage);
+    }, 120);
+  } else {
+    void queuePageRender(currentPage, true);
+    keepRenderWindow(currentPage);
+  }
 
   if (!sectionPopover.hidden) {
     void updateCurrentSectionHighlight();
@@ -212,7 +229,7 @@ function pageAtViewportCenter() {
   const target = document.elementFromPoint(window.innerWidth / 2, y)?.closest(".page");
 
   if (target?.dataset.page) {
-    setCurrentPage(Number.parseInt(target.dataset.page, 10));
+    setCurrentPage(Number.parseInt(target.dataset.page, 10), true);
   }
 }
 
@@ -662,7 +679,7 @@ function takeNextQueuedPage() {
 
   let pageNumber;
   for (const queuedPage of queue) {
-    if (pageNumber === undefined || queuedPage < pageNumber) {
+    if (pageNumber === undefined || Math.abs(queuedPage - currentPage) < Math.abs(pageNumber - currentPage)) {
       pageNumber = queuedPage;
     }
   }
@@ -724,6 +741,8 @@ async function renderPageNow(pageNumber) {
   ]);
 
   if (generation !== renderGeneration || (!renderingAllPages && !pageIsInRenderWindow(pageNumber))) {
+    canvas.width = 0;
+    canvas.height = 0;
     page.cleanup();
     return;
   }
@@ -752,6 +771,8 @@ async function renderPageNow(pageNumber) {
   }
 
   if (generation !== renderGeneration || (!renderingAllPages && !pageIsInRenderWindow(pageNumber))) {
+    canvas.width = 0;
+    canvas.height = 0;
     page.cleanup();
     return;
   }
@@ -772,6 +793,7 @@ async function renderPageNow(pageNumber) {
   );
   container.classList.add("rendered");
   renderedPages.add(pageNumber);
+  pagePreviews?.hide(pageNumber);
   markDocumentReady();
   page.cleanup();
 }
@@ -829,14 +851,18 @@ function releaseRenderedPage(pageNumber) {
   container.replaceChildren();
   container.classList.remove("rendered");
   renderedPages.delete(pageNumber);
+  pagePreviews?.show(pageNumber);
   priorityRenderQueue.delete(pageNumber);
   backgroundRenderQueue.delete(pageNumber);
 }
 
-function keepRenderWindow(centerPage = currentPage) {
+function keepRenderWindow(centerPage = currentPage, queueNearby = true) {
   if (!pdfDocument) {
     return;
   }
+
+  if (renderingAllPages) return;
+  pagePreviews?.update(centerPage);
 
   const firstPage = Math.max(1, centerPage - RENDER_WINDOW_RADIUS);
   const lastPage = Math.min(pdfDocument.numPages, centerPage + RENDER_WINDOW_RADIUS);
@@ -853,7 +879,13 @@ function keepRenderWindow(centerPage = currentPage) {
     }
   }
 
-  for (let pageNumber = firstPage; pageNumber <= lastPage; pageNumber += 1) {
+  for (const pageNumber of [...priorityRenderQueue]) {
+    if (pageNumber < firstPage || pageNumber > lastPage) {
+      priorityRenderQueue.delete(pageNumber);
+    }
+  }
+
+  for (let pageNumber = firstPage; queueNearby && pageNumber <= lastPage; pageNumber += 1) {
     if (pageNumber !== centerPage) {
       void queuePageRender(pageNumber);
     }
@@ -1096,7 +1128,9 @@ async function rotatePages(delta) {
   }
 
   rotation = (rotation + delta + 360) % 360;
+  clearTimeout(sharpRenderTimer);
   renderGeneration += 1;
+  pagePreviews?.start(rotation, currentPage);
   priorityRenderQueue.clear();
   backgroundRenderQueue.clear();
   for (const pageNumber of [...renderedPages]) {
@@ -1335,11 +1369,26 @@ async function initialize() {
   const samplePage = await pdfDocument.getPage(currentPage);
   createPagePlaceholders(samplePage.getViewport({ scale: 1 }));
   samplePage.cleanup();
+  pagePreviews = new PagePreviews({
+    pdfDocument,
+    pages: pageElements,
+    isSharp: (pageNumber) => renderedPages.has(pageNumber),
+    waitForForeground: () => renderQueuePromise?.catch(() => {}),
+  });
   bindControls();
   await initializeSectionNavigation();
   goToPage(currentPage, "auto");
   keepRenderWindow(currentPage);
+  pagePreviews.start(rotation, currentPage);
 }
+
+window.addEventListener("pagehide", () => {
+  clearTimeout(sharpRenderTimer);
+  pagePreviews?.stop();
+});
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) pagePreviews?.start(rotation, currentPage);
+});
 
 initialize().catch(async (error) => {
   abandonPdfDocumentSession();

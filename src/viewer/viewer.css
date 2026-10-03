@@ -724,7 +724,8 @@ input {
   font-size: 13px;
 }
 
-.page.rendered::before {
+.page.rendered::before,
+.page.previewed::before {
   content: none;
 }
 
@@ -732,12 +733,17 @@ input {
   box-shadow: 0 0 0 1px var(--page-border);
 }
 
-.page canvas {
+.page canvas,
+.page-preview {
   display: block;
   width: 100%;
   height: auto;
   filter: var(--page-filter);
   background: #fff;
+}
+
+.page-preview {
+  pointer-events: none;
 }
 
 .text-layer {
