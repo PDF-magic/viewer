@@ -44,7 +44,7 @@ Chrome extensions cannot start local processes directly, so register the include
 ./native/install-host.sh CHROME_EXTENSION_ID /path/to/PDF-magic/enhancer
 ```
 
-The host runs `ocr-scanned-pdf.sh`, writes a new local `*-enhanced-ocr.pdf` copy, and stamps the original reference URL into the PDF as `PDFMagicSourceURL` metadata. The current tab is replaced with the enhanced local copy. Copy File URL, Copy Page Link, and Summarize with ChatGPT then use the preserved reference URL instead of the local `file://` path.
+The host runs `ocr-scanned-pdf.sh`, uses the OCR tagging report to name the new local `*-enhanced-ocr.pdf` copy from the document's recognized title when a credible title is available, and falls back to the source URL filename otherwise. It also stamps the original reference URL into the PDF as `PDFMagicSourceURL` metadata. The current tab is replaced with the enhanced local copy. Copy File URL, Copy Page Link, and Summarize with ChatGPT then use the preserved reference URL instead of the local `file://` path.
 
 Chrome may require **Allow access to file URLs** for the unpacked extension so the enhanced local PDF reopens in this viewer.
 
