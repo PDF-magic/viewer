@@ -399,16 +399,7 @@ function syncZoomControls() {
 }
 
 function forceViewerRerender() {
-  const page = document.querySelector(".page");
-  const rotateRightButton = document.querySelector("#rotate-right");
-  const rotateLeftButton = document.querySelector("#rotate-left");
-
-  if (!page || !rotateRightButton || !rotateLeftButton) {
-    return;
-  }
-
-  rotateRightButton.click();
-  rotateLeftButton.click();
+  window.dispatchEvent(new Event("pdf-viewer-rerender"));
 }
 
 function scheduleViewerRerender() {
@@ -507,6 +498,21 @@ if (zoomControls) {
       syncZoomControls();
       scheduleViewerRerender();
     }, 120);
+  });
+
+  window.addEventListener("pdf-viewer-minimap-layout-change", (event) => {
+    applyZoomLayout();
+    const anchor = event.detail;
+    if (anchor) {
+      const rect = anchor.page.getBoundingClientRect();
+      window.scrollTo({
+        left: window.scrollX,
+        top: window.scrollY + rect.top + rect.height * anchor.ratio - anchor.viewportY,
+        behavior: "instant",
+      });
+    }
+    syncZoomControls();
+    scheduleViewerRerender();
   });
 
   applyZoomLayout();

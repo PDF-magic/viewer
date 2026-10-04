@@ -1138,15 +1138,13 @@ function focusSearchFromSelection() {
   }
 }
 
-async function rotatePages(delta) {
+async function refreshPageRendering() {
   if (!pdfDocument) {
     return;
   }
 
-  rotation = (rotation + delta + 360) % 360;
   clearTimeout(sharpRenderTimer);
   renderGeneration += 1;
-  pagePreviews?.start(rotation, currentPage);
   priorityRenderQueue.clear();
   backgroundRenderQueue.clear();
   for (const pageNumber of [...renderedPages]) {
@@ -1155,6 +1153,16 @@ async function rotatePages(delta) {
 
   await queuePageRender(currentPage, true);
   keepRenderWindow(currentPage);
+}
+
+async function rotatePages(delta) {
+  if (!pdfDocument) {
+    return;
+  }
+
+  rotation = (rotation + delta + 360) % 360;
+  pagePreviews?.start(rotation, currentPage);
+  await refreshPageRendering();
   pageElements[currentPage - 1]?.scrollIntoView({ behavior: "auto", block: "center" });
 }
 
@@ -1327,6 +1335,9 @@ function bindControls() {
 
   window.addEventListener("scroll", schedulePageTracking, { passive: true });
   window.addEventListener("resize", schedulePageTracking);
+  window.addEventListener("pdf-viewer-rerender", () => {
+    void refreshPageRendering();
+  });
 }
 
 async function initialize() {

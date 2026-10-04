@@ -65,8 +65,27 @@ function setMinimapAccessibility() {
   minimapShell?.setAttribute("data-collapsed", String(minimapCollapsed()));
 }
 
+function updateMinimapLayout(update) {
+  // Keep the same point on the page at the viewport center as its width changes.
+  const viewportY = window.innerHeight / 2;
+  const pages = Array.from(viewer.querySelectorAll(".page"));
+  const page = pages.find((element) => {
+    const rect = element.getBoundingClientRect();
+    return rect.top + rect.height > viewportY;
+  }) || pages.at(-1);
+  const rect = page?.getBoundingClientRect();
+  const anchor = rect?.height > 0
+    ? { page, ratio: (viewportY - rect.top) / rect.height, viewportY }
+    : null;
+
+  update();
+  window.dispatchEvent(new CustomEvent("pdf-viewer-minimap-layout-change", { detail: anchor }));
+}
+
 function setMinimapEnabled(enabled, persist = true) {
-  document.documentElement.classList.toggle("minimap-disabled", !enabled);
+  updateMinimapLayout(() => {
+    document.documentElement.classList.toggle("minimap-disabled", !enabled);
+  });
   minimapToggle.checked = enabled;
   setMinimapAccessibility();
 
@@ -77,8 +96,6 @@ function setMinimapEnabled(enabled, persist = true) {
   if (enabled && !minimapCollapsed()) {
     scheduleSync();
   }
-
-  window.dispatchEvent(new Event("resize"));
 }
 
 function setMinimapMode(mode, persist = true) {
@@ -96,7 +113,6 @@ function setMinimapMode(mode, persist = true) {
 
   if (persist) {
     localStorage.setItem(MINIMAP_MODE_STORAGE_KEY, local ? "local" : "overview");
-    window.dispatchEvent(new Event("resize"));
   }
 
   scheduleSync();
@@ -104,7 +120,9 @@ function setMinimapMode(mode, persist = true) {
 
 function setMinimapSide(side, persist = true) {
   const left = side === "left";
-  document.documentElement.classList.toggle("minimap-left", left);
+  updateMinimapLayout(() => {
+    document.documentElement.classList.toggle("minimap-left", left);
+  });
   if (minimapSwapSideButton) {
     const label = left ? "Move minimap to the right" : "Move minimap to the left";
     minimapSwapSideButton.setAttribute("aria-label", label);
@@ -113,14 +131,15 @@ function setMinimapSide(side, persist = true) {
 
   if (persist) {
     localStorage.setItem(MINIMAP_SIDE_STORAGE_KEY, left ? "left" : "right");
-    window.dispatchEvent(new Event("resize"));
   }
 
   scheduleSync();
 }
 
 function setMinimapCollapsed(collapsed, persist = true) {
-  document.documentElement.classList.toggle("minimap-collapsed", collapsed);
+  updateMinimapLayout(() => {
+    document.documentElement.classList.toggle("minimap-collapsed", collapsed);
+  });
   if (minimapCollapseButton) {
     const label = collapsed ? "Expand minimap" : "Collapse minimap";
     minimapCollapseButton.setAttribute("aria-label", label);
@@ -131,7 +150,6 @@ function setMinimapCollapsed(collapsed, persist = true) {
 
   if (persist) {
     localStorage.setItem(MINIMAP_COLLAPSED_STORAGE_KEY, String(collapsed));
-    window.dispatchEvent(new Event("resize"));
   }
 
   if (!collapsed) {

@@ -49,7 +49,9 @@ function fixture(count, height = 900) {
   const context = vm.createContext({ document, window, localStorage, chrome,
     pdfDocumentSessionReady: new Promise(() => {}),
     GlobalWorkerOptions: {}, VerbosityLevel: { ERRORS: 0 }, URLSearchParams, Event, MutationObserver: observer,
-    ResizeObserver: observer, WheelEvent: { DOM_DELTA_LINE: 1, DOM_DELTA_PAGE: 2 }, requestAnimationFrame() { return 1; } });
+    ResizeObserver: observer, CustomEvent: class extends Event {
+      constructor(type, options) { super(type); this.detail = options.detail; }
+    }, WheelEvent: { DOM_DELTA_LINE: 1, DOM_DELTA_PAGE: 2 }, requestAnimationFrame() { return 1; } });
   vm.runInContext(source, context);
   const sync = () => vm.runInContext('syncMinimap()', context);
   sync();
@@ -171,7 +173,7 @@ test('minimap toggle persists visibility and updates accessibility state', () =>
   assert.ok(!f.classes.has('minimap-disabled'));
   assert.equal(f.track.tabIndex, 0);
   assert.equal(f.storedValues.get('pdf-viewer-show-minimap'), 'true');
-  assert.deepEqual(f.windowEvents, ['resize', 'resize', 'resize']);
+  assert.deepEqual(f.windowEvents, Array(5).fill('pdf-viewer-minimap-layout-change'));
   assert.match(viewerMarkup, /id="show-minimap" class="checkbox-input" type="checkbox"/);
   assert.doesNotMatch(viewerMarkup, /id="show-minimap"[\s\S]{0,120}toggle-switch/);
   assert.match(toggleStyles, /\.checkbox-input:checked\s*\{/);
