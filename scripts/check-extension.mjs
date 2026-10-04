@@ -45,6 +45,7 @@ async function validateManifest(path, expected) {
 
   const viewerHtml = await readFile(join(root, pdfHandler.handler_url), "utf8");
   for (const [, asset] of viewerHtml.matchAll(/(?:src|href)="([^"]+)"/g)) {
+    if (/^https?:\/\//i.test(asset)) continue;
     await requireFile(join(root, dirname(pdfHandler.handler_url), asset), `${path} viewer asset`);
   }
   for (const contentScript of manifest.content_scripts || []) {
