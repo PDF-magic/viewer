@@ -10,6 +10,7 @@ document.head.append(accentStylesheet);
 const root = document.documentElement;
 const toolsMenu = document.querySelector("#tools-menu");
 let accentColorInput;
+let accentHexInput;
 
 function normalizeAccentColor(value) {
   return typeof value === "string" && HEX_COLOR_PATTERN.test(value)
@@ -51,7 +52,31 @@ function createAccentColorSetting(color) {
     await chrome.storage.local.set({ [ACCENT_COLOR_STORAGE_KEY]: nextColor });
   });
 
-  label.append(text, accentColorInput);
+  accentHexInput = document.createElement("input");
+  accentHexInput.type = "text";
+  accentHexInput.className = "accent-hex-input";
+  accentHexInput.value = color;
+  accentHexInput.maxLength = 7;
+  accentHexInput.pattern = "#[0-9a-fA-F]{6}";
+  accentHexInput.setAttribute("aria-label", "Theme color HEX");
+  accentHexInput.spellcheck = false;
+  accentHexInput.addEventListener("input", () => {
+    const valid = HEX_COLOR_PATTERN.test(accentHexInput.value);
+    accentHexInput.setCustomValidity(valid ? "" : "Enter a HEX color such as #43af49");
+    if (valid) {
+      accentColorInput.value = applyAccentColor(accentHexInput.value);
+    }
+  });
+  accentHexInput.addEventListener("change", async () => {
+    if (accentHexInput.checkValidity()) {
+      await chrome.storage.local.set({ [ACCENT_COLOR_STORAGE_KEY]: applyAccentColor(accentHexInput.value) });
+    }
+  });
+  accentColorInput.addEventListener("input", () => {
+    accentHexInput.value = accentColorInput.value;
+    accentHexInput.setCustomValidity("");
+  });
+  label.append(text, accentHexInput, accentColorInput);
 
   const firstSetting = toolsMenu.querySelector(".tool-toggle");
   if (firstSetting) {
@@ -75,6 +100,8 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   const color = applyAccentColor(changes[ACCENT_COLOR_STORAGE_KEY].newValue);
   if (accentColorInput) {
     accentColorInput.value = color;
+    accentHexInput.value = color;
+    accentHexInput.setCustomValidity("");
   }
 });
 
