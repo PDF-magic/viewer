@@ -4,6 +4,7 @@ import { resolvePdfSource } from "./pdf-source.js";
 const NATIVE_HOST = "org.pdfmagic.enhancer";
 const enhanceNav = document.querySelector("#enhance-nav");
 const enhanceButton = document.querySelector("#enhance-pdf");
+const installLink = document.querySelector("#install-enhancer");
 const sectionNav = document.querySelector("#section-nav");
 const pageNumberInput = document.querySelector("#page-number");
 const toast = document.querySelector("#toast");
@@ -79,7 +80,12 @@ async function enhanceCurrentPdf() {
   } catch (error) {
     const message = error?.message || "Could not enhance PDF";
     showToast(message);
-    showTemporaryTitle(message.includes("native") ? "Install PDF enhancer host" : "Could not enhance PDF");
+    if (/native.*(?:host|messag)|host.*(?:not found|not configured)/i.test(message)) {
+      enhanceButton.hidden = true;
+      installLink.hidden = false;
+    } else {
+      showTemporaryTitle("Could not enhance PDF");
+    }
   } finally {
     enhanceButton.disabled = false;
     if (enhanceButton.title === "Enhancing PDF…") {
