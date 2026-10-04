@@ -74,3 +74,28 @@ test("slider counts note occurrences and navigates to their page and vertical po
   assert.equal(element("#document-scrubber-current").textContent, "42");
   assert.match(element("#document-scrubber-preview").textContent, /Second note text/);
 });
+
+function realDocumentPages(name) {
+  return JSON.parse(readFileSync(new URL(`./fixtures/footnotes-${name}.json`, import.meta.url), "utf8")).pages;
+}
+
+function indexFixture(page) {
+  return footnotesForPage(page.items, {
+    width: page.width, height: page.height,
+    convertToViewportPoint: (x, y) => [x, page.height - y],
+  }, page.pageNumber);
+}
+
+test("SEC news digest OCR addresses, decimals and dates are not footnotes", () => {
+  for (const page of realDocumentPages("digest")) assert.deepEqual(indexFixture(page), []);
+});
+
+test("SEC comment letter keeps full-size note text and notes starting above midpage", () => {
+  const pages = realDocumentPages("letter");
+  assert.deepEqual(pages.map((page) => indexFixture(page).map((note) => note.number)), [[1], [4], [41, 42]]);
+  const [note] = indexFixture(pages[1]);
+  assert.ok(note.yRatio < 0.5);
+  assert.match(note.text, /classification as a legacy transfer agent/);
+  assert.match(note.text, /note 77/);
+  assert.doesNotMatch(note.text, /Page 3 of 64/);
+});

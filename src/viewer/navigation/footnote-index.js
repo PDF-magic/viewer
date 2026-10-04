@@ -29,6 +29,8 @@ function pageCoordinates(item, viewport) {
 }
 
 export function candidateForPage(items, viewport, number, pageNumber, originPage) {
+  const indexed = footnotesForPage(items, viewport, pageNumber).find((note) => note.number === number);
+  if (indexed) return { ...indexed, score: 20 - Math.min(Math.abs(pageNumber - originPage) * 0.015, 1.5) };
   const pattern = markerPattern(number);
   const textItems = items.filter((item) => typeof item.str === "string" && item.str.trim());
   const typicalHeight = median(textItems.map((item) => Math.abs(item.height || item.transform?.[3] || 0)));
@@ -104,41 +106,67 @@ export function candidateForPage(items, viewport, number, pageNumber, originPage
   return best;
 }
 
-// Index note occurrences, preserving repeated numbers on different pages.
+function positionedItems(items, viewport) {
+  return items.filter((item) => typeof item.str === "string" && item.str.trim()).flatMap((item) => {
+    const point = pageCoordinates(item, viewport);
+    return point ? [{ ...point, item, text: item.str.trim(), height: Math.abs(item.height || item.transform?.[3] || 0) }] : [];
+  });
+}
+
+function startsLine(entry, entries, baseline) {
+  return !entries.some((other) => other !== entry && other.x < entry.x - 2 &&
+    Math.abs(other.y - baseline) < Math.max(2, other.height * 0.2));
+}
+
+// Confirm isolated superscripts against their text baseline and an in-body reference.
+// OCR word boxes alone are not reliable evidence of smaller footnote type.
 export function footnotesForPage(items, viewport, pageNumber) {
-  const numbers = new Set();
-  for (const item of items) {
-    const match = item.str?.trim().match(/^(?:\[\s*(\d+)\s*\]|\(\s*(\d+)\s*\)|(\d+)(?:[.)]|\s|$))/);
-    if (match) numbers.add(Number(match[1] || match[2] || match[3]));
-  }
-  const typicalHeight = median(items.map((item) => Math.abs(item.height || item.transform?.[3] || 0)));
+  const entries = positionedItems(items, viewport);
+  const bodyEntries = entries.filter((entry) => entry.yRatio < 0.5);
+  const typicalHeight = median((bodyEntries.length ? bodyEntries : entries).map((entry) => entry.height));
   const notes = [];
-  for (const number of numbers) {
+  for (const entry of entries) {
+    const match = entry.text.match(/^(?:\[\s*(\d+)\s*\]|\(\s*(\d+)\s*\)|(\d+)(?:[.)](?!\d)|\s|$))/);
+    if (!match || entry.xRatio > 0.45) continue;
+    const number = Number(match[1] || match[2] || match[3]);
     if (!Number.isSafeInteger(number) || number <= 0) continue;
-    const target = candidateForPage(items, viewport, number, pageNumber, pageNumber);
-    if (!target) continue;
-    const marker = items.find((item) => {
-      const point = pageCoordinates(item, viewport);
-      return point && Math.abs(point.xRatio - target.xRatio) < 0.001 &&
-        Math.abs(point.yRatio - target.yRatio) < 0.001 && markerPattern(number).test(item.str?.trim() || "");
-    });
-    const height = Math.abs(marker?.height || marker?.transform?.[3] || 0);
-    // Body-size numbered lists are not enough evidence of a footnote.
-    if (!(height > 0 && height <= typicalHeight * 0.9)) continue;
-    notes.push({ ...target, number });
+    const inlineText = entry.text.slice(match[0].length).trim();
+    const adjacent = entries.filter((other) => other !== entry && other.x > entry.x &&
+      other.y >= entry.y - 2 && other.y - entry.y <= Math.max(3, other.height * 0.65) &&
+      other.text.length >= 3).sort((a, b) => a.x - b.x)[0];
+    if (!inlineText && !adjacent) continue;
+    const baseline = inlineText ? entry.y : adjacent.y;
+    if (!startsLine(entry, entries, baseline)) continue;
+    const superscript = /^\d+$/.test(entry.text) && adjacent &&
+      entry.height <= adjacent.height * 0.8 &&
+      adjacent.y - entry.y >= adjacent.height * 0.15 &&
+      adjacent.x - entry.x <= entry.height * (entry.text.length + 2);
+    const reference = superscript && entries.some((other) => other !== entry &&
+      other.text === entry.text && other.y < entry.y - entry.height &&
+      other.height <= adjacent.height * 0.8 && entries.some((body) =>
+        body !== other && body.x < other.x &&
+        Math.abs(body.x + Math.abs(body.item.width || 0) - other.x) < adjacent.height &&
+        body.y - other.y >= body.height * 0.15 && body.y - other.y <= body.height * 0.65));
+    // Traditional smaller-type notes need a distinct lower-page block.
+    const smallerBlock = entry.yRatio >= 0.52 && entry.height <= typicalHeight * 0.8 &&
+      (inlineText || adjacent.height <= typicalHeight * 0.8);
+    if (!reference && !smallerBlock) continue;
+    notes.push({ pageNumber, number, xRatio: entry.xRatio, yRatio: entry.yRatio,
+      label: entry.text, baseline, textHeight: inlineText ? entry.height : adjacent.height });
   }
   notes.sort((a, b) => a.yRatio - b.yRatio || a.xRatio - b.xRatio);
   return notes.map((note, index) => {
     const next = notes[index + 1];
-    const text = items.filter((item) => {
-      const point = pageCoordinates(item, viewport);
-      if (!point || !item.str?.trim()) return false;
-      const height = Math.abs(item.height || item.transform?.[3] || 0);
-      return height <= typicalHeight * 0.9 && point.yRatio >= note.yRatio - 0.005 &&
-        point.xRatio >= note.xRatio - 0.02 &&
-        (!next || point.yRatio < next.yRatio - 0.005 ||
-          (Math.abs(point.yRatio - next.yRatio) < 0.005 && point.xRatio < next.xRatio));
-    }).map((item) => item.str.trim()).join(" ").replace(markerPattern(note.number), "").trim();
+    const text = entries.filter((entry) => {
+      const withinNote = entry.y >= note.baseline - 2 &&
+        (!next || entry.y < next.yRatio * viewport.height - 2);
+      const sameType = Math.abs(entry.height - note.textHeight) <= note.textHeight * 0.15;
+      // Exclude running footers and page counters from the preview.
+      const footer = entry.yRatio > 0.92 && (/^(?:Page\s+)?\d+(?:\s+of\s+\d+)?$/i.test(entry.text) ||
+        (entry.xRatio > 0.35 && entry.xRatio < 0.65));
+      return withinNote && sameType && !footer && entry.xRatio >= note.xRatio - 0.02;
+    }).sort((a, b) => Math.abs(a.y - b.y) < 2 ? a.x - b.x : a.y - b.y)
+      .map((entry) => entry.text).join(" ").replace(markerPattern(note.number), "").trim();
     return { ...note, text: text.slice(0, 1000) };
   }).filter((note) => note.text.length >= 3);
 }
