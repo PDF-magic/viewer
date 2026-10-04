@@ -14,9 +14,20 @@
     padding-right: 112px;
   }
 
+  html:not(.minimap-disabled):not(.minimap-collapsed) .viewer[data-zoom-mode] {
+    /* Keep the one-pixel page outline visible when the outer gutter closes. */
+    --outer-page-gutter: clamp(1px, calc((100vw - 112px - var(--zoom-page-width)) / 2), 16px);
+    padding-left: var(--outer-page-gutter);
+  }
+
   html.minimap-left:not(.minimap-disabled):not(.minimap-collapsed) .viewer {
     padding-right: 16px;
     padding-left: 112px;
+  }
+
+  html.minimap-left:not(.minimap-disabled):not(.minimap-collapsed) .viewer[data-zoom-mode] {
+    padding-left: 112px;
+    padding-right: var(--outer-page-gutter);
   }
 
   html:not(.minimap-disabled):not(.minimap-collapsed) .viewer:not([data-zoom-mode]) .page {

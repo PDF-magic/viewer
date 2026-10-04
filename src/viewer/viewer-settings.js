@@ -342,7 +342,10 @@ function viewportPageWidth() {
       ? minimapShell?.getBoundingClientRect().width || 0
       : 0;
 
-  return Math.max(160, window.innerWidth - minimapWidth - PAGE_HORIZONTAL_GUTTER);
+  const horizontalGutter = window.innerWidth > 700 && minimapWidth > 0
+    ? PAGE_HORIZONTAL_GUTTER / 2 + 1
+    : PAGE_HORIZONTAL_GUTTER;
+  return Math.max(160, window.innerWidth - minimapWidth - horizontalGutter);
 }
 
 function viewportPageHeight() {
@@ -359,6 +362,10 @@ function applyZoomLayout() {
 
   if (zoomMode === "fit-height") {
     viewer.style.setProperty("--zoom-page-height", `${viewportPageHeight()}px`);
+    const pageWidth = viewer.querySelector(".page")?.getBoundingClientRect().width;
+    if (pageWidth) {
+      viewer.style.setProperty("--zoom-page-width", `${pageWidth}px`);
+    }
     return;
   }
 
