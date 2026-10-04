@@ -751,6 +751,7 @@ input {
   border-radius: 8px;
   overflow: hidden;
   background: var(--page-bg);
+  box-shadow: 0 0 0 1px var(--page-border);
 }
 
 .page.search-match-page {
@@ -770,10 +771,6 @@ input {
 .page.rendered::before,
 .page.previewed::before {
   content: none;
-}
-
-.page.rendered {
-  box-shadow: 0 0 0 1px var(--page-border);
 }
 
 .page canvas,
@@ -926,10 +923,6 @@ input {
     break-after: page;
     border: 0;
     border-radius: 0;
-    box-shadow: none;
-  }
-
-  .page.rendered {
     box-shadow: none;
   }
 }
