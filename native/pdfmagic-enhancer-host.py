@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 from pathlib import Path
@@ -270,10 +271,10 @@ def stamp_source_url(output_path: Path, reference_url: str) -> None:
 
     qpdf = shutil.which("qpdf")
     if qpdf:
-        subprocess.run([qpdf, "--check", str(output_path)], check=True, stdout=sys.stderr)
+        subprocess.run([qpdf, "--warning-exit-0", "--check", str(output_path)], check=True, stdout=sys.stderr)
 
 
-def enhance_pdf(source_url: str, reference_url: str) -> Path:
+def enhance_pdf(source_url: str, reference_url: str, uploaded_path: Path | None = None) -> Path:
     config = load_config()
     enhancer_dir = Path(str(config["enhancer_dir"])).expanduser().resolve()
     enhancer = enhancer_dir / "ocr-scanned-pdf.sh"
@@ -282,18 +283,67 @@ def enhance_pdf(source_url: str, reference_url: str) -> Path:
 
     with tempfile.TemporaryDirectory(prefix="pdf-magic-enhancer-") as temp_name:
         temporary_directory = Path(temp_name)
-        input_path, is_local = input_from_url(source_url, temporary_directory)
-        output_directory = input_path.parent if is_local else Path.home() / "Downloads"
+        input_path, is_local = (
+            (uploaded_path, False) if uploaded_path is not None
+            else input_from_url(source_url, temporary_directory)
+        )
+        # Browser-launched helpers can create Downloads files yet be denied
+        # permission to replace them during tagging. Keep web copies in app data.
+        web_output_directory = (
+            Path.home() / "Library/Application Support/PDF Magic/Enhanced"
+            if sys.platform == "darwin"
+            else Path.home() / ".local/share/pdf-magic/enhanced"
+        )
+        output_directory = input_path.parent if is_local else web_output_directory
         output_path = unique_output(output_directory, safe_stem(source_url))
 
-        subprocess.run(
-            ["/bin/bash", str(enhancer), str(input_path), str(output_path)],
-            check=True,
+        result = subprocess.run(
+            ["/bin/bash", str(enhancer), str(input_path), str(output_path), "--skip-text"],
             stdout=sys.stderr,
+            stderr=subprocess.PIPE,
+            text=True,
         )
+        if result.returncode:
+            detail = result.stderr.strip()[-2000:]
+            raise RuntimeError(detail or f"PDF enhancement failed (exit {result.returncode})")
         output_path = rename_for_ocr_title(output_path)
         stamp_source_url(output_path, reference_url)
         return output_path.resolve()
+
+
+def enhance_uploaded_pdf(message: dict[str, object]) -> Path:
+    source_url = str(message.get("sourceUrl") or "")
+    reference_url = str(message.get("referenceUrl") or "")
+    byte_length = message.get("byteLength")
+    if not source_url or not reference_url:
+        raise ValueError("sourceUrl and referenceUrl are required")
+    if type(byte_length) is not int or byte_length <= 0:
+        raise ValueError("positive PDF byteLength is required")
+    with tempfile.TemporaryDirectory(prefix="pdf-magic-upload-") as folder:
+        path = Path(folder) / "source.pdf"
+        received = 0
+        with path.open("wb") as output:
+            send_message({"ok": True})
+            while True:
+                chunk = read_message()
+                if chunk.get("action") == "enhance-pdf-finish":
+                    break
+                if chunk.get("action") != "enhance-pdf-chunk":
+                    raise ValueError("expected PDF chunk or finish")
+                data = base64.b64decode(chunk.get("data", ""), validate=True)
+                if not data or len(data) > 256 * 1024:
+                    raise ValueError("invalid PDF chunk size")
+                received += len(data)
+                if received > byte_length:
+                    raise ValueError("PDF upload exceeds declared byteLength")
+                output.write(data)
+                send_message({"ok": True})
+        if received != byte_length:
+            raise ValueError("incomplete PDF upload")
+        with path.open("rb") as uploaded:
+            if b"%PDF-" not in uploaded.read(1024):
+                raise ValueError("uploaded document is not a PDF")
+        return enhance_pdf(source_url, reference_url, uploaded_path=path)
 
 
 def stamp_mode() -> int:
@@ -338,7 +388,7 @@ def main() -> int:
 
     try:
         message = read_message()
-        if message.get("action") != "enhance-pdf":
+        if message.get("action") not in {"enhance-pdf", "enhance-pdf-start"}:
             raise ValueError("unsupported native-host action")
 
         source_url = str(message.get("sourceUrl") or "")
@@ -346,7 +396,10 @@ def main() -> int:
         if not source_url or not reference_url:
             raise ValueError("sourceUrl and referenceUrl are required")
 
-        output_path = enhance_pdf(source_url, reference_url)
+        output_path = (
+            enhance_uploaded_pdf(message) if message["action"] == "enhance-pdf-start"
+            else enhance_pdf(source_url, reference_url)
+        )
         send_message(
             {
                 "ok": True,

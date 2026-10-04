@@ -1,5 +1,6 @@
 import { resolveDocumentReferenceUrl } from "./document-reference-url.js";
 import { resolvePdfSource } from "./pdf-source.js";
+import { pdfDocumentSessionReady } from "./pdf-document-session.js";
 
 const NATIVE_HOST = "org.pdfmagic.enhancer";
 const enhanceNav = document.querySelector("#enhance-nav");
@@ -11,6 +12,59 @@ const toast = document.querySelector("#toast");
 const defaultTitle = enhanceButton.title;
 let titleResetTimer;
 let toastTimer;
+
+async function enhanceLoadedPdf(sourceUrl, referenceUrl) {
+  const session = await pdfDocumentSessionReady;
+  if (!session?.document) throw new Error("PDF has not finished loading");
+  const data = await session.document.getData();
+  const port = chrome.runtime.connectNative(NATIVE_HOST);
+  let pending;
+  let disconnected = false;
+  let disconnectMessage;
+  port.onMessage.addListener((response) => {
+    const request = pending;
+    pending = null;
+    if (!response?.ok) {
+      request?.reject(new Error(response?.error || "PDF enhancer failed"));
+    } else {
+      request?.resolve(response);
+    }
+  });
+  port.onDisconnect.addListener(() => {
+    disconnected = true;
+    disconnectMessage = chrome.runtime.lastError?.message || "PDF enhancer disconnected";
+    pending?.reject(new Error(disconnectMessage));
+    pending = null;
+  });
+  function request(message) {
+    if (disconnected) return Promise.reject(new Error(disconnectMessage));
+    return new Promise((resolve, reject) => {
+      pending = { resolve, reject };
+      try {
+        port.postMessage(message);
+      } catch (error) {
+        pending = null;
+        reject(error);
+      }
+    });
+  }
+  try {
+    await request({ action: "enhance-pdf-start", sourceUrl, referenceUrl, byteLength: data.length });
+    // Acknowledge each chunk so large PDFs do not fill the native-message queue.
+    const chunkSize = 256 * 1024;
+    for (let offset = 0; offset < data.length; offset += chunkSize) {
+      const chunk = data.subarray(offset, offset + chunkSize);
+      let binary = "";
+      for (let index = 0; index < chunk.length; index += 8192) {
+        binary += String.fromCharCode(...chunk.subarray(index, index + 8192));
+      }
+      await request({ action: "enhance-pdf-chunk", data: btoa(binary) });
+    }
+    return await request({ action: "enhance-pdf-finish" });
+  } finally {
+    port.disconnect();
+  }
+}
 
 function syncEnhancerSlot() {
   enhanceNav.hidden = !sectionNav.hidden;
@@ -68,11 +122,11 @@ async function enhanceCurrentPdf() {
       throw new Error("PDF source URL unavailable");
     }
 
-    const response = await chrome.runtime.sendNativeMessage(NATIVE_HOST, {
-      action: "enhance-pdf",
-      sourceUrl: source.originalUrl.href,
-      referenceUrl,
-    });
+    const response = source.originalUrl.protocol === "file:"
+      ? await chrome.runtime.sendNativeMessage(NATIVE_HOST, {
+        action: "enhance-pdf", sourceUrl: source.originalUrl.href, referenceUrl,
+      })
+      : await enhanceLoadedPdf(source.originalUrl.href, referenceUrl);
 
     if (!response?.ok || !response.outputUrl) {
       throw new Error(response?.error || "PDF enhancer did not return a local copy");

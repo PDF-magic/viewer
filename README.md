@@ -48,6 +48,10 @@ If the native host is unavailable, the enhancer control becomes a link to these 
 
 The installer registers the host for both Chrome and Brave. The host locates Homebrew tools even when the browser is launched from Finder and keeps OCR logs separate from native-messaging responses.
 
+For web PDFs, the viewer sends the already-loaded document to the host in acknowledged chunks. Enhancement does not make another HTTP download, so it can use PDFs that the browser loaded from sites that reject standalone requests. Local PDFs are read directly from disk. Update the enhancer checkout as well: the host passes `--skip-text` to preserve pages that already contain text while OCR processes scanned pages.
+
+Enhanced web copies are saved under `~/Library/Application Support/PDF Magic/Enhanced` on macOS or `~/.local/share/pdf-magic/enhanced` on Linux. This lets browser-launched helpers finish tagging without needing to replace files in the protected Downloads folder. Enhanced local copies are saved beside their source PDF.
+
 The host runs `ocr-scanned-pdf.sh`, uses the OCR tagging report to name the new local `*-enhanced-ocr.pdf` copy from the document's recognized title when a credible title is available, and falls back to the source URL filename otherwise. It also stamps the original reference URL into the PDF's XMP metadata as a `pdfmagic:href` tag. The current tab is replaced with the enhanced local copy. Copy File URL, Copy Page Link, and Summarize with ChatGPT then use the preserved reference URL instead of the local `file://` path. Older enhanced copies with `PDFMagicSourceURL` document-info metadata remain supported.
 
 Enable **Allow access to file URLs** for the unpacked extension in Chrome or Brave so the enhanced local PDF reopens in this viewer.
