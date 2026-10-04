@@ -276,6 +276,22 @@ function goToPage(pageNumber, behavior = "smooth") {
   });
 }
 
+function goToFootnote(target) {
+  if (!pdfDocument || !target) return;
+  const page = pageElements[target.pageNumber - 1];
+  if (!page) return;
+
+  setCurrentPage(target.pageNumber);
+  const toolbarHeight = document.querySelector(".toolbar")?.getBoundingClientRect().height || 52;
+  const scrubberHeight = document.querySelector("#document-scrubber")?.getBoundingClientRect().height || 0;
+  const readableHeight = Math.max(1, window.innerHeight - toolbarHeight - scrubberHeight);
+  const rect = page.getBoundingClientRect();
+  window.scrollTo({
+    top: Math.max(0, window.scrollY + rect.top + rect.height * target.yRatio - toolbarHeight - readableHeight / 2),
+    behavior: "instant",
+  });
+}
+
 function showToast(message) {
   clearTimeout(toastTimer);
   toast.textContent = message;
@@ -1203,6 +1219,7 @@ async function downloadPdf() {
 }
 
 function bindControls() {
+  window.addEventListener("pdf-viewer-footnote-jump", (event) => goToFootnote(event.detail));
   previousButton.addEventListener("click", () => goToPage(currentPage - 1));
   nextButton.addEventListener("click", () => goToPage(currentPage + 1));
   shareButton.addEventListener("click", () => void shareCurrentPage());

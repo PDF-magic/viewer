@@ -61,31 +61,7 @@ async function findFootnoteTarget(pdfDocument, number, originPage, requestId) {
 }
 
 function scrollToTarget(target) {
-  if (!pageNumberInput) {
-    return;
-  }
-
-  pageNumberInput.value = String(target.pageNumber);
-  pageNumberInput.dispatchEvent(new Event("change", { bubbles: true }));
-
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      const page = document.querySelector(`.page[data-page="${target.pageNumber}"]`);
-      if (!page) {
-        return;
-      }
-
-      const toolbarHeight = document.querySelector(".toolbar")?.getBoundingClientRect().height || 52;
-      const pageRect = page.getBoundingClientRect();
-      const targetTop = window.scrollY + pageRect.top + pageRect.height * target.yRatio;
-      const scrubberHeight = document.querySelector("#document-scrubber")?.getBoundingClientRect().height || 0;
-      const readableHeight = Math.max(1, window.innerHeight - toolbarHeight - scrubberHeight);
-      window.scrollTo({
-        top: Math.max(0, targetTop - toolbarHeight - readableHeight / 2),
-        behavior: "smooth",
-      });
-    });
-  });
+  window.dispatchEvent(new CustomEvent("pdf-viewer-footnote-jump", { detail: target }));
 }
 
 async function jumpToFootnote(rawNumber) {

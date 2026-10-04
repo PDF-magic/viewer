@@ -79,3 +79,24 @@ test("footnote lookup rejects a centered footer page number by itself", () => {
 
   assert.equal(candidateForPage(items, viewport, 12, 4, 4), undefined);
 });
+
+
+test("footnote navigation scrolls once to the note without an intermediate page jump", () => {
+  const viewerSource = readFileSync(new URL("../src/viewer/viewer.js", import.meta.url), "utf8");
+  const start = viewerSource.indexOf("function goToFootnote(");
+  const end = viewerSource.indexOf("function showToast(", start);
+  const events = [];
+  const context = vm.createContext({
+    pdfDocument: {},
+    pageElements: [null, { getBoundingClientRect: () => ({ top: 10000, height: 1200 }) }],
+    setCurrentPage: (pageNumber) => events.push({ pageNumber }),
+    document: { querySelector: (selector) => ({ getBoundingClientRect: () => ({ height: selector === ".toolbar" ? 52 : 28 }) }) },
+    window: { innerHeight: 900, scrollY: 200, scrollTo: (options) => events.push(options) },
+  });
+  vm.runInContext(viewerSource.slice(start, end), context);
+  context.goToFootnote({ pageNumber: 2, yRatio: 0.8 });
+  assert.equal(events.length, 2);
+  assert.equal(events[0].pageNumber, 2);
+  assert.equal(events[1].top, 10698);
+  assert.equal(events[1].behavior, "instant");
+});
