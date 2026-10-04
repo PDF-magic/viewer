@@ -227,6 +227,8 @@ function syncMinimap() {
   const contentHeight = tileHeights.reduce((total, height) => total + height, 0);
   mapHeight = minimapMode() === "overview" ? Math.min(trackHeight, contentHeight) : contentHeight;
 
+  // Clip the full thumbnail strip before moving it through the visible track.
+  minimapPages.style.height = `${mapHeight}px`;
   const strip = minimapPages.querySelector(".minimap-strip");
   if (strip) {
     strip.style.height = `${mapHeight}px`;

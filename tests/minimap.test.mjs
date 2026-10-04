@@ -55,8 +55,28 @@ function fixture(count, height = 900) {
   vm.runInContext(source, context);
   const sync = () => vm.runInContext('syncMinimap()', context);
   sync();
-  return { window, windowEvents, tiles, track, viewport, toggle, classes, storedValues, context, sync, listeners };
+  return { window, windowEvents, tiles, track, viewport, toggle, classes, storedValues, context, sync, listeners, minimapPageContainer };
 }
+
+test('switching to local view keeps thumbnails unclipped at the middle and end', () => {
+  const f = fixture(100);
+  const maximum = 100 * 1420 - f.window.innerHeight;
+  for (const scrollY of [maximum / 2, maximum]) {
+    f.window.scrollY = scrollY;
+    vm.runInContext('setMinimapMode("local")', f.context);
+    f.sync();
+    const height = parseFloat(f.minimapPageContainer.style.height);
+    const offset = vm.runInContext('mapOffset', f.context);
+    assert.equal(height, 100 * 112);
+    assert.ok(offset > f.track.clientHeight);
+    assert.ok(height - offset >= f.track.clientHeight);
+
+    vm.runInContext('setMinimapMode("overview")', f.context);
+    f.sync();
+    assert.equal(parseFloat(f.minimapPageContainer.style.height), f.track.clientHeight);
+    assert.equal(vm.runInContext('mapOffset', f.context), 0);
+  }
+});
 
 test('short documents keep fixed thumbnail heights at the top after resize', () => {
   const f = fixture(2);
