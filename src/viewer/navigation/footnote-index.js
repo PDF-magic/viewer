@@ -167,6 +167,6 @@ export function footnotesForPage(items, viewport, pageNumber) {
       return withinNote && sameType && !footer && entry.xRatio >= note.xRatio - 0.02;
     }).sort((a, b) => Math.abs(a.y - b.y) < 2 ? a.x - b.x : a.y - b.y)
       .map((entry) => entry.text).join(" ").replace(markerPattern(note.number), "").trim();
-    return { ...note, text: text.slice(0, 1000) };
+    return { ...note, text };
   }).filter((note) => note.text.length >= 3);
 }

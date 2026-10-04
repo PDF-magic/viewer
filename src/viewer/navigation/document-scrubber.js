@@ -24,7 +24,11 @@ function clampIndex(value) {
 function previewNote(index) {
   const note = notes[index];
   if (!note) return;
-  preview.textContent = `Footnote ${note.number} · page ${note.pageNumber}\n${note.text}`;
+  const text = `Note ${note.number} at ${note.pageNumber}\n${note.text}`;
+  if (preview.textContent !== text) {
+    preview.textContent = text;
+    preview.scrollTop = 0;
+  }
 }
 
 function updateScrubber(index) {
@@ -121,13 +125,21 @@ range?.addEventListener("change", () => navigateToFootnote(range.value));
 range?.addEventListener("pointerdown", () => { dragging = true; });
 window.addEventListener("pointerup", () => { dragging = false; });
 window.addEventListener("pointercancel", () => { dragging = false; });
+track?.addEventListener("pointermove", (event) => {
+  if (preview.contains(event.target)) return;
+  const rect = track.getBoundingClientRect();
+  track.style.setProperty("--scrubber-preview-x", `${event.clientX - rect.left}px`);
+});
+track?.addEventListener("pointerleave", () => {
+  track.style.removeProperty("--scrubber-preview-x");
+  previewNote(clampIndex(range.value));
+});
 range?.addEventListener("pointermove", (event) => {
   if (dragging) return;
   const rect = range.getBoundingClientRect();
   const progress = Math.min(1, Math.max(0, (event.clientX - rect.left - 7) / Math.max(1, rect.width - 14)));
   previewNote(Math.round(progress * (notes.length - 1)));
 });
-range?.addEventListener("pointerleave", () => previewNote(clampIndex(range.value)));
 window.addEventListener("scroll", scheduleTracking, { passive: true });
 window.addEventListener("resize", () => {
   updateScrubber(clampIndex(range.value));

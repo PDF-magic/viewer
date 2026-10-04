@@ -638,7 +638,7 @@ input {
 .document-scrubber-preview {
   position: absolute;
   bottom: 28px;
-  left: clamp(0px, calc(var(--scrubber-thumb-x, 7px) - 160px), max(0px, calc(100% - 320px)));
+  left: clamp(0px, calc(var(--scrubber-preview-x, var(--scrubber-thumb-x, 7px)) - min(160px, 40vw)), max(0px, calc(100% - min(320px, 80vw))));
   width: min(320px, 80vw);
   padding: 10px 12px;
   border: 1px solid var(--border);
@@ -649,17 +649,28 @@ input {
   font-size: 12px;
   line-height: 1.45;
   white-space: pre-line;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 5;
-  overflow: hidden;
+  max-height: min(240px, 40vh);
+  overflow: auto;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
   visibility: hidden;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .document-scrubber-track:hover .document-scrubber-preview,
 .document-scrubber-track:focus-within .document-scrubber-preview {
   visibility: visible;
+}
+
+/* Keep the hover area connected across the gap above the slider. */
+.document-scrubber-track:hover::before,
+.document-scrubber-track:focus-within::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  width: 100%;
+  height: 14px;
 }
 
 .document-scrubber-input {
