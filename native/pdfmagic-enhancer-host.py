@@ -68,6 +68,149 @@ def unique_output(directory: Path, stem: str) -> Path:
     return candidate
 
 
+def prettify_ocr_heading(value: str) -> str:
+    text = re.sub(r"\s+", " ", value).strip(" .-_")
+    if not text:
+        return ""
+
+    letters = [character for character in text if character.isalpha()]
+    uppercase_ratio = (
+        sum(character.isupper() for character in letters) / len(letters)
+        if letters
+        else 0
+    )
+    if uppercase_ratio < 0.9:
+        return text
+
+    small_words = {
+        "A",
+        "AN",
+        "AND",
+        "AS",
+        "AT",
+        "BY",
+        "FOR",
+        "FROM",
+        "IN",
+        "OF",
+        "ON",
+        "OR",
+        "THE",
+        "TO",
+        "WITH",
+    }
+    raw_words = text.split()
+    words: list[str] = []
+    for index, word in enumerate(raw_words):
+        core = re.sub(r"[^A-Za-z]", "", word)
+        if not core:
+            words.append(word)
+        elif core in small_words and index not in {0, len(raw_words) - 1}:
+            words.append(word.lower())
+        elif core.isupper() and len(core) <= 4:
+            words.append(word)
+        else:
+            words.append(word.capitalize())
+    return " ".join(words)
+
+
+def filename_stem(value: str) -> str | None:
+    text = re.sub(r"\s+", " ", value).strip()
+    text = re.sub(r'[\x00-\x1f/:*?"<>|\\]+', "-", text)
+    text = re.sub(r"\s*-\s*", " - ", text)
+    text = text.strip(" .-_")
+    if not text:
+        return None
+    return text[:140].rstrip(" .-_")
+
+
+def ocr_title_stem(report_path: Path) -> str | None:
+    try:
+        report = json.loads(report_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+
+    headings = report.get("headings")
+    if not isinstance(headings, list):
+        return None
+
+    structural_heading = re.compile(
+        r"^(?:appendix|chapter|contents|index|introduction|part|preface|"
+        r"section|table(?:\s+of\s+contents)?)\b",
+        re.IGNORECASE,
+    )
+    candidates: list[tuple[int, str]] = []
+    for heading in headings:
+        if not isinstance(heading, dict):
+            continue
+        try:
+            page = int(heading.get("page", 0))
+        except (TypeError, ValueError):
+            continue
+        text = prettify_ocr_heading(str(heading.get("text") or ""))
+        if (
+            page < 1
+            or page > 2
+            or len(text) < 4
+            or len(text) > 140
+            or structural_heading.match(text)
+        ):
+            continue
+        candidates.append((page, text))
+
+    if not candidates:
+        return None
+
+    title_page = min(page for page, _text in candidates)
+    parts: list[str] = []
+    for page, text in candidates:
+        if page != title_page or text in parts:
+            continue
+        proposed = " - ".join([*parts, text])
+        if len(proposed) > 140:
+            if not parts:
+                parts.append(text[:140].rstrip())
+            break
+        parts.append(text)
+        if len(parts) == 3:
+            break
+
+    return filename_stem(" - ".join(parts))
+
+
+def rename_for_ocr_title(output_path: Path) -> Path:
+    report_path = output_path.with_suffix(".tagging.json")
+    title_stem = ocr_title_stem(report_path)
+    if not title_stem:
+        return output_path
+
+    preferred_output = output_path.parent / f"{title_stem}-enhanced-ocr.pdf"
+    if preferred_output == output_path:
+        return output_path
+
+    titled_output = unique_output(output_path.parent, title_stem)
+    moves = [
+        (output_path, titled_output),
+        (output_path.with_suffix(".txt"), titled_output.with_suffix(".txt")),
+        (report_path, titled_output.with_suffix(".tagging.json")),
+    ]
+    if not all(source.exists() for source, _destination in moves):
+        return output_path
+
+    for source, destination in moves:
+        source.replace(destination)
+
+    titled_report = titled_output.with_suffix(".tagging.json")
+    try:
+        report = json.loads(titled_report.read_text())
+        report["output"] = str(titled_output)
+        titled_report.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n")
+    except (OSError, json.JSONDecodeError, TypeError):
+        pass
+
+    return titled_output
+
+
 def input_from_url(source_url: str, temporary_directory: Path) -> tuple[Path, bool]:
     parsed = urlparse(source_url)
     if parsed.scheme == "file":
@@ -146,6 +289,7 @@ def enhance_pdf(source_url: str, reference_url: str) -> Path:
             ["/bin/bash", str(enhancer), str(input_path), str(output_path)],
             check=True,
         )
+        output_path = rename_for_ocr_title(output_path)
         stamp_source_url(output_path, reference_url)
         return output_path.resolve()
 
