@@ -24,7 +24,7 @@ function loadFootnoteHelpers() {
     RegExp,
     String,
   });
-  const runnableSource = source.replace(/^import .*\n/, "");
+  const runnableSource = (readFileSync(new URL("../src/viewer/navigation/footnote-index.js", import.meta.url), "utf8") + source).replace(/^import .*$/gm, "").replace(/^export \{.*$/gm, "").replace(/^export /gm, "");
   vm.runInContext(runnableSource, context);
   return context;
 }

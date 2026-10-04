@@ -576,7 +576,7 @@ input {
 }
 
 :root {
-  --document-scrubber-height: 44px;
+  --document-scrubber-height: 0px;
 }
 
 .document-scrubber {
@@ -587,7 +587,7 @@ input {
   grid-template-columns: minmax(24px, auto) minmax(0, 1fr) minmax(24px, auto);
   align-items: center;
   gap: 10px;
-  height: 44px;
+  height: 28px;
   padding: 4px 12px;
   border-top: 1px solid var(--border);
   background: var(--toolbar-bg);
@@ -605,15 +605,17 @@ input {
 .document-scrubber-track {
   position: relative;
   min-width: 0;
-  height: 36px;
+  height: 18px;
+  margin-left: 42px;
   --scrubber-progress: 0;
 }
 
 .document-scrubber-current {
   position: absolute;
-  top: 0;
-  left: clamp(14px, calc(var(--scrubber-progress) * 100%), calc(100% - 14px));
-  transform: translateX(-50%);
+  top: 50%;
+  left: calc(var(--scrubber-thumb-x, 7px) - 12px);
+  transform: translate(-100%, -50%);
+  z-index: 1;
   min-width: 28px;
   padding: 1px 5px;
   border-radius: 999px;
@@ -626,9 +628,36 @@ input {
   pointer-events: none;
 }
 
+.document-scrubber-preview {
+  position: absolute;
+  bottom: 28px;
+  left: clamp(0px, calc(var(--scrubber-thumb-x, 7px) - 160px), max(0px, calc(100% - 320px)));
+  width: min(320px, 80vw);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--toolbar-bg);
+  color: var(--text);
+  box-shadow: 0 4px 18px #0003;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.document-scrubber-track:hover .document-scrubber-preview,
+.document-scrubber-track:focus-within .document-scrubber-preview {
+  visibility: visible;
+}
+
 .document-scrubber-input {
   position: absolute;
-  inset: auto 0 2px;
+  inset: 0;
   width: 100%;
   height: 18px;
   margin: 0;
@@ -698,7 +727,7 @@ input {
   align-items: center;
   gap: 0;
   min-height: 100vh;
-  padding: 76px 16px 64px;
+  padding: 76px 16px calc(20px + var(--document-scrubber-height));
 }
 
 .page {

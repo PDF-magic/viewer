@@ -197,9 +197,10 @@
       </div>
     </aside>
 
-    <nav id="document-scrubber" class="document-scrubber" aria-label="Document position">
-      <span class="document-scrubber-edge" aria-hidden="true">1</span>
+    <nav id="document-scrubber" class="document-scrubber" aria-label="Footnote navigation" hidden>
+      <span id="document-scrubber-start" class="document-scrubber-edge" aria-hidden="true">1</span>
       <div class="document-scrubber-track">
+        <div id="document-scrubber-preview" class="document-scrubber-preview" role="tooltip"></div>
         <output id="document-scrubber-current" class="document-scrubber-current" for="document-scrubber-range">1</output>
         <input
           id="document-scrubber-range"
@@ -209,7 +210,7 @@
           max="1"
           step="1"
           value="1"
-          aria-label="Document page"
+          aria-label="Footnote" aria-describedby="document-scrubber-preview"
         />
       </div>
       <span id="document-scrubber-end" class="document-scrubber-edge document-scrubber-end" aria-hidden="true">—</span>

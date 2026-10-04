@@ -1,0 +1,10 @@
+
+fit page to widths doest soom to work on https://www.sec.gov/comments/s7-25-20/s72520-8569142-230826.pdf
+
+all ocr tests go dub chechk
+
+
+enhance pdf install button doesnt work
+aas just use 'href' rather than The native enhancer writes this document-info entry:
+/PDFMagicSourceURL
+it shoeld be an actuar meta tag
