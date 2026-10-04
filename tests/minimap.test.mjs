@@ -237,7 +237,7 @@ test('minimap shares the viewer document and its cached fingerprint', () => {
   assert.match(source, /cachedStripPromise = restoreCachedThumbnailStrip\(generation\);[\s\S]*?await waitForPageElements/);
   assert.doesNotMatch(source, /getDocument\(/);
   assert.doesNotMatch(source, /resolvePdfSource\(/);
-  assert.match(viewerSource, /publishPdfDocument\(pdfDocument\)/);
+  assert.match(viewerSource, /publishPdfDocument\(pdfDocument, OPS\)/);
 });
 
 

@@ -1,101 +1,183 @@
 import { pdfDocumentSessionReady } from "../pdf-document-session.js";
+import { appendFootnotesForPage } from "./footnote-index.js";
+import { scrollToTarget } from "./footnote-jump.js";
 
-const viewer = document.querySelector("#viewer");
 const scrubber = document.querySelector("#document-scrubber");
 const range = document.querySelector("#document-scrubber-range");
 const currentLabel = document.querySelector("#document-scrubber-current");
+const startLabel = document.querySelector("#document-scrubber-start");
 const endLabel = document.querySelector("#document-scrubber-end");
-const pageNumberInput = document.querySelector("#page-number");
+const preview = document.querySelector("#document-scrubber-preview");
+const track = document.querySelector(".document-scrubber-track");
 
-let totalPages = 1;
+let notes = [];
 let navigationFrame;
 let trackingFrame;
-let pendingPage = 1;
+let pendingIndex = 0;
+let dragging = false;
+let editingNumber = false;
 
-function clampPage(value) {
-  const page = Number.parseInt(String(value), 10) || 1;
-  return Math.min(Math.max(page, 1), totalPages);
+function clampIndex(value) {
+  return Math.min(Math.max((Number.parseInt(value, 10) || 1) - 1, 0), notes.length - 1);
 }
 
-function updateScrubber(pageNumber) {
-  const page = clampPage(pageNumber);
-  const progress = totalPages > 1 ? (page - 1) / (totalPages - 1) : 0;
-
-  range.value = String(page);
-  range.setAttribute("aria-valuetext", `Page ${page} of ${totalPages}`);
-  currentLabel.value = String(page);
-  currentLabel.textContent = String(page);
-  scrubber.style.setProperty("--scrubber-progress", String(progress));
-  document.querySelector(".document-scrubber-track")?.style.setProperty(
-    "--scrubber-progress",
-    String(progress),
-  );
-}
-
-function flushNavigation() {
-  navigationFrame = undefined;
-  const page = clampPage(pendingPage);
-
-  updateScrubber(page);
-  pageNumberInput.value = String(page);
-  pageNumberInput.dispatchEvent(new Event("change", { bubbles: true }));
-}
-
-function navigateToPage(pageNumber) {
-  pendingPage = clampPage(pageNumber);
-  updateScrubber(pendingPage);
-
-  if (!navigationFrame) {
-    navigationFrame = requestAnimationFrame(flushNavigation);
+function previewNote(index) {
+  const note = notes[index];
+  if (!note) return;
+  const text = `Note ${note.number} at ${note.pageNumber}\n${note.text}`;
+  if (preview.textContent !== text) {
+    preview.textContent = text;
+    preview.scrollTop = 0;
   }
 }
 
-function pageAtViewportCenter() {
-  const toolbarHeight = document.querySelector(".toolbar")?.getBoundingClientRect().height || 52;
-  const scrubberHeight = scrubber?.getBoundingClientRect().height || 44;
-  const readableHeight = Math.max(1, window.innerHeight - toolbarHeight - scrubberHeight);
-  const y = toolbarHeight + readableHeight / 2;
-  const target = document.elementFromPoint(window.innerWidth / 2, y)?.closest(".page");
-
-  return target?.dataset.page ? clampPage(target.dataset.page) : null;
+function updateScrubber(index) {
+  const note = notes[index];
+  if (!note) return;
+  const progress = notes.length > 1 ? index / (notes.length - 1) : 0;
+  range.value = String(index + 1);
+  range.setAttribute("aria-valuetext", `Footnote ${note.number}, ${index + 1} of ${notes.length}, page ${note.pageNumber}: ${note.text}`);
+  if (!editingNumber) currentLabel.value = String(note.number);
+  track.style.setProperty("--scrubber-progress", String(progress));
+  // Match the native thumb's center, including its radius at both endpoints.
+  track.style.setProperty("--scrubber-thumb-x", `${7 + progress * Math.max(0, track.clientWidth - 14)}px`);
+  previewNote(index);
 }
 
-function scheduleTracking() {
-  if (trackingFrame) {
-    return;
-  }
-
-  trackingFrame = requestAnimationFrame(() => {
-    trackingFrame = undefined;
-    const page = pageAtViewportCenter();
-    if (page !== null) {
-      updateScrubber(page);
-    }
+function navigateToFootnote(value) {
+  pendingIndex = clampIndex(value);
+  updateScrubber(pendingIndex);
+  if (navigationFrame) return;
+  navigationFrame = requestAnimationFrame(() => {
+    navigationFrame = undefined;
+    scrollToTarget(notes[pendingIndex]);
   });
 }
 
-range?.addEventListener("input", () => navigateToPage(range.value));
-range?.addEventListener("change", () => navigateToPage(range.value));
-
-window.addEventListener("scroll", scheduleTracking, { passive: true });
-window.addEventListener("resize", scheduleTracking);
-
-const pageObserver = new MutationObserver(scheduleTracking);
-if (viewer) {
-  pageObserver.observe(viewer, { childList: true });
+function trackPosition() {
+  if (!notes.length || dragging || navigationFrame || editingNumber) return;
+  const toolbarHeight = document.querySelector(".toolbar")?.getBoundingClientRect().height || 52;
+  const y = toolbarHeight + (window.innerHeight - toolbarHeight - scrubber.getBoundingClientRect().height) / 2;
+  const page = document.elementFromPoint(window.innerWidth / 2, y)?.closest(".page");
+  if (!page) return;
+  const pageNumber = Number(page.dataset.page);
+  const rect = page.getBoundingClientRect();
+  const yRatio = (y - rect.top) / Math.max(1, rect.height);
+  // Allow for the superscript baseline and rounded rendered page dimensions.
+  const markerTolerance = 8 / Math.max(1, rect.height);
+  const selected = clampIndex(range.value);
+  if (notes[selected]?.pageNumber === pageNumber && Math.abs(notes[selected].yRatio - yRatio) <= markerTolerance) return;
+  let index = 0;
+  let distance = Infinity;
+  for (let i = 0; i < notes.length; i += 1) {
+    const note = notes[i];
+    if (note.pageNumber > pageNumber) break;
+    if (note.pageNumber < pageNumber) { index = i; continue; }
+    const delta = Math.abs(note.yRatio - yRatio);
+    if (delta < distance) { distance = delta; index = i; }
+  }
+  updateScrubber(index);
 }
+
+function scheduleTracking() {
+  if (trackingFrame || !notes.length) return;
+  trackingFrame = requestAnimationFrame(() => {
+    trackingFrame = undefined;
+    trackPosition();
+  });
+}
+
+currentLabel?.addEventListener("focus", () => {
+  editingNumber = true;
+  currentLabel.select();
+});
+currentLabel?.addEventListener("click", () => currentLabel.select());
+currentLabel?.addEventListener("input", () => currentLabel.setCustomValidity(""));
+currentLabel?.addEventListener("blur", () => {
+  editingNumber = false;
+  currentLabel.setCustomValidity("");
+  updateScrubber(clampIndex(range.value));
+  scheduleTracking();
+});
+currentLabel?.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    currentLabel.blur();
+    return;
+  }
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  const rawNumber = currentLabel.value.trim();
+  const number = /^\d+$/.test(rawNumber) ? Number(rawNumber) : NaN;
+  const currentIndex = clampIndex(range.value);
+  let targetIndex = -1;
+  for (let index = 0; index < notes.length; index += 1) {
+    if (notes[index].number === number && (targetIndex < 0 ||
+      Math.abs(index - currentIndex) < Math.abs(targetIndex - currentIndex))) targetIndex = index;
+  }
+  if (targetIndex < 0) {
+    currentLabel.setCustomValidity("Enter a footnote number found in this document.");
+    currentLabel.reportValidity();
+    return;
+  }
+  editingNumber = false;
+  navigateToFootnote(targetIndex + 1);
+  currentLabel.blur();
+});
+
+range?.addEventListener("input", () => navigateToFootnote(range.value));
+range?.addEventListener("change", () => navigateToFootnote(range.value));
+range?.addEventListener("pointerdown", () => { dragging = true; });
+window.addEventListener("pointerup", () => { dragging = false; });
+window.addEventListener("pointercancel", () => { dragging = false; });
+track?.addEventListener("pointermove", (event) => {
+  if (preview.contains(event.target)) return;
+  const rect = track.getBoundingClientRect();
+  track.style.setProperty("--scrubber-preview-x", `${event.clientX - rect.left}px`);
+});
+track?.addEventListener("pointerleave", () => {
+  track.style.removeProperty("--scrubber-preview-x");
+  previewNote(clampIndex(range.value));
+});
+range?.addEventListener("pointermove", (event) => {
+  if (dragging) return;
+  const rect = range.getBoundingClientRect();
+  const progress = Math.min(1, Math.max(0, (event.clientX - rect.left - 7) / Math.max(1, rect.width - 14)));
+  previewNote(Math.round(progress * (notes.length - 1)));
+});
+window.addEventListener("scroll", scheduleTracking, { passive: true });
+window.addEventListener("resize", () => {
+  updateScrubber(clampIndex(range.value));
+  scheduleTracking();
+});
 
 async function initializeScrubber() {
   const session = await pdfDocumentSessionReady;
-  if (!session?.document) {
-    scrubber.hidden = true;
-    return;
+  if (!session?.document) return;
+  let previousPageText;
+  // Only retain compact note metadata; yield between pages so rendering can continue.
+  for (let pageNumber = 1; pageNumber <= session.document.numPages; pageNumber += 1) {
+    try {
+      const page = await session.document.getPage(pageNumber);
+      const content = await page.getTextContent();
+      const viewport = page.getViewport({ scale: 1 });
+      const operators = await page.getOperatorList().catch(() => null);
+      appendFootnotesForPage(notes, content.items, viewport, pageNumber, operators, session.operators, previousPageText);
+      previousPageText = { items: content.items, viewport };
+    } catch (error) {
+      previousPageText = undefined;
+      console.warn(`Could not index footnotes on page ${pageNumber}`, error);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 0));
   }
-
-  totalPages = Math.max(1, session.document.numPages);
-  range.max = String(totalPages);
-  endLabel.textContent = String(totalPages);
-  updateScrubber(pageNumberInput?.value || 1);
+  if (!notes.length) return;
+  range.max = String(notes.length);
+  startLabel.textContent = String(notes[0].number);
+  endLabel.textContent = String(notes.at(-1).number);
+  endLabel.title = `${notes.length} footnotes`;
+  scrubber.hidden = false;
+  document.documentElement.style.setProperty("--document-scrubber-height", "28px");
+  updateScrubber(0);
   scheduleTracking();
 }
 

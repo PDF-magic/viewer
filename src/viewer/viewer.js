@@ -1,4 +1,4 @@
-import { AnnotationLayer, createValidAbsoluteUrl, getDocument, GlobalWorkerOptions, TextLayer, VerbosityLevel } from "../../node_modules/pdfjs-dist/build/pdf.mjs";
+import { AnnotationLayer, createValidAbsoluteUrl, getDocument, GlobalWorkerOptions, OPS, TextLayer, VerbosityLevel } from "../../node_modules/pdfjs-dist/build/pdf.mjs";
 import { EventBus, PDFLinkService } from "../../node_modules/pdfjs-dist/web/pdf_viewer.mjs";
 import { abandonPdfDocumentSession, publishPdfDocument } from "./pdf-document-session.js";
 import { resolveDocumentReferenceUrl } from "./document-reference-url.js";
@@ -273,6 +273,22 @@ function goToPage(pageNumber, behavior = "smooth") {
   window.scrollTo({
     top: Math.max(0, pageTop - toolbarHeight - pageGap),
     behavior: scrollBehavior,
+  });
+}
+
+function goToFootnote(target) {
+  if (!pdfDocument || !target) return;
+  const page = pageElements[target.pageNumber - 1];
+  if (!page) return;
+
+  setCurrentPage(target.pageNumber);
+  const toolbarHeight = document.querySelector(".toolbar")?.getBoundingClientRect().height || 52;
+  const scrubberHeight = document.querySelector("#document-scrubber")?.getBoundingClientRect().height || 0;
+  const readableHeight = Math.max(1, window.innerHeight - toolbarHeight - scrubberHeight);
+  const rect = page.getBoundingClientRect();
+  window.scrollTo({
+    top: Math.max(0, window.scrollY + rect.top + rect.height * target.yRatio - toolbarHeight - readableHeight / 2),
+    behavior: "instant",
   });
 }
 
@@ -1203,6 +1219,7 @@ async function downloadPdf() {
 }
 
 function bindControls() {
+  window.addEventListener("pdf-viewer-footnote-jump", (event) => goToFootnote(event.detail));
   previousButton.addEventListener("click", () => goToPage(currentPage - 1));
   nextButton.addEventListener("click", () => goToPage(currentPage + 1));
   shareButton.addEventListener("click", () => void shareCurrentPage());
@@ -1350,7 +1367,7 @@ async function initialize() {
 
   const loadingTask = getDocument(documentOptions);
   pdfDocument = await loadingTask.promise;
-  publishPdfDocument(pdfDocument);
+  publishPdfDocument(pdfDocument, OPS);
   pdfLinkService = new PDFLinkService({
     eventBus: new EventBus(),
     externalLinkTarget: 2,

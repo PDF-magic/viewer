@@ -576,7 +576,7 @@ input {
 }
 
 :root {
-  --document-scrubber-height: 44px;
+  --document-scrubber-height: 0px;
 }
 
 .document-scrubber {
@@ -587,7 +587,7 @@ input {
   grid-template-columns: minmax(24px, auto) minmax(0, 1fr) minmax(24px, auto);
   align-items: center;
   gap: 10px;
-  height: 44px;
+  height: 28px;
   padding: 4px 12px;
   border-top: 1px solid var(--border);
   background: var(--toolbar-bg);
@@ -605,16 +605,21 @@ input {
 .document-scrubber-track {
   position: relative;
   min-width: 0;
-  height: 36px;
+  height: 18px;
+  margin-left: 42px;
   --scrubber-progress: 0;
 }
 
 .document-scrubber-current {
   position: absolute;
-  top: 0;
-  left: clamp(14px, calc(var(--scrubber-progress) * 100%), calc(100% - 14px));
-  transform: translateX(-50%);
+  top: 50%;
+  left: calc(var(--scrubber-thumb-x, 7px) - 12px);
+  transform: translate(-100%, -50%);
+  z-index: 1;
+  width: 4ch;
   min-width: 28px;
+  border: 0;
+  font-family: inherit;
   padding: 1px 5px;
   border-radius: 999px;
   background: var(--control-bg);
@@ -623,12 +628,54 @@ input {
   font-variant-numeric: tabular-nums;
   line-height: 15px;
   text-align: center;
-  pointer-events: none;
+  cursor: text;
+}
+
+.document-scrubber-current:focus-visible {
+  outline: 1px solid var(--search-focus-border);
+}
+
+.document-scrubber-preview {
+  position: absolute;
+  bottom: 28px;
+  left: clamp(0px, calc(var(--scrubber-preview-x, var(--scrubber-thumb-x, 7px)) - min(160px, 40vw)), max(0px, calc(100% - min(320px, 80vw))));
+  width: min(320px, 80vw);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--toolbar-bg);
+  color: var(--text);
+  box-shadow: 0 4px 18px #0003;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-line;
+  max-height: min(240px, 40vh);
+  overflow: auto;
+  overscroll-behavior: contain;
+  overflow-wrap: anywhere;
+  visibility: hidden;
+  pointer-events: auto;
+}
+
+.document-scrubber-track:hover .document-scrubber-preview,
+.document-scrubber-track:focus-within .document-scrubber-preview {
+  visibility: visible;
+}
+
+/* Keep the hover area connected across the gap above the slider. */
+.document-scrubber-track:hover::before,
+.document-scrubber-track:focus-within::before {
+  content: "";
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  width: 100%;
+  height: 14px;
 }
 
 .document-scrubber-input {
   position: absolute;
-  inset: auto 0 2px;
+  inset: 0;
   width: 100%;
   height: 18px;
   margin: 0;
@@ -698,7 +745,7 @@ input {
   align-items: center;
   gap: 0;
   min-height: 100vh;
-  padding: 76px 16px 64px;
+  padding: 76px 16px calc(20px + var(--document-scrubber-height));
 }
 
 .page {
