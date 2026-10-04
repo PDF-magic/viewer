@@ -157,7 +157,7 @@ export function footnotesForPage(items, viewport, pageNumber) {
   notes.sort((a, b) => a.yRatio - b.yRatio || a.xRatio - b.xRatio);
   return notes.map((note, index) => {
     const next = notes[index + 1];
-    const text = entries.filter((entry) => {
+    const noteEntries = entries.filter((entry) => {
       const withinNote = entry.y >= note.baseline - 2 &&
         (!next || entry.y < next.yRatio * viewport.height - 2);
       const sameType = Math.abs(entry.height - note.textHeight) <= note.textHeight * 0.15;
@@ -165,8 +165,18 @@ export function footnotesForPage(items, viewport, pageNumber) {
       const footer = entry.yRatio > 0.92 && (/^(?:Page\s+)?\d+(?:\s+of\s+\d+)?$/i.test(entry.text) ||
         (entry.xRatio > 0.35 && entry.xRatio < 0.65));
       return withinNote && sameType && !footer && entry.xRatio >= note.xRatio - 0.02;
-    }).sort((a, b) => Math.abs(a.y - b.y) < 2 ? a.x - b.x : a.y - b.y)
-      .map((entry) => entry.text).join(" ").replace(markerPattern(note.number), "").trim();
+    }).sort((a, b) => Math.abs(a.y - b.y) < 2 ? a.x - b.x : a.y - b.y);
+    const text = noteEntries.reduce((text, entry, index) => {
+      const previous = noteEntries[index - 1];
+      if (!previous) return entry.text;
+      // PDF text runs can split a word at an apostrophe or a font change.
+      const sameLine = Math.abs(previous.y - entry.y) < 2;
+      const gap = entry.x - previous.x - Math.abs(previous.item.width || 0);
+      const explicitSpace = /\s$/.test(previous.item.str) || /^\s/.test(entry.item.str);
+      const contiguous = sameLine && Number.isFinite(previous.item.width) &&
+        gap <= Math.max(previous.height, entry.height) * 0.18 && !explicitSpace;
+      return text + (contiguous ? "" : " ") + entry.text;
+    }, "").replace(markerPattern(note.number), "").trim();
     return { ...note, text };
   }).filter((note) => note.text.length >= 3);
 }

@@ -96,7 +96,7 @@ test("SEC news digest OCR addresses, decimals and dates are not footnotes", () =
 
 test("SEC comment letter keeps full-size note text and notes starting above midpage", () => {
   const pages = realDocumentPages("letter");
-  assert.deepEqual(pages.map((page) => indexFixture(page).map((note) => note.number)), [[1], [4], [41, 42]]);
+  assert.deepEqual(pages.map((page) => indexFixture(page).map((note) => note.number)), [[1], [4], [41, 42], [33, 34]]);
   const [note] = indexFixture(pages[1]);
   assert.ok(note.yRatio < 0.5);
   assert.match(note.text, /classification as a legacy transfer agent/);
@@ -133,4 +133,14 @@ test("invalid typed numbers stay editable and Escape restores the active number"
   field.listeners.keydown({ key: "Escape", preventDefault() {} });
   assert.equal(field.value, "7");
   assert.equal(field.validityMessage, "");
+});
+
+
+test("note 33 joins apostrophes without adding spaces inside words", () => {
+  const page = realDocumentPages("letter").find((page) => page.pageNumber === 46);
+  const note = indexFixture(page).find((note) => note.number === 33);
+  assert.match(note.text, /Commission’s efforts/);
+  assert.match(note.text, /it’s important/);
+  assert.doesNotMatch(note.text, /\s’|’\s/);
+  assert.match(note.text, /review and prevent unauthorized/);
 });
