@@ -34,7 +34,10 @@ function showTemporaryTitle(title) {
 }
 
 async function replaceCurrentTab(outputUrl) {
-  const destination = new URL(outputUrl);
+  const destination = new URL(window.location.href);
+  destination.search = "";
+  destination.hash = "";
+  destination.searchParams.set("url", outputUrl);
   const pageNumber = Number.parseInt(pageNumberInput?.value || "", 10);
   if (Number.isFinite(pageNumber) && pageNumber > 1) {
     destination.hash = `page=${pageNumber}`;

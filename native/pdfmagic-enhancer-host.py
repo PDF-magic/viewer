@@ -265,11 +265,12 @@ def stamp_source_url(output_path: Path, reference_url: str) -> None:
             reference_url,
         ],
         check=True,
+        stdout=sys.stderr,
     )
 
     qpdf = shutil.which("qpdf")
     if qpdf:
-        subprocess.run([qpdf, "--check", str(output_path)], check=True)
+        subprocess.run([qpdf, "--check", str(output_path)], check=True, stdout=sys.stderr)
 
 
 def enhance_pdf(source_url: str, reference_url: str) -> Path:
@@ -288,6 +289,7 @@ def enhance_pdf(source_url: str, reference_url: str) -> Path:
         subprocess.run(
             ["/bin/bash", str(enhancer), str(input_path), str(output_path)],
             check=True,
+            stdout=sys.stderr,
         )
         output_path = rename_for_ocr_title(output_path)
         stamp_source_url(output_path, reference_url)
@@ -327,6 +329,10 @@ def stamp_mode() -> int:
 
 
 def main() -> int:
+    # Browsers launched from Finder do not inherit the shell's Homebrew PATH.
+    os.environ["PATH"] = os.pathsep.join(
+        ["/opt/homebrew/bin", "/usr/local/bin", os.environ.get("PATH", os.defpath)]
+    )
     if len(sys.argv) > 1 and sys.argv[1] == "--stamp":
         return stamp_mode()
 

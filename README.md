@@ -38,7 +38,7 @@ The root manifest points directly at the source files and local `node_modules`, 
 
 The viewer can hand the current PDF to the local PDF-magic/enhancer workflow: https://github.com/PDF-magic/enhancer. The enhancer button occupies the top-left section-control slot only when the PDF has no section navigator.
 
-Chrome extensions cannot start local processes directly, so register the included native-messaging host after loading the unpacked extension. Copy the extension ID from `chrome://extensions`, then run:
+Chrome and Brave extensions cannot start local processes directly, so register the included native-messaging host after loading the unpacked extension. Copy the extension ID from `chrome://extensions` or `brave://extensions`, then run:
 
 ```sh
 ./native/install-host.sh CHROME_EXTENSION_ID /path/to/PDF-magic/enhancer
@@ -46,9 +46,11 @@ Chrome extensions cannot start local processes directly, so register the include
 
 If the native host is unavailable, the enhancer control becomes a link to these setup instructions. After installation, reload the PDF tab to retry enhancement.
 
+The installer registers the host for both Chrome and Brave. The host locates Homebrew tools even when the browser is launched from Finder and keeps OCR logs separate from native-messaging responses.
+
 The host runs `ocr-scanned-pdf.sh`, uses the OCR tagging report to name the new local `*-enhanced-ocr.pdf` copy from the document's recognized title when a credible title is available, and falls back to the source URL filename otherwise. It also stamps the original reference URL into the PDF's XMP metadata as a `pdfmagic:href` tag. The current tab is replaced with the enhanced local copy. Copy File URL, Copy Page Link, and Summarize with ChatGPT then use the preserved reference URL instead of the local `file://` path. Older enhanced copies with `PDFMagicSourceURL` document-info metadata remain supported.
 
-Chrome may require **Allow access to file URLs** for the unpacked extension so the enhanced local PDF reopens in this viewer.
+Enable **Allow access to file URLs** for the unpacked extension in Chrome or Brave so the enhanced local PDF reopens in this viewer.
 
 ## Build a standalone extension folder
 
