@@ -58,7 +58,7 @@ class NativeEnhancerTests(unittest.TestCase):
             source = directory / "scan.pdf"
             source.write_bytes(b"test PDF")
             (directory / "ocr-scanned-pdf.sh").write_text(
-                '[ "$3" = "--skip-text" ] || exit 2\n'
+                '[ "$3" = "--force-ocr" ] && [ "$4" = "--ai-review" ] || exit 2\n'
                 'printf "OCR progress on stdout\\n"\ncp "$1" "$2"\n'
             )
             bootstrap = f"""

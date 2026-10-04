@@ -63,6 +63,7 @@ def unique_output(directory: Path, stem: str) -> Path:
         candidate.exists()
         or candidate.with_suffix(".txt").exists()
         or candidate.with_suffix(".tagging.json").exists()
+        or candidate.with_suffix(".review.jsonl").exists()
     ):
         candidate = directory / f"{stem}-enhanced-ocr-{index}.pdf"
         index += 1
@@ -197,6 +198,9 @@ def rename_for_ocr_title(output_path: Path) -> Path:
     ]
     if not all(source.exists() for source, _destination in moves):
         return output_path
+    review_path = output_path.with_suffix(".review.jsonl")
+    if review_path.exists():
+        moves.append((review_path, titled_output.with_suffix(".review.jsonl")))
 
     for source, destination in moves:
         source.replace(destination)
@@ -298,7 +302,7 @@ def enhance_pdf(source_url: str, reference_url: str, uploaded_path: Path | None 
         output_path = unique_output(output_directory, safe_stem(source_url))
 
         result = subprocess.run(
-            ["/bin/bash", str(enhancer), str(input_path), str(output_path), "--skip-text"],
+            ["/bin/bash", str(enhancer), str(input_path), str(output_path), "--force-ocr", "--ai-review"],
             stdout=sys.stderr,
             stderr=subprocess.PIPE,
             text=True,
