@@ -19,7 +19,7 @@
     padding-left: 112px;
   }
 
-  html:not(.minimap-disabled):not(.minimap-collapsed) .page {
+  html:not(.minimap-disabled):not(.minimap-collapsed) .viewer:not([data-zoom-mode]) .page {
     width: min(1100px, calc(100vw - 128px));
   }
 }
