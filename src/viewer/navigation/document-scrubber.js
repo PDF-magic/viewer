@@ -5,8 +5,6 @@ import { scrollToTarget } from "./footnote-jump.js";
 const scrubber = document.querySelector("#document-scrubber");
 const range = document.querySelector("#document-scrubber-range");
 const currentLabel = document.querySelector("#document-scrubber-current");
-const startLabel = document.querySelector("#document-scrubber-start");
-const endLabel = document.querySelector("#document-scrubber-end");
 const preview = document.querySelector("#document-scrubber-preview");
 const track = document.querySelector(".document-scrubber-track");
 
@@ -172,9 +170,6 @@ async function initializeScrubber() {
   }
   if (!notes.length) return;
   range.max = String(notes.length);
-  startLabel.textContent = String(notes[0].number);
-  endLabel.textContent = String(notes.at(-1).number);
-  endLabel.title = `${notes.length} footnotes`;
   scrubber.hidden = false;
   document.documentElement.style.setProperty("--document-scrubber-height", "28px");
   updateScrubber(0);
