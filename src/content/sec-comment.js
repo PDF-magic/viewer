@@ -108,8 +108,8 @@
   function popupWindowFeatures() {
     const screenWidth = window.screen.availWidth || window.screen.width || 1440;
     const screenHeight = window.screen.availHeight || window.screen.height || 900;
-    const width = Math.max(420, Math.min(760, Math.floor(screenWidth * 0.46)));
-    const height = Math.max(600, Math.min(screenHeight, Math.floor(screenHeight * 0.94)));
+    const width = Math.min(screenWidth, Math.max(420, Math.min(900, Math.floor(screenWidth * 0.72))));
+    const height = Math.min(screenHeight, Math.max(600, Math.min(1000, Math.floor(width * 1.1), Math.floor(screenHeight * 0.8))));
     const left = (window.screen.availLeft || 0) + screenWidth - width - 12;
     const top =
       (window.screen.availTop || 0) +
