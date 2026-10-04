@@ -229,7 +229,7 @@ test('thumbnail edges fade softly into the minimap background', () => {
 
 test('overview thumbnails retain their compact default resolution', () => {
   assert.match(source, /MINIMAP_THUMBNAIL_WIDTH\s*=\s*80/);
-  assert.match(source, /MINIMAP_THUMBNAIL_RENDER_WIDTH\s*=\s*40/);
+  assert.match(source, /MINIMAP_THUMBNAIL_RENDER_WIDTH\s*=\s*50/);
   assert.match(source, /renderWidth = MINIMAP_THUMBNAIL_RENDER_WIDTH/);
   assert.match(source, /scale:\s*renderWidth\s*\/\s*Math\.max\(baseViewport\.width, 1\)/);
 });
