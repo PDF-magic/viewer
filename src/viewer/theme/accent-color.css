@@ -40,3 +40,18 @@
   border: 0;
   border-radius: 4px;
 }
+
+.accent-hex-input {
+  width: 8ch;
+  margin-left: auto;
+  padding: 3px 5px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--background);
+  color: var(--text);
+  font: inherit;
+}
+
+.accent-hex-input:invalid {
+  border-color: #c43f3f;
+}
