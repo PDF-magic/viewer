@@ -616,7 +616,10 @@ input {
   left: calc(var(--scrubber-thumb-x, 7px) - 12px);
   transform: translate(-100%, -50%);
   z-index: 1;
+  width: 4ch;
   min-width: 28px;
+  border: 0;
+  font-family: inherit;
   padding: 1px 5px;
   border-radius: 999px;
   background: var(--control-bg);
@@ -625,7 +628,11 @@ input {
   font-variant-numeric: tabular-nums;
   line-height: 15px;
   text-align: center;
-  pointer-events: none;
+  cursor: text;
+}
+
+.document-scrubber-current:focus-visible {
+  outline: 1px solid var(--search-focus-border);
 }
 
 .document-scrubber-preview {

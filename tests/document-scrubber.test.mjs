@@ -33,6 +33,10 @@ async function loadScrubber(pages) {
       style: { setProperty: (key, value) => { properties[key] = value; } },
       addEventListener(name, callback) { this.listeners[name] = callback; },
       setAttribute(name, value) { this.attributes[name] = value; },
+      select() { this.selected = true; },
+      blur() { this.listeners.blur?.(); },
+      setCustomValidity(message) { this.validityMessage = message; },
+      reportValidity() { this.reportedValidity = true; },
       getBoundingClientRect: () => ({ height: 28, width: 600, left: 0 }),
     });
     return elements.get(selector);
@@ -71,7 +75,7 @@ test("slider counts note occurrences and navigates to their page and vertical po
   assert.equal(jumps[0].number, 42);
   assert.equal(jumps[0].pageNumber, 2);
   assert.equal(jumps[0].yRatio, 704 / 800);
-  assert.equal(element("#document-scrubber-current").textContent, "42");
+  assert.equal(element("#document-scrubber-current").value, "42");
   assert.match(element("#document-scrubber-preview").textContent, /Second note text/);
 });
 
@@ -98,4 +102,35 @@ test("SEC comment letter keeps full-size note text and notes starting above midp
   assert.match(note.text, /classification as a legacy transfer agent/);
   assert.match(note.text, /note 77/);
   assert.doesNotMatch(note.text, /Page 3 of 64/);
+});
+
+
+test("typing a displayed note number navigates by number, not slider index", async () => {
+  const { element, jumps, frames } = await loadScrubber([body, noteItems]);
+  const field = element("#document-scrubber-current");
+  field.listeners.focus();
+  assert.equal(field.selected, true);
+  field.value = "42";
+  field.listeners.keydown({ key: "Enter", preventDefault() {} });
+  while (frames.length) frames.shift()();
+  assert.equal(jumps.length, 1);
+  assert.equal(jumps[0].number, 42);
+  assert.equal(jumps[0].pageNumber, 2);
+  assert.equal(element("#document-scrubber-range").value, "2");
+});
+
+test("invalid typed numbers stay editable and Escape restores the active number", async () => {
+  const { element, jumps } = await loadScrubber([noteItems]);
+  const field = element("#document-scrubber-current");
+  field.listeners.focus();
+  for (const value of ["", "999", "7oops", "7.5"]) {
+    field.value = value;
+    field.listeners.keydown({ key: "Enter", preventDefault() {} });
+    assert.equal(jumps.length, 0);
+    assert.ok(field.validityMessage);
+    assert.equal(field.value, value);
+  }
+  field.listeners.keydown({ key: "Escape", preventDefault() {} });
+  assert.equal(field.value, "7");
+  assert.equal(field.validityMessage, "");
 });

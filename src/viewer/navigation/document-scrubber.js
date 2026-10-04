@@ -15,6 +15,7 @@ let navigationFrame;
 let trackingFrame;
 let pendingIndex = 0;
 let dragging = false;
+let editingNumber = false;
 
 function clampIndex(value) {
   return Math.min(Math.max((Number.parseInt(value, 10) || 1) - 1, 0), notes.length - 1);
@@ -32,8 +33,7 @@ function updateScrubber(index) {
   const progress = notes.length > 1 ? index / (notes.length - 1) : 0;
   range.value = String(index + 1);
   range.setAttribute("aria-valuetext", `Footnote ${note.number}, ${index + 1} of ${notes.length}, page ${note.pageNumber}: ${note.text}`);
-  currentLabel.value = String(note.number);
-  currentLabel.textContent = String(note.number);
+  if (!editingNumber) currentLabel.value = String(note.number);
   track.style.setProperty("--scrubber-progress", String(progress));
   // Match the native thumb's center, including its radius at both endpoints.
   track.style.setProperty("--scrubber-thumb-x", `${7 + progress * Math.max(0, track.clientWidth - 14)}px`);
@@ -51,7 +51,7 @@ function navigateToFootnote(value) {
 }
 
 function trackPosition() {
-  if (!notes.length || dragging || navigationFrame) return;
+  if (!notes.length || dragging || navigationFrame || editingNumber) return;
   const toolbarHeight = document.querySelector(".toolbar")?.getBoundingClientRect().height || 52;
   const y = toolbarHeight + (window.innerHeight - toolbarHeight - scrubber.getBoundingClientRect().height) / 2;
   const page = document.elementFromPoint(window.innerWidth / 2, y)?.closest(".page");
@@ -59,10 +59,12 @@ function trackPosition() {
   const pageNumber = Number(page.dataset.page);
   const rect = page.getBoundingClientRect();
   const yRatio = (y - rect.top) / Math.max(1, rect.height);
+  // Allow for the superscript baseline and rounded rendered page dimensions.
+  const markerTolerance = 8 / Math.max(1, rect.height);
   let index = 0;
   for (let i = 0; i < notes.length; i += 1) {
     const note = notes[i];
-    if (note.pageNumber > pageNumber || (note.pageNumber === pageNumber && note.yRatio > yRatio)) break;
+    if (note.pageNumber > pageNumber || (note.pageNumber === pageNumber && note.yRatio > yRatio + markerTolerance)) break;
     index = i;
   }
   updateScrubber(index);
@@ -75,6 +77,44 @@ function scheduleTracking() {
     trackPosition();
   });
 }
+
+currentLabel?.addEventListener("focus", () => {
+  editingNumber = true;
+  currentLabel.select();
+});
+currentLabel?.addEventListener("click", () => currentLabel.select());
+currentLabel?.addEventListener("input", () => currentLabel.setCustomValidity(""));
+currentLabel?.addEventListener("blur", () => {
+  editingNumber = false;
+  currentLabel.setCustomValidity("");
+  updateScrubber(clampIndex(range.value));
+  scheduleTracking();
+});
+currentLabel?.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    currentLabel.blur();
+    return;
+  }
+  if (event.key !== "Enter") return;
+  event.preventDefault();
+  const rawNumber = currentLabel.value.trim();
+  const number = /^\d+$/.test(rawNumber) ? Number(rawNumber) : NaN;
+  const currentIndex = clampIndex(range.value);
+  let targetIndex = -1;
+  for (let index = 0; index < notes.length; index += 1) {
+    if (notes[index].number === number && (targetIndex < 0 ||
+      Math.abs(index - currentIndex) < Math.abs(targetIndex - currentIndex))) targetIndex = index;
+  }
+  if (targetIndex < 0) {
+    currentLabel.setCustomValidity("Enter a footnote number found in this document.");
+    currentLabel.reportValidity();
+    return;
+  }
+  editingNumber = false;
+  navigateToFootnote(targetIndex + 1);
+  currentLabel.blur();
+});
 
 range?.addEventListener("input", () => navigateToFootnote(range.value));
 range?.addEventListener("change", () => navigateToFootnote(range.value));
