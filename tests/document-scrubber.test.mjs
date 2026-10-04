@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
-import { footnotesForPage, footnoteContinuationForPage } from "../src/viewer/navigation/footnote-index.js";
+import { footnotesForPage, footnoteContinuationForPage, appendFootnotesForPage } from "../src/viewer/navigation/footnote-index.js";
 
 const source = readFileSync(new URL("../src/viewer/navigation/document-scrubber.js", import.meta.url), "utf8");
 const viewport = { width: 600, height: 800, convertToViewportPoint: (x, y) => [x, y] };
@@ -48,7 +48,7 @@ async function loadScrubber(pages) {
       numPages: pages.length,
       getPage: async (number) => ({ getTextContent: async () => ({ items: pages[number - 1] }), getViewport: () => viewport, getOperatorList: async () => ({ argsArray: [] }) }),
     } }),
-    footnotesForPage, footnoteContinuationForPage, scrollToTarget: (note) => jumps.push(note),
+    appendFootnotesForPage, scrollToTarget: (note) => jumps.push(note),
     requestAnimationFrame: (callback) => { frames.push(callback); return frames.length; },
     setTimeout: (callback) => { callback(); }, console,
   });
@@ -161,4 +161,56 @@ test("note 12 includes its unnumbered continuation on the next page without body
   assert.equal(footnoteContinuationForPage(page.items, viewport, { argsArray: [] }, note, []), null);
   const next = pages[2];
   assert.equal(footnoteContinuationForPage(next.items, { width: next.width, height: next.height, convertToViewportPoint: (x, y) => [x, next.height - y] }, next.operators, note, indexFixture(next)), null);
+});
+
+function federalRegisterFixture() {
+  return JSON.parse(readFileSync(new URL("./fixtures/footnotes-federal-register.json", import.meta.url), "utf8"));
+}
+
+function appendFixture(index, page, operatorIds) {
+  appendFootnotesForPage(index, page.items, {
+    width: page.width, height: page.height,
+    convertToViewportPoint: (x, y) => [x, page.height - y],
+  }, page.pageNumber, page.operators, operatorIds);
+}
+
+test("Federal Register notes follow all three columns and exclude citation years", () => {
+  const fixture = federalRegisterFixture();
+  const notes = [];
+  appendFixture(notes, fixture.pages[0], fixture.operatorIds);
+  assert.deepEqual(notes.map((note) => note.number), Array.from({ length: 17 }, (_, i) => i + 1));
+  assert.equal(notes[0].text, "See 85 FR 15576 (March 18, 2020).");
+  assert.equal(notes[11].text, "See 12 U.S.C. 1467a(g)(1).");
+  assert.match(notes[6].text, /results of the 2026 supervisory stress test/);
+  assert.doesNotMatch(notes[6].text, /company treated as a bank holding/);
+  assert.equal(notes[16].text, "12 U.S.C. 5365 note.");
+});
+
+test("a footnote continues into the next column and stops before its next marker", () => {
+  const fixture = federalRegisterFixture();
+  const notes = [];
+  appendFixture(notes, fixture.pages[1], fixture.operatorIds);
+  const note = notes.find((note) => note.number === 22);
+  assert.equal(note.columnIndex, 0);
+  assert.equal(note.endColumnIndex, 1);
+  assert.match(note.text, /Stress Capital Buffer Requirements/);
+  assert.match(note.text, /Those comments are addressed in a separate rulemaking/);
+  assert.match(note.text, /FR-2025-0063-01\/comments\.$/);
+  assert.doesNotMatch(note.text, /This commenter also noted/);
+});
+
+test("article dividers do not attach a new article to a completed footnote", () => {
+  const fixture = federalRegisterFixture();
+  const notes = [];
+  appendFixture(notes, fixture.pages[2], fixture.operatorIds);
+  const note = notes.find((note) => note.number === 10);
+  assert.equal(note.text, "15 U.S.C. 78w(a)(2).");
+  assert.equal(note.endColumnIndex, 0);
+});
+
+test("full-width tables above footnotes preserve the three-column note layout", () => {
+  const fixture = federalRegisterFixture();
+  const notes = [];
+  appendFixture(notes, fixture.pages[3], fixture.operatorIds);
+  assert.deepEqual(notes.map((note) => note.number), [3, 4, 5, 6, 7, 8, 9]);
 });

@@ -1,5 +1,5 @@
 import { pdfDocumentSessionReady } from "../pdf-document-session.js";
-import { footnotesForPage, footnoteContinuationForPage } from "./footnote-index.js";
+import { appendFootnotesForPage } from "./footnote-index.js";
 import { scrollToTarget } from "./footnote-jump.js";
 
 const scrubber = document.querySelector("#document-scrubber");
@@ -65,11 +65,16 @@ function trackPosition() {
   const yRatio = (y - rect.top) / Math.max(1, rect.height);
   // Allow for the superscript baseline and rounded rendered page dimensions.
   const markerTolerance = 8 / Math.max(1, rect.height);
+  const selected = clampIndex(range.value);
+  if (notes[selected]?.pageNumber === pageNumber && Math.abs(notes[selected].yRatio - yRatio) <= markerTolerance) return;
   let index = 0;
+  let distance = Infinity;
   for (let i = 0; i < notes.length; i += 1) {
     const note = notes[i];
-    if (note.pageNumber > pageNumber || (note.pageNumber === pageNumber && note.yRatio > yRatio + markerTolerance)) break;
-    index = i;
+    if (note.pageNumber > pageNumber) break;
+    if (note.pageNumber < pageNumber) { index = i; continue; }
+    const delta = Math.abs(note.yRatio - yRatio);
+    if (delta < distance) { distance = delta; index = i; }
   }
   updateScrubber(index);
 }
@@ -155,18 +160,8 @@ async function initializeScrubber() {
       const page = await session.document.getPage(pageNumber);
       const content = await page.getTextContent();
       const viewport = page.getViewport({ scale: 1 });
-      const pageNotes = footnotesForPage(content.items, viewport, pageNumber);
-      const previous = notes.at(-1);
-      if (previous?.continues && previous.endPageNumber === pageNumber - 1) {
-        const operators = await page.getOperatorList().catch(() => null);
-        const continuation = footnoteContinuationForPage(content.items, viewport, operators, previous, pageNotes);
-        previous.continues = Boolean(continuation?.continues);
-        if (continuation) {
-          previous.text += ` ${continuation.text}`;
-          previous.endPageNumber = pageNumber;
-        }
-      }
-      notes.push(...pageNotes);
+      const operators = await page.getOperatorList().catch(() => null);
+      appendFootnotesForPage(notes, content.items, viewport, pageNumber, operators, session.operators);
     } catch (error) {
       console.warn(`Could not index footnotes on page ${pageNumber}`, error);
     }

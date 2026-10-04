@@ -17,7 +17,7 @@ const sessionState = globalThis[SESSION_KEY];
 
 export const pdfDocumentSessionReady = sessionState.ready;
 
-export function publishPdfDocument(pdfDocument) {
+export function publishPdfDocument(pdfDocument, operators) {
   if (sessionState.settled) {
     return;
   }
@@ -25,6 +25,7 @@ export function publishPdfDocument(pdfDocument) {
   sessionState.settled = true;
   sessionState.resolveReady({
     document: pdfDocument,
+    operators,
     fingerprint: pdfDocument.fingerprints?.[0] || null,
   });
 }

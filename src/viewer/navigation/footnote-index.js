@@ -113,70 +113,14 @@ function positionedItems(items, viewport) {
   });
 }
 
-function startsLine(entry, entries, baseline) {
-  return !entries.some((other) => other !== entry && other.x < entry.x - 2 &&
-    Math.abs(other.y - baseline) < Math.max(2, other.height * 0.2));
-}
-
-// Confirm isolated superscripts against their text baseline and an in-body reference.
-// OCR word boxes alone are not reliable evidence of smaller footnote type.
-export function footnotesForPage(items, viewport, pageNumber) {
-  const entries = positionedItems(items, viewport);
-  const bodyEntries = entries.filter((entry) => entry.yRatio < 0.5);
-  const typicalHeight = median((bodyEntries.length ? bodyEntries : entries).map((entry) => entry.height));
-  const notes = [];
-  for (const entry of entries) {
-    const match = entry.text.match(/^(?:\[\s*(\d+)\s*\]|\(\s*(\d+)\s*\)|(\d+)(?:[.)](?!\d)|\s|$))/);
-    if (!match || entry.xRatio > 0.45) continue;
-    const number = Number(match[1] || match[2] || match[3]);
-    if (!Number.isSafeInteger(number) || number <= 0) continue;
-    const inlineText = entry.text.slice(match[0].length).trim();
-    const adjacent = entries.filter((other) => other !== entry && other.x > entry.x &&
-      other.y >= entry.y - 2 && other.y - entry.y <= Math.max(3, other.height * 0.65) &&
-      other.text.length >= 3).sort((a, b) => a.x - b.x)[0];
-    if (!inlineText && !adjacent) continue;
-    const baseline = inlineText ? entry.y : adjacent.y;
-    if (!startsLine(entry, entries, baseline)) continue;
-    const superscript = /^\d+$/.test(entry.text) && adjacent &&
-      entry.height <= adjacent.height * 0.8 &&
-      adjacent.y - entry.y >= adjacent.height * 0.15 &&
-      adjacent.x - entry.x <= entry.height * (entry.text.length + 2);
-    const reference = superscript && entries.some((other) => other !== entry &&
-      other.text === entry.text && other.y < entry.y - entry.height &&
-      other.height <= adjacent.height * 0.8 && entries.some((body) =>
-        body !== other && body.x < other.x &&
-        Math.abs(body.x + Math.abs(body.item.width || 0) - other.x) < adjacent.height &&
-        body.y - other.y >= body.height * 0.15 && body.y - other.y <= body.height * 0.65));
-    // Traditional smaller-type notes need a distinct lower-page block.
-    const smallerBlock = entry.yRatio >= 0.52 && entry.height <= typicalHeight * 0.8 &&
-      (inlineText || adjacent.height <= typicalHeight * 0.8);
-    if (!reference && !smallerBlock) continue;
-    notes.push({ pageNumber, number, xRatio: entry.xRatio, yRatio: entry.yRatio,
-      label: entry.text, baseline, textHeight: inlineText ? entry.height : adjacent.height });
-  }
-  notes.sort((a, b) => a.yRatio - b.yRatio || a.xRatio - b.xRatio);
-  return notes.map((note, index) => {
-    const next = notes[index + 1];
-    const noteEntries = entries.filter((entry) => {
-      const withinNote = entry.y >= note.baseline - 2 &&
-        (!next || entry.y < next.yRatio * viewport.height - 2);
-      const sameType = Math.abs(entry.height - note.textHeight) <= note.textHeight * 0.15;
-      // Exclude running footers and page counters from the preview.
-      const footer = entry.yRatio > 0.92 && (/^(?:Page\s+)?\d+(?:\s+of\s+\d+)?$/i.test(entry.text) ||
-        (entry.xRatio > 0.35 && entry.xRatio < 0.65));
-      return withinNote && sameType && !footer && entry.xRatio >= note.xRatio - 0.02;
-    }).sort((a, b) => Math.abs(a.y - b.y) < 2 ? a.x - b.x : a.y - b.y);
-    const text = joinNoteEntries(noteEntries).replace(markerPattern(note.number), "").trim();
-    return { ...note, text, endPageNumber: pageNumber,
-      continues: !next && noteEntries.at(-1)?.yRatio >= 0.88 };
-  }).filter((note) => note.text.length >= 3);
+function readingOrder(a, b) {
+  return Math.abs(a.y - b.y) < 2 ? a.x - b.x : a.y - b.y;
 }
 
 function joinNoteEntries(entries) {
   return entries.reduce((text, entry, index) => {
     const previous = entries[index - 1];
     if (!previous) return entry.text;
-    // PDF text runs can split a word at an apostrophe or a font change.
     const sameLine = Math.abs(previous.y - entry.y) < 2;
     const gap = entry.x - previous.x - Math.abs(previous.item.width || 0);
     const explicitSpace = /\s$/.test(previous.item.str) || /^\s/.test(entry.item.str);
@@ -186,29 +130,157 @@ function joinNoteEntries(entries) {
   }, "").trim();
 }
 
-// A continuation has no repeated marker, but remains below the PDF's footnote rule.
-export function footnoteContinuationForPage(items, viewport, operatorList, previousNote, pageNotes) {
-  const separators = (operatorList?.argsArray || []).flatMap((args) => {
-    // PDF.js constructPath arguments contain the paths and their bounding box.
+function multiply(a, b) {
+  return [a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1],
+    a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3],
+    a[0] * b[4] + a[2] * b[5] + a[4], a[1] * b[4] + a[3] * b[5] + a[5]];
+}
+
+export function footnoteRulesForPage(operatorList, viewport, operatorIds) {
+  let matrix = [1, 0, 0, 1, 0, 0];
+  const stack = [], rules = [];
+  for (let index = 0; index < (operatorList?.argsArray.length || 0); index += 1) {
+    const args = operatorList.argsArray[index];
+    const fn = operatorList.fnArray?.[index];
+    if (operatorIds && fn === operatorIds.save) { stack.push([...matrix]); continue; }
+    if (operatorIds && fn === operatorIds.restore) { matrix = stack.pop() || [1, 0, 0, 1, 0, 0]; continue; }
+    if (operatorIds && fn === operatorIds.transform) { matrix = multiply(matrix, args); continue; }
+    if (operatorIds && fn !== operatorIds.constructPath) continue;
     const bounds = args?.[2];
     if (!Array.isArray(args?.[1]) || bounds?.length !== 4 ||
-      !args[1].some((path) => Array.isArray(path) || ArrayBuffer.isView(path))) return [];
-    const [x1, y1] = viewport.convertToViewportPoint(bounds[0], bounds[1]);
-    const [x2, y2] = viewport.convertToViewportPoint(bounds[2], bounds[3]);
-    const width = Math.abs(x2 - x1);
-    const top = Math.min(y1, y2);
-    return Math.abs(y2 - y1) <= 2 && width >= viewport.width * 0.12 &&
-      width <= viewport.width * 0.5 && top >= viewport.height * 0.2 &&
-      Math.abs(Math.min(x1, x2) / viewport.width - previousNote.xRatio) < 0.02 ? [top] : [];
-  });
-  const separator = separators.sort((a, b) => a - b)[0];
-  if (separator === undefined) return null;
-  const next = pageNotes[0];
-  const entries = positionedItems(items, viewport).filter((entry) =>
-    entry.y > separator + 2 && (!next || entry.y < next.yRatio * viewport.height - 2) &&
-    entry.yRatio < 0.92 && entry.xRatio >= previousNote.xRatio - 0.02 &&
-    Math.abs(entry.height - previousNote.textHeight) <= previousNote.textHeight * 0.15)
-    .sort((a, b) => Math.abs(a.y - b.y) < 2 ? a.x - b.x : a.y - b.y);
+      !args[1].some((path) => Array.isArray(path) || ArrayBuffer.isView(path))) continue;
+    const point = (x, y) => viewport.convertToViewportPoint(matrix[0] * x + matrix[2] * y + matrix[4], matrix[1] * x + matrix[3] * y + matrix[5]);
+    const [x1, y1] = point(bounds[0], bounds[1]), [x2, y2] = point(bounds[2], bounds[3]);
+    const width = Math.abs(x2 - x1), y = Math.min(y1, y2);
+    if (Math.abs(y2 - y1) <= 2 && width >= viewport.width * 0.06 && width <= viewport.width * 0.6 &&
+      y >= viewport.height * 0.2 && y < viewport.height * 0.96) rules.push({ x: Math.min(x1, x2), y, width });
+  }
+  return rules;
+}
+
+function columnsForPage(entries, viewport, rules) {
+  const counts = new Map();
+  for (const entry of entries) {
+    if (entry.yRatio < 0.1 || entry.yRatio > 0.95 || entry.item.width < viewport.width * 0.15 ||
+      entry.item.width > viewport.width * 0.4) continue;
+    const x = Math.round(entry.x / 3) * 3;
+    counts.set(x, (counts.get(x) || 0) + 1);
+  }
+  const starts = [];
+  const candidates = [...rules.map((rule) => rule.x), ...[...counts].filter(([, count]) => count >= 8).map(([x]) => x)].sort((a, b) => a - b);
+  for (const x of candidates) if (!starts.length || x - starts.at(-1) > viewport.width * 0.18) starts.push(x);
+  // Wide body lines indicate a single-column document, despite short text fragments.
+  const wideLines = entries.filter((entry) => entry.yRatio > 0.1 && entry.item.width > viewport.width * 0.55).length;
+  const distinctRules = new Set(rules.map((rule) => Math.round(rule.x / 12))).size;
+  if (starts.length < 2 || (wideLines >= 5 && distinctRules < 2)) return [{ index: 0, left: 0, right: viewport.width, margin: rules[0]?.x || 0 }];
+  return starts.map((x, index) => ({ index, left: Math.max(0, x - 12), right: (starts[index + 1] || viewport.width + 12) - 12, margin: x }));
+}
+
+function isPreviewText(entry, height) {
+  if (entry.yRatio > 0.96 || /^(?:Page\s+)?\d+\s+of\s+\d+$/i.test(entry.text)) return false;
+  return Math.abs(entry.height - height) <= height * 0.15;
+}
+
+function pageLayout(items, viewport, rules) {
+  const entries = positionedItems(items, viewport);
+  const columns = columnsForPage(entries, viewport, rules);
+  return columns.map((column) => ({ ...column,
+    entries: entries.filter((entry) => entry.x >= column.left && entry.x < column.right),
+    rules: rules.filter((rule) => rule.x >= column.left && rule.x < column.right &&
+      (columns.length === 1 || rule.width < (column.right - column.left) * 0.65)),
+  }));
+}
+
+// Detect and collect each column independently, then traverse columns left to right.
+export function footnotesForPage(items, viewport, pageNumber, rules = []) {
+  const result = [];
+  const allEntries = positionedItems(items, viewport);
+  for (const column of pageLayout(items, viewport, rules)) {
+    const entries = column.entries;
+    const bodyEntries = entries.filter((entry) => entry.yRatio < 0.5);
+    const typicalHeight = median((bodyEntries.length ? bodyEntries : entries).map((entry) => entry.height));
+    const notes = [];
+    for (const entry of entries) {
+      const match = entry.text.match(/^(?:\[\s*(\d+)\s*\]|\(\s*(\d+)\s*\)|(\d+)(?:[.)](?!\d)|\s|$))/);
+      if (!match || entry.x > column.left + (column.right - column.left) * 0.45) continue;
+      const number = Number(match[1] || match[2] || match[3]);
+      if (!Number.isSafeInteger(number) || number <= 0) continue;
+      const inlineText = entry.text.slice(match[0].length).trim();
+      const adjacent = entries.filter((other) => other !== entry && other.x > entry.x &&
+        other.y >= entry.y - 2 && other.y - entry.y <= Math.max(3, other.height * 0.65) && other.text.length >= 3)
+        .sort((a, b) => a.x - b.x)[0];
+      if (!inlineText && !adjacent) continue;
+      const baseline = inlineText ? entry.y : adjacent.y;
+      if (entries.some((other) => other !== entry && other.x < entry.x - 2 &&
+        Math.abs(other.y - baseline) < Math.max(2, other.height * 0.2))) continue;
+      const superscript = /^\d+$/.test(entry.text) && adjacent && entry.height <= adjacent.height * 0.8 &&
+        adjacent.y - entry.y >= adjacent.height * 0.15 && adjacent.x - entry.x <= entry.height * (entry.text.length + 2);
+      const reference = superscript && allEntries.some((other) => other !== entry && other.text === entry.text &&
+        other.y < entry.y - entry.height && other.height <= adjacent.height * 0.8 && allEntries.some((body) =>
+          body !== other && body.x < other.x && Math.abs(body.x + Math.abs(body.item.width || 0) - other.x) < adjacent.height &&
+          body.y - other.y >= body.height * 0.15 && body.y - other.y <= body.height * 0.65));
+      const rule = column.rules.find((rule) => rule.y < entry.y && entry.y - rule.y > 2);
+      const previousLine = entries.filter((other) => other.y < entry.y - 2).sort((a, b) => b.y - a.y)[0];
+      const separated = !previousLine || entry.y - previousLine.y >= typicalHeight * 1.5;
+      const smallerBlock = !column.rules.length && separated && entry.yRatio >= 0.52 && entry.height <= typicalHeight * 0.8 &&
+        (inlineText || adjacent.height <= typicalHeight * 0.8);
+      if (column.rules.length && !rule) continue;
+      if (!reference && !(superscript && rule) && !smallerBlock) continue;
+      notes.push({ pageNumber, number, xRatio: entry.xRatio, yRatio: entry.yRatio, label: entry.text,
+        baseline, textHeight: inlineText ? entry.height : adjacent.height, columnIndex: column.index,
+        columnLeft: column.left, columnRight: column.right });
+    }
+    notes.sort((a, b) => a.yRatio - b.yRatio);
+    for (const [index, note] of notes.entries()) {
+      const next = notes[index + 1];
+      // Table notes can occupy the full page width above resumed body columns.
+      // A larger-type body line ends that note block even if more small text follows.
+      const resumedBody = entries.filter((entry) => entry.y > note.baseline + 2 &&
+        entry.height > note.textHeight * 1.2).sort(readingOrder)[0];
+      const textEntries = entries.filter((entry) => entry.y >= note.baseline - 2 &&
+        (!resumedBody || entry.y < resumedBody.y - 2) &&
+        (!next || entry.y < next.yRatio * viewport.height - 2) && isPreviewText(entry, note.textHeight) &&
+        !(/^\d+$/.test(entry.text) && entry.yRatio > 0.92)).sort(readingOrder);
+      const text = joinNoteEntries(textEntries).replace(markerPattern(note.number), "").trim();
+      if (text.length >= 3) result.push({ ...note, text, endPageNumber: pageNumber, endColumnIndex: column.index,
+        continues: !next && textEntries.at(-1)?.yRatio >= 0.88 });
+    }
+  }
+  return result;
+}
+
+function continuationInColumn(column, viewport, previousNote, pageNotes) {
+  const firstNote = pageNotes.find((note) => note.columnIndex === column.index);
+  const separator = column.rules.sort((a, b) => a.y - b.y)[0];
+  if (!separator) return null;
+  const entries = column.entries.filter((entry) => entry.y > separator.y + 2 &&
+    (!firstNote || entry.y < firstNote.yRatio * viewport.height - 2) && isPreviewText(entry, previousNote.textHeight))
+    .sort(readingOrder);
   const text = joinNoteEntries(entries);
-  return text ? { text, continues: !next && entries.at(-1)?.yRatio >= 0.88 } : null;
+  return text ? { text, continues: !firstNote && entries.at(-1)?.yRatio >= 0.88 } : null;
+}
+
+export function footnoteContinuationForPage(items, viewport, operatorList, previousNote, pageNotes, operatorIds) {
+  const rules = footnoteRulesForPage(operatorList, viewport, operatorIds);
+  return continuationInColumn(pageLayout(items, viewport, rules)[0], viewport, previousNote, pageNotes);
+}
+
+export function appendFootnotesForPage(index, items, viewport, pageNumber, operatorList, operatorIds) {
+  const rules = footnoteRulesForPage(operatorList, viewport, operatorIds);
+  const pageNotes = footnotesForPage(items, viewport, pageNumber, rules);
+  for (const column of pageLayout(items, viewport, rules)) {
+    const previous = index.at(-1);
+    const adjacent = previous && (previous.endPageNumber === pageNumber - 1 && column.index === 0 ||
+      previous.endPageNumber === pageNumber && previous.endColumnIndex === column.index - 1);
+    if (previous?.continues && adjacent) {
+      const continuation = continuationInColumn(column, viewport, previous, pageNotes);
+      previous.continues = Boolean(continuation?.continues);
+      if (continuation) {
+        previous.text += ` ${continuation.text}`;
+        previous.endPageNumber = pageNumber;
+        previous.endColumnIndex = column.index;
+      }
+    }
+    index.push(...pageNotes.filter((note) => note.columnIndex === column.index));
+  }
 }
