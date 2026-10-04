@@ -27,6 +27,7 @@ const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
 const MINIMAP_THUMBNAIL_WIDTH = 80;
 const MINIMAP_THUMBNAIL_RENDER_WIDTH = 40;
 const MINIMAP_STRIP_MAX_HEIGHT = 32767;
+const MINIMAP_LOCAL_CACHE_LIMIT = 32;
 const WHEEL_LINE_HEIGHT = 16;
 let syncFrame;
 let dragging = false;
@@ -41,6 +42,10 @@ let thumbnailLoadGeneration = 0;
 let thumbnailRotation = 0;
 let thumbnailPreparationStarted = false;
 let thumbnailPreparationCancel;
+const localThumbnails = new Map();
+let localThumbnailTargets = [];
+let localThumbnailRenderWidth = 0;
+let localThumbnailRendering = false;
 
 function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
@@ -262,6 +267,92 @@ function syncMinimap() {
   minimapViewport.style.height = `${viewportHeight}px`;
   minimap.setAttribute("aria-valuemax", String(Math.round(scrollMaximum)));
   minimap.setAttribute("aria-valuenow", String(Math.round(window.scrollY)));
+  updateLocalThumbnails(tiles, trackHeight);
+}
+
+function clearLocalThumbnails() {
+  for (const canvas of localThumbnails.values()) {
+    canvas.remove();
+    canvas.width = canvas.height = 0;
+  }
+  localThumbnails.clear();
+  localThumbnailTargets = [];
+}
+
+function updateLocalThumbnails(tiles, trackHeight) {
+  if (minimapMode() !== "local" || !thumbnailDocument) {
+    localThumbnailTargets = [];
+    return;
+  }
+
+  const renderWidth = Math.ceil(
+    (tiles[0]?.clientWidth || MINIMAP_THUMBNAIL_WIDTH) * clamp(window.devicePixelRatio || 1, 1, 3),
+  );
+  if (renderWidth !== localThumbnailRenderWidth) {
+    clearLocalThumbnails();
+    localThumbnailRenderWidth = renderWidth;
+  }
+
+  // Only sharpen the visible pages and one track of overscan on either side.
+  localThumbnailTargets = tiles.flatMap((tile, index) => {
+    const top = parseFloat(tile.style.top);
+    const bottom = top + parseFloat(tile.style.height);
+    return bottom >= mapOffset - trackHeight && top <= mapOffset + trackHeight * 2
+      ? [{ pageNumber: index + 1, tile }]
+      : [];
+  }).sort((a, b) => {
+    const center = mapOffset + trackHeight / 2;
+    const distance = ({ tile }) => Math.abs(parseFloat(tile.style.top) + parseFloat(tile.style.height) / 2 - center);
+    return distance(a) - distance(b);
+  }).slice(0, MINIMAP_LOCAL_CACHE_LIMIT);
+  for (const { pageNumber } of localThumbnailTargets) {
+    const cached = localThumbnails.get(pageNumber);
+    if (cached) {
+      localThumbnails.delete(pageNumber);
+      localThumbnails.set(pageNumber, cached);
+    }
+  }
+  void renderLocalThumbnails();
+}
+
+async function renderLocalThumbnails() {
+  if (localThumbnailRendering) {
+    return;
+  }
+  localThumbnailRendering = true;
+  try {
+    while (thumbnailDocument && minimapEnabled() && !minimapCollapsed() && minimapMode() === "local") {
+      const target = localThumbnailTargets.find(({ pageNumber }) => !localThumbnails.has(pageNumber));
+      if (!target) {
+        break;
+      }
+      const generation = thumbnailGeneration;
+      const width = localThumbnailRenderWidth;
+      const canvas = await renderThumbnail(target.pageNumber, generation, width);
+      if (!canvas || generation !== thumbnailGeneration || width !== localThumbnailRenderWidth ||
+          !localThumbnailTargets.some(({ tile }) => tile === target.tile)) {
+        if (canvas) {
+          canvas.width = canvas.height = 0;
+        }
+        continue;
+      }
+      canvas.className = "minimap-local-thumbnail";
+      target.tile.append(canvas);
+      localThumbnails.set(target.pageNumber, canvas);
+      while (localThumbnails.size > MINIMAP_LOCAL_CACHE_LIMIT) {
+        const oldest = localThumbnails.keys().next().value;
+        const evicted = localThumbnails.get(oldest);
+        evicted.remove();
+        evicted.width = evicted.height = 0;
+        localThumbnails.delete(oldest);
+      }
+      await yieldToBrowser();
+    }
+  } catch {
+    // Keep the overview strip as a fallback if a local preview cannot render.
+  } finally {
+    localThumbnailRendering = false;
+  }
 }
 
 function waitForPageElements(expectedCount) {
@@ -315,7 +406,7 @@ async function loadThumbnailDocument(loadGeneration) {
   await renderAllThumbnails(generation, cachedStripPromise);
 }
 
-async function renderThumbnail(pageNumber, generation) {
+async function renderThumbnail(pageNumber, generation, renderWidth = MINIMAP_THUMBNAIL_RENDER_WIDTH) {
   const page = await thumbnailDocument.getPage(pageNumber);
   if (generation !== thumbnailGeneration) {
     page.cleanup();
@@ -324,7 +415,7 @@ async function renderThumbnail(pageNumber, generation) {
 
   const baseViewport = page.getViewport({ scale: 1, rotation: thumbnailRotation });
   const viewport = page.getViewport({
-    scale: MINIMAP_THUMBNAIL_RENDER_WIDTH / Math.max(baseViewport.width, 1),
+    scale: renderWidth / Math.max(baseViewport.width, 1),
     rotation: thumbnailRotation,
   });
   const canvas = document.createElement("canvas");
@@ -543,6 +634,7 @@ function stopThumbnailPreparation() {
   cancelScheduledThumbnailPreparation();
   thumbnailLoadGeneration += 1;
   thumbnailGeneration += 1;
+  clearLocalThumbnails();
   thumbnailPreparationStarted = false;
   minimapPages.replaceChildren();
   thumbnailDocument = undefined;
@@ -552,8 +644,10 @@ function stopThumbnailPreparation() {
 
 function rerenderThumbnails(delta) {
   thumbnailRotation = (thumbnailRotation + delta + 360) % 360;
+  clearLocalThumbnails();
   if (thumbnailDocument) {
     void renderAllThumbnails();
+    scheduleSync();
   }
 }
 

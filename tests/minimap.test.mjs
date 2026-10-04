@@ -227,10 +227,60 @@ test('thumbnail edges fade softly into the minimap background', () => {
   assert.match(styles, /transparent[\s\S]*?#000 6%[\s\S]*?#000 94%[\s\S]*?transparent/);
 });
 
-test('thumbnail canvases render below their displayed width', () => {
+test('overview thumbnails retain their compact default resolution', () => {
   assert.match(source, /MINIMAP_THUMBNAIL_WIDTH\s*=\s*80/);
   assert.match(source, /MINIMAP_THUMBNAIL_RENDER_WIDTH\s*=\s*40/);
-  assert.match(source, /scale:\s*MINIMAP_THUMBNAIL_RENDER_WIDTH\s*\/\s*Math\.max\(baseViewport\.width, 1\)/);
+  assert.match(source, /renderWidth = MINIMAP_THUMBNAIL_RENDER_WIDTH/);
+  assert.match(source, /scale:\s*renderWidth\s*\/\s*Math\.max\(baseViewport\.width, 1\)/);
+});
+
+test('local thumbnails render at display density and keep a bounded cache while navigating', async () => {
+  const f = fixture(1000);
+  const renders = [];
+  f.context.yieldToBrowser = async () => {};
+  f.context.renderThumbnail = async (pageNumber, generation, width) => {
+    renders.push({ pageNumber, width });
+    return { width, height: width * 1.4, remove() {} };
+  };
+  f.tiles.forEach(tile => { tile.append = () => {}; });
+  f.window.devicePixelRatio = 2;
+  vm.runInContext('thumbnailDocument = { numPages: 1000 }; setMinimapMode("local")', f.context);
+  for (const ratio of [0, 0.25, 0.5, 0.75, 1]) {
+    f.window.scrollY = ratio * (1000 * 1420 - f.window.innerHeight);
+    f.sync();
+    await vm.runInContext('renderLocalThumbnails()', f.context);
+    // A sync starts the worker; let its pending render/yield microtasks finish.
+    await new Promise(resolve => setImmediate(resolve));
+    assert.ok(vm.runInContext('localThumbnails.size <= 32', f.context));
+    assert.ok(vm.runInContext('localThumbnailTargets.every(({ pageNumber }) => localThumbnails.has(pageNumber))', f.context));
+  }
+  assert.ok(renders.length > 32);
+  assert.ok(renders.every(({ width }) => width === 160));
+  const count = renders.length;
+  vm.runInContext('setMinimapMode("overview")', f.context);
+  f.sync();
+  await vm.runInContext('renderLocalThumbnails()', f.context);
+  assert.equal(renders.length, count);
+  vm.runInContext('clearLocalThumbnails()', f.context);
+  assert.equal(vm.runInContext('localThumbnails.size', f.context), 0);
+});
+
+test('local thumbnails discard pending renders after navigation or rotation', async () => {
+  const f = fixture(1000);
+  let completeRender;
+  const attached = [];
+  f.tiles.forEach((tile, index) => { tile.append = () => attached.push(index + 1); });
+  f.context.renderThumbnail = () => new Promise(resolve => { completeRender = resolve; });
+  f.context.yieldToBrowser = async () => {};
+  vm.runInContext('thumbnailDocument = { numPages: 1000 }; setMinimapMode("local")', f.context);
+  f.sync();
+  const canvas = { width: 80, height: 112 };
+  vm.runInContext('thumbnailGeneration += 1; clearLocalThumbnails()', f.context);
+  completeRender(canvas);
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  assert.deepEqual(attached, []);
+  assert.equal(canvas.width, 0);
+  assert.equal(vm.runInContext('localThumbnails.size', f.context), 0);
 });
 
 test('persistent thumbnails and their work follow the global minimap preference', () => {
