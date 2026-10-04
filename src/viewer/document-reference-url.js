@@ -13,6 +13,7 @@ function normalizedUrl(value) {
 
 export function referenceUrlFromPdfMetadata(info, metadata) {
   const candidates = [
+    metadata?.get?.("pdfmagic:href"),
     info?.Custom?.[PDF_MAGIC_SOURCE_KEY],
     info?.[PDF_MAGIC_SOURCE_KEY],
     metadata?.get?.("pdfmagic:sourceurl"),

@@ -3,6 +3,26 @@ import test from "node:test";
 
 import { referenceUrlFromPdfMetadata } from "../src/viewer/document-reference-url.js";
 
+test("prefers the XMP href tag over legacy document-info metadata", () => {
+  assert.equal(
+    referenceUrlFromPdfMetadata(
+      { Custom: { PDFMagicSourceURL: "https://example.com/legacy.pdf" } },
+      { get: (key) => key === "pdfmagic:href" ? "https://example.com/source.pdf?x=1&y=2" : null },
+    ),
+    "https://example.com/source.pdf?x=1&y=2",
+  );
+});
+
+test("falls back to legacy metadata when the XMP href tag is invalid", () => {
+  assert.equal(
+    referenceUrlFromPdfMetadata(
+      { Custom: { PDFMagicSourceURL: "https://example.com/legacy.pdf" } },
+      { get: () => "not a URL" },
+    ),
+    "https://example.com/legacy.pdf",
+  );
+});
+
 test("prefers the PDF Magic document-info source URL", () => {
   assert.equal(
     referenceUrlFromPdfMetadata(

@@ -161,6 +161,11 @@ input {
   object-fit: contain;
 }
 
+#install-enhancer {
+  color: var(--text);
+  text-decoration: none;
+}
+
 .tools-toggle {
   font-size: 20px;
 }

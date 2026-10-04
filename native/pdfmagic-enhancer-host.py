@@ -313,7 +313,13 @@ def stamp_mode() -> int:
         temporary.unlink()
 
     with pikepdf.open(path) as pdf:
-        pdf.docinfo["/PDFMagicSourceURL"] = pikepdf.String(source_url)
+        pikepdf.models.PdfMetadata.register_xml_namespace(
+            "https://pdfmagic.org/ns/1.0/", "pdfmagic"
+        )
+        with pdf.open_metadata(set_pikepdf_as_editor=False, update_docinfo=False) as metadata:
+            metadata["pdfmagic:href"] = source_url
+        if "/PDFMagicSourceURL" in pdf.docinfo:
+            del pdf.docinfo["/PDFMagicSourceURL"]
         pdf.save(temporary)
 
     os.replace(temporary, path)
