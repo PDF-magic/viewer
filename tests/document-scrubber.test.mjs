@@ -167,11 +167,11 @@ function federalRegisterFixture() {
   return JSON.parse(readFileSync(new URL("./fixtures/footnotes-federal-register.json", import.meta.url), "utf8"));
 }
 
-function appendFixture(index, page, operatorIds) {
+function appendFixture(index, page, operatorIds, referenceContext) {
   appendFootnotesForPage(index, page.items, {
     width: page.width, height: page.height,
     convertToViewportPoint: (x, y) => [x, page.height - y],
-  }, page.pageNumber, page.operators, operatorIds);
+  }, page.pageNumber, page.operators, operatorIds, referenceContext);
 }
 
 test("Federal Register notes follow all three columns and exclude citation years", () => {
@@ -213,4 +213,54 @@ test("full-width tables above footnotes preserve the three-column note layout", 
   const notes = [];
   appendFixture(notes, fixture.pages[3], fixture.operatorIds);
   assert.deepEqual(notes.map((note) => note.number), [3, 4, 5, 6, 7, 8, 9]);
+});
+
+
+test("notes beneath a full-width table retain references from the preceding page", () => {
+  const fixture = federalRegisterFixture();
+  const previous = fixture.pages.find((page) => page.pageNumber === 76);
+  const page = fixture.pages.find((page) => page.pageNumber === 77);
+  const notes = [];
+  appendFixture(notes, page, fixture.operatorIds, { items: previous.items,
+    viewport: { width: previous.width, height: previous.height, convertToViewportPoint: (x, y) => [x, previous.height - y] } });
+  assert.deepEqual(notes.map((note) => note.number), [1, 2, 3, 4]);
+  assert.match(notes[0].text, /^Impact and vibratory driving/);
+  assert.match(notes[3].text, /tory driving and auger drilling\.$/);
+  assert.doesNotMatch(notes[3].text, /This change is minor/);
+});
+
+test("full-width table note previews stop before the main article resumes", () => {
+  const fixture = federalRegisterFixture();
+  const notes = [];
+  appendFixture(notes, fixture.pages.find((page) => page.pageNumber === 78), fixture.operatorIds);
+  assert.deepEqual(notes.map((note) => note.number), [1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.match(notes[0].text, /Committee on Taxonomy/);
+  assert.match(notes[7].text, /harbor seal to be 2,832\.$/);
+  assert.doesNotMatch(notes[7].text, /A detailed description/);
+});
+
+test("superscripts attached to table cell values are references, not additional notes", () => {
+  const fixture = federalRegisterFixture();
+  const notes = [];
+  appendFixture(notes, fixture.pages.find((page) => page.pageNumber === 87), fixture.operatorIds);
+  assert.deepEqual(notes.map((note) => note.number), [1, 2]);
+  assert.match(notes[0].text, /within a relevant shutdown zone\.$/);
+  assert.equal(notes[1].text, "Underwater noise would be truncated by land at approximately 13.9 km from Manchester Fuel Pier at its furthest distance.");
+  assert.ok(notes.every((note) => !note.text.includes("21,544")));
+});
+
+test("release numbers on page 151 remain in the continued note, not the note index", () => {
+  const fixture = federalRegisterFixture();
+  const page = fixture.pages.find((page) => page.pageNumber === 151);
+  const notes = [];
+  appendFixture(notes, page, fixture.operatorIds);
+  assert.deepEqual(notes.map((note) => note.number), [3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
+  const continued = notes.find((note) => note.number === 5);
+  assert.match(continued.text, /99098 \(Dec\. 6, 2023\)/);
+  assert.match(continued.text, /99108 \(Dec\. 07, 2023\)/);
+  const fallback = footnotesForPage(page.items, {
+    width: page.width, height: page.height,
+    convertToViewportPoint: (x, y) => [x, page.height - y],
+  }, page.pageNumber);
+  assert.ok(fallback.every((note) => ![2023, 9908, 99098, 99108].includes(note.number)));
 });

@@ -192,9 +192,11 @@ function pageLayout(items, viewport, rules) {
 }
 
 // Detect and collect each column independently, then traverse columns left to right.
-export function footnotesForPage(items, viewport, pageNumber, rules = []) {
+export function footnotesForPage(items, viewport, pageNumber, rules = [], referenceContext) {
   const result = [];
   const allEntries = positionedItems(items, viewport);
+  if (referenceContext) allEntries.push(...positionedItems(referenceContext.items, referenceContext.viewport)
+    .map((entry) => ({ ...entry, priorPage: true })));
   for (const column of pageLayout(items, viewport, rules)) {
     const entries = column.entries;
     const bodyEntries = entries.filter((entry) => entry.yRatio < 0.5);
@@ -207,7 +209,7 @@ export function footnotesForPage(items, viewport, pageNumber, rules = []) {
       if (!Number.isSafeInteger(number) || number <= 0) continue;
       const inlineText = entry.text.slice(match[0].length).trim();
       const adjacent = entries.filter((other) => other !== entry && other.x > entry.x &&
-        other.y >= entry.y - 2 && other.y - entry.y <= Math.max(3, other.height * 0.65) && other.text.length >= 3)
+        other.y >= entry.y - 2 && other.y - entry.y <= Math.max(3, other.height * 0.65) && other.text.length >= 3 && /[A-Za-z\u00c0-\u02af]/u.test(other.text))
         .sort((a, b) => a.x - b.x)[0];
       if (!inlineText && !adjacent) continue;
       const baseline = inlineText ? entry.y : adjacent.y;
@@ -216,16 +218,30 @@ export function footnotesForPage(items, viewport, pageNumber, rules = []) {
       const superscript = /^\d+$/.test(entry.text) && adjacent && entry.height <= adjacent.height * 0.8 &&
         adjacent.y - entry.y >= adjacent.height * 0.15 && adjacent.x - entry.x <= entry.height * (entry.text.length + 2);
       const reference = superscript && allEntries.some((other) => other !== entry && other.text === entry.text &&
-        other.y < entry.y - entry.height && other.height <= adjacent.height * 0.8 && allEntries.some((body) =>
-          body !== other && body.x < other.x && Math.abs(body.x + Math.abs(body.item.width || 0) - other.x) < adjacent.height &&
+        (other.priorPage || other.y < entry.y - entry.height) && other.height <= adjacent.height * 0.8 && allEntries.some((body) =>
+          body !== other && Boolean(body.priorPage) === Boolean(other.priorPage) &&
+          ((body.x < other.x && Math.abs(body.x + Math.abs(body.item.width || 0) - other.x) < adjacent.height) ||
+            (body.x > other.x && body.x - other.x - Math.abs(other.item.width || 0) < adjacent.height)) &&
           body.y - other.y >= body.height * 0.15 && body.y - other.y <= body.height * 0.65));
+      const wideNoteBlock = superscript && adjacent.item.width > viewport.width * 0.55 &&
+        entries.some((other) => other !== entry && /^\d+$/.test(other.text) &&
+          Math.abs(other.x - entry.x) < 2 && Math.abs(other.height - entry.height) < 0.1 &&
+          Math.abs(other.y - entry.y) < adjacent.height * 6 && entries.some((line) =>
+            line.x > other.x && line.y > other.y && line.y - other.y < adjacent.height * 0.65 &&
+            line.item.width > viewport.width * 0.55));
       const rule = column.rules.find((rule) => rule.y < entry.y && entry.y - rule.y > 2);
       const previousLine = entries.filter((other) => other.y < entry.y - 2).sort((a, b) => b.y - a.y)[0];
       const separated = !previousLine || entry.y - previousLine.y >= typicalHeight * 1.5;
-      const smallerBlock = !column.rules.length && separated && entry.yRatio >= 0.52 && entry.height <= typicalHeight * 0.8 &&
+      // Plain numbers beginning a small-text block may be dates or release
+      // citations continued from another column. Inline markers need an
+      // explicit delimiter or an established note block in this column.
+      const inlineMarker = !inlineText || /^[\[(]|^\d+\.(?!\d)/.test(entry.text) ||
+        notes.some((note) => Math.abs(note.xRatio - entry.xRatio) * viewport.width < 2 &&
+          Math.abs(note.textHeight - entry.height) < entry.height * 0.15);
+      const smallerBlock = inlineMarker && !column.rules.length && separated && entry.yRatio >= 0.52 && entry.height <= typicalHeight * 0.8 &&
         (inlineText || adjacent.height <= typicalHeight * 0.8);
       if (column.rules.length && !rule) continue;
-      if (!reference && !(superscript && rule) && !smallerBlock) continue;
+      if (!reference && !wideNoteBlock && !(superscript && rule) && !smallerBlock) continue;
       notes.push({ pageNumber, number, xRatio: entry.xRatio, yRatio: entry.yRatio, label: entry.text,
         baseline, textHeight: inlineText ? entry.height : adjacent.height, columnIndex: column.index,
         columnLeft: column.left, columnRight: column.right });
@@ -265,9 +281,9 @@ export function footnoteContinuationForPage(items, viewport, operatorList, previ
   return continuationInColumn(pageLayout(items, viewport, rules)[0], viewport, previousNote, pageNotes);
 }
 
-export function appendFootnotesForPage(index, items, viewport, pageNumber, operatorList, operatorIds) {
+export function appendFootnotesForPage(index, items, viewport, pageNumber, operatorList, operatorIds, referenceContext) {
   const rules = footnoteRulesForPage(operatorList, viewport, operatorIds);
-  const pageNotes = footnotesForPage(items, viewport, pageNumber, rules);
+  const pageNotes = footnotesForPage(items, viewport, pageNumber, rules, referenceContext);
   for (const column of pageLayout(items, viewport, rules)) {
     const previous = index.at(-1);
     const adjacent = previous && (previous.endPageNumber === pageNumber - 1 && column.index === 0 ||

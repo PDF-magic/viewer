@@ -154,6 +154,7 @@ window.addEventListener("resize", () => {
 async function initializeScrubber() {
   const session = await pdfDocumentSessionReady;
   if (!session?.document) return;
+  let previousPageText;
   // Only retain compact note metadata; yield between pages so rendering can continue.
   for (let pageNumber = 1; pageNumber <= session.document.numPages; pageNumber += 1) {
     try {
@@ -161,8 +162,10 @@ async function initializeScrubber() {
       const content = await page.getTextContent();
       const viewport = page.getViewport({ scale: 1 });
       const operators = await page.getOperatorList().catch(() => null);
-      appendFootnotesForPage(notes, content.items, viewport, pageNumber, operators, session.operators);
+      appendFootnotesForPage(notes, content.items, viewport, pageNumber, operators, session.operators, previousPageText);
+      previousPageText = { items: content.items, viewport };
     } catch (error) {
+      previousPageText = undefined;
       console.warn(`Could not index footnotes on page ${pageNumber}`, error);
     }
     await new Promise((resolve) => setTimeout(resolve, 0));
