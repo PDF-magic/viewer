@@ -1,5 +1,5 @@
 import { pdfDocumentSessionReady } from "../pdf-document-session.js";
-import { footnotesForPage } from "./footnote-index.js";
+import { footnotesForPage, footnoteContinuationForPage } from "./footnote-index.js";
 import { scrollToTarget } from "./footnote-jump.js";
 
 const scrubber = document.querySelector("#document-scrubber");
@@ -154,7 +154,19 @@ async function initializeScrubber() {
     try {
       const page = await session.document.getPage(pageNumber);
       const content = await page.getTextContent();
-      notes.push(...footnotesForPage(content.items, page.getViewport({ scale: 1 }), pageNumber));
+      const viewport = page.getViewport({ scale: 1 });
+      const pageNotes = footnotesForPage(content.items, viewport, pageNumber);
+      const previous = notes.at(-1);
+      if (previous?.continues && previous.endPageNumber === pageNumber - 1) {
+        const operators = await page.getOperatorList().catch(() => null);
+        const continuation = footnoteContinuationForPage(content.items, viewport, operators, previous, pageNotes);
+        previous.continues = Boolean(continuation?.continues);
+        if (continuation) {
+          previous.text += ` ${continuation.text}`;
+          previous.endPageNumber = pageNumber;
+        }
+      }
+      notes.push(...pageNotes);
     } catch (error) {
       console.warn(`Could not index footnotes on page ${pageNumber}`, error);
     }

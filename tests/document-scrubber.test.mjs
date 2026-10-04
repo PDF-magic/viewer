@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
-import { footnotesForPage } from "../src/viewer/navigation/footnote-index.js";
+import { footnotesForPage, footnoteContinuationForPage } from "../src/viewer/navigation/footnote-index.js";
 
 const source = readFileSync(new URL("../src/viewer/navigation/document-scrubber.js", import.meta.url), "utf8");
 const viewport = { width: 600, height: 800, convertToViewportPoint: (x, y) => [x, y] };
@@ -46,9 +46,9 @@ async function loadScrubber(pages) {
     window: { addEventListener() {}, innerHeight: 800, innerWidth: 1000 },
     pdfDocumentSessionReady: Promise.resolve({ document: {
       numPages: pages.length,
-      getPage: async (number) => ({ getTextContent: async () => ({ items: pages[number - 1] }), getViewport: () => viewport }),
+      getPage: async (number) => ({ getTextContent: async () => ({ items: pages[number - 1] }), getViewport: () => viewport, getOperatorList: async () => ({ argsArray: [] }) }),
     } }),
-    footnotesForPage, scrollToTarget: (note) => jumps.push(note),
+    footnotesForPage, footnoteContinuationForPage, scrollToTarget: (note) => jumps.push(note),
     requestAnimationFrame: (callback) => { frames.push(callback); return frames.length; },
     setTimeout: (callback) => { callback(); }, console,
   });
@@ -143,4 +143,22 @@ test("note 33 joins apostrophes without adding spaces inside words", () => {
   assert.match(note.text, /it’s important/);
   assert.doesNotMatch(note.text, /\s’|’\s/);
   assert.match(note.text, /review and prevent unauthorized/);
+});
+
+
+test("note 12 includes its unnumbered continuation on the next page without body text", () => {
+  const pages = JSON.parse(readFileSync(new URL("./fixtures/footnote-continuation.json", import.meta.url), "utf8"));
+  const note = indexFixture(pages[0]).find((note) => note.number === 12);
+  assert.equal(note.continues, true);
+  const page = pages[1];
+  const viewport = { width: page.width, height: page.height, convertToViewportPoint: (x, y) => [x, page.height - y] };
+  const continuation = footnoteContinuationForPage(page.items, viewport, page.operators, note, indexFixture(page));
+  assert.match(continuation.text, /^implementation details involving/);
+  assert.match(continuation.text, /issuer’s insider offering transactions\.$/);
+  assert.doesNotMatch(continuation.text, /The present processing|Page 9 of 64|EDGAR Next Machine/);
+  // A bottom-page paragraph remains eligible, but the next numbered note stops it.
+  assert.equal(continuation.continues, true);
+  assert.equal(footnoteContinuationForPage(page.items, viewport, { argsArray: [] }, note, []), null);
+  const next = pages[2];
+  assert.equal(footnoteContinuationForPage(next.items, { width: next.width, height: next.height, convertToViewportPoint: (x, y) => [x, next.height - y] }, next.operators, note, indexFixture(next)), null);
 });

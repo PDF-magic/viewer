@@ -166,17 +166,49 @@ export function footnotesForPage(items, viewport, pageNumber) {
         (entry.xRatio > 0.35 && entry.xRatio < 0.65));
       return withinNote && sameType && !footer && entry.xRatio >= note.xRatio - 0.02;
     }).sort((a, b) => Math.abs(a.y - b.y) < 2 ? a.x - b.x : a.y - b.y);
-    const text = noteEntries.reduce((text, entry, index) => {
-      const previous = noteEntries[index - 1];
-      if (!previous) return entry.text;
-      // PDF text runs can split a word at an apostrophe or a font change.
-      const sameLine = Math.abs(previous.y - entry.y) < 2;
-      const gap = entry.x - previous.x - Math.abs(previous.item.width || 0);
-      const explicitSpace = /\s$/.test(previous.item.str) || /^\s/.test(entry.item.str);
-      const contiguous = sameLine && Number.isFinite(previous.item.width) &&
-        gap <= Math.max(previous.height, entry.height) * 0.18 && !explicitSpace;
-      return text + (contiguous ? "" : " ") + entry.text;
-    }, "").replace(markerPattern(note.number), "").trim();
-    return { ...note, text };
+    const text = joinNoteEntries(noteEntries).replace(markerPattern(note.number), "").trim();
+    return { ...note, text, endPageNumber: pageNumber,
+      continues: !next && noteEntries.at(-1)?.yRatio >= 0.88 };
   }).filter((note) => note.text.length >= 3);
+}
+
+function joinNoteEntries(entries) {
+  return entries.reduce((text, entry, index) => {
+    const previous = entries[index - 1];
+    if (!previous) return entry.text;
+    // PDF text runs can split a word at an apostrophe or a font change.
+    const sameLine = Math.abs(previous.y - entry.y) < 2;
+    const gap = entry.x - previous.x - Math.abs(previous.item.width || 0);
+    const explicitSpace = /\s$/.test(previous.item.str) || /^\s/.test(entry.item.str);
+    const contiguous = sameLine && Number.isFinite(previous.item.width) &&
+      gap <= Math.max(previous.height, entry.height) * 0.18 && !explicitSpace;
+    return text + (contiguous ? "" : " ") + entry.text;
+  }, "").trim();
+}
+
+// A continuation has no repeated marker, but remains below the PDF's footnote rule.
+export function footnoteContinuationForPage(items, viewport, operatorList, previousNote, pageNotes) {
+  const separators = (operatorList?.argsArray || []).flatMap((args) => {
+    // PDF.js constructPath arguments contain the paths and their bounding box.
+    const bounds = args?.[2];
+    if (!Array.isArray(args?.[1]) || bounds?.length !== 4 ||
+      !args[1].some((path) => Array.isArray(path) || ArrayBuffer.isView(path))) return [];
+    const [x1, y1] = viewport.convertToViewportPoint(bounds[0], bounds[1]);
+    const [x2, y2] = viewport.convertToViewportPoint(bounds[2], bounds[3]);
+    const width = Math.abs(x2 - x1);
+    const top = Math.min(y1, y2);
+    return Math.abs(y2 - y1) <= 2 && width >= viewport.width * 0.12 &&
+      width <= viewport.width * 0.5 && top >= viewport.height * 0.2 &&
+      Math.abs(Math.min(x1, x2) / viewport.width - previousNote.xRatio) < 0.02 ? [top] : [];
+  });
+  const separator = separators.sort((a, b) => a - b)[0];
+  if (separator === undefined) return null;
+  const next = pageNotes[0];
+  const entries = positionedItems(items, viewport).filter((entry) =>
+    entry.y > separator + 2 && (!next || entry.y < next.yRatio * viewport.height - 2) &&
+    entry.yRatio < 0.92 && entry.xRatio >= previousNote.xRatio - 0.02 &&
+    Math.abs(entry.height - previousNote.textHeight) <= previousNote.textHeight * 0.15)
+    .sort((a, b) => Math.abs(a.y - b.y) < 2 ? a.x - b.x : a.y - b.y);
+  const text = joinNoteEntries(entries);
+  return text ? { text, continues: !next && entries.at(-1)?.yRatio >= 0.88 } : null;
 }
