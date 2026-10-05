@@ -730,6 +730,34 @@ input {
   visibility: visible;
 }
 
+.document-scrubber-preview.document-scrubber-choices {
+  width: min(560px, 80vw);
+  left: clamp(0px, calc(var(--scrubber-preview-x, var(--scrubber-thumb-x, 7px)) - min(280px, 40vw)), max(0px, calc(100% - min(560px, 80vw))));
+  visibility: visible;
+}
+
+.document-scrubber-choice {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--control-bg);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.document-scrubber-choice:hover,
+.document-scrubber-choice:focus-visible {
+  background: var(--control-hover);
+  outline: 1px solid var(--search-focus-border);
+}
+
 /* Keep the hover area connected across the gap above the slider. */
 .document-scrubber-track:hover::before,
 .document-scrubber-track:focus-within::before {
