@@ -38,6 +38,7 @@ async function loadScrubber(pages, operators) {
       style: { setProperty: (key, value) => { properties[key] = value; } },
       addEventListener(name, callback) { this.listeners[name] = callback; },
       setAttribute(name, value) { this.attributes[name] = value; },
+      removeAttribute(name) { delete this.attributes[name]; },
       select() { this.selected = true; },
       blur() { this.listeners.blur?.(); },
       setCustomValidity(message) { this.validityMessage = message; },
@@ -313,6 +314,7 @@ test("editing or escaping repeated-number choices cancels without navigation", a
   field.value = "7";
   field.listeners.input();
   assert.equal(field.attributes["aria-expanded"], "false");
+  field.value = "42";
   field.listeners.keydown({ key: "Enter", preventDefault() {} });
   preview.listeners.keydown({ key: "Escape", preventDefault() {} });
   assert.equal(jumps.length, 0);

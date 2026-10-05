@@ -56,6 +56,7 @@ function navigateToFootnote(value) {
 function closeChoices() {
   choosingOccurrence = false;
   preview.setAttribute("role", "tooltip");
+  preview.removeAttribute("aria-label");
   preview.classList.remove("document-scrubber-choices");
   currentLabel.setAttribute("aria-expanded", "false");
   previewNote(clampIndex(range.value));
