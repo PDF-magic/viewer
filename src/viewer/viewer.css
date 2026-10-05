@@ -804,19 +804,20 @@ input {
   appearance: none;
   background: var(--body-bg);
   box-shadow: 0 0 0 2px var(--toolbar-bg);
+  transform: translateX(var(--scrubber-thumb-offset, 0px));
 }
 
 .document-scrubber-input::-moz-range-track {
   height: 4px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: var(--control-bg);
+  background: linear-gradient(to right, var(--page-border) calc(var(--scrubber-progress) * 100%), var(--control-bg) calc(var(--scrubber-progress) * 100%));
 }
 
 .document-scrubber-input::-moz-range-progress {
   height: 4px;
   border-radius: 999px;
-  background: var(--page-border);
+  background: transparent;
 }
 
 .document-scrubber-input::-moz-range-thumb {
@@ -825,6 +826,7 @@ input {
   border: 2px solid var(--page-border);
   border-radius: 50%;
   background: var(--body-bg);
+  transform: translateX(var(--scrubber-thumb-offset, 0px));
 }
 
 .document-scrubber-input:focus-visible {

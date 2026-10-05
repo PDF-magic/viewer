@@ -48,6 +48,7 @@ async function loadScrubber(pages, operators) {
   const jumps = [];
   const frames = [];
   const properties = {};
+  const motionPreference = { matches: false, addEventListener() {} };
   function element(selector) {
     if (!elements.has(selector)) elements.set(selector, {
       hidden: true, value: "1", clientWidth: 600, listeners: {}, attributes: {}, children: [],
@@ -70,7 +71,7 @@ async function loadScrubber(pages, operators) {
   }
   const context = vm.createContext({
     document: { createElement: () => element(Symbol()), querySelector: element, documentElement: element("root"), elementFromPoint: () => null },
-    window: { addEventListener() {}, innerHeight: 800, innerWidth: 1000 },
+    window: { addEventListener() {}, matchMedia: () => motionPreference, innerHeight: 800, innerWidth: 1000 },
     pdfDocumentSessionReady: Promise.resolve({ operators, document: {
       numPages: pages.length,
       getPage: async (number) => {
@@ -85,12 +86,37 @@ async function loadScrubber(pages, operators) {
     } }),
     appendFootnotesForPage, scrollToTarget: (note) => jumps.push(note),
     requestAnimationFrame: (callback) => { frames.push(callback); return frames.length; },
+    cancelAnimationFrame: (id) => { frames[id - 1] = () => {}; },
+    performance: { now: () => 0 },
     setTimeout: (callback) => { callback(); }, console,
   });
   vm.runInContext(source.replace(/^import .*$/gm, "").replace("void initializeScrubber();", "globalThis.ready = initializeScrubber();"), context);
   await context.ready;
-  return { element, jumps, frames, properties };
+  return { element, jumps, frames, properties, context, motionPreference };
 }
+
+test("scroll tracking glides from the visible position and retargets without a jump", async () => {
+  const { context, properties, frames, motionPreference } = await loadScrubber([noteItems]);
+  vm.runInContext("updateScrubber(1, true)", context);
+  assert.equal(properties["--scrubber-progress"], "0");
+  frames[vm.runInContext("motionFrame", context) - 1](80);
+  const halfway = Number(properties["--scrubber-progress"]);
+  assert.ok(halfway > 0 && halfway < 1);
+  vm.runInContext("updateScrubber(0, true)", context);
+  assert.equal(Number(properties["--scrubber-progress"]), halfway);
+  frames[vm.runInContext("motionFrame", context) - 1](80);
+  assert.ok(Number(properties["--scrubber-progress"]) < halfway);
+  frames[vm.runInContext("motionFrame", context) - 1](160);
+  assert.equal(properties["--scrubber-progress"], "0");
+  assert.equal(properties["--scrubber-thumb-offset"], "0px");
+  vm.runInContext("updateScrubber(1, true)", context);
+  vm.runInContext("updateScrubber(0)", context);
+  assert.equal(vm.runInContext("motionFrame", context), undefined);
+  motionPreference.matches = true;
+  vm.runInContext("updateScrubber(1, true)", context);
+  assert.equal(properties["--scrubber-progress"], "1");
+  assert.equal(vm.runInContext("motionFrame", context), undefined);
+});
 
 test("scrubber stays hidden and reserves no space on documents without footnotes", async () => {
   const { element, properties } = await loadScrubber([body, body]);

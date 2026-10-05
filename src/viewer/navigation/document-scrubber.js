@@ -15,6 +15,40 @@ let pendingIndex = 0;
 let dragging = false;
 let editingNumber = false;
 let choosingOccurrence = false;
+let selectedIndex = -1;
+let visualProgress = 0;
+let motionFrame;
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+function paintProgress(progress) {
+  visualProgress = progress;
+  const width = Math.max(0, track.clientWidth - 14);
+  const target = notes.length > 1 ? selectedIndex / (notes.length - 1) : 0;
+  track.style.setProperty("--scrubber-progress", String(progress));
+  track.style.setProperty("--scrubber-thumb-x", `${7 + progress * width}px`);
+  track.style.setProperty("--scrubber-thumb-offset", `${(progress - target) * width}px`);
+}
+
+function moveProgress(target, smooth) {
+  if (motionFrame) cancelAnimationFrame(motionFrame);
+  motionFrame = undefined;
+  if (!smooth || reducedMotion.matches) {
+    paintProgress(target);
+    return;
+  }
+  const start = visualProgress;
+  const started = performance.now();
+  // Retarget from the visible position so rapid page changes never restart at
+  // an old footnote. Direct slider/keyboard navigation stays immediate.
+  paintProgress(start);
+  function animate(now) {
+    const elapsed = Math.min(1, (now - started) / 160);
+    const eased = 1 - (1 - elapsed) ** 3;
+    paintProgress(start + (target - start) * eased);
+    motionFrame = elapsed < 1 ? requestAnimationFrame(animate) : undefined;
+  }
+  motionFrame = requestAnimationFrame(animate);
+}
 
 function clampIndex(value) {
   return Math.min(Math.max((Number.parseInt(value, 10) || 1) - 1, 0), notes.length - 1);
@@ -30,16 +64,16 @@ function previewNote(index) {
   }
 }
 
-function updateScrubber(index) {
+function updateScrubber(index, smooth = false) {
   const note = notes[index];
   if (!note) return;
+  if (smooth && index === selectedIndex) return;
+  selectedIndex = index;
   const progress = notes.length > 1 ? index / (notes.length - 1) : 0;
   range.value = String(index + 1);
   range.setAttribute("aria-valuetext", `Footnote ${note.number}, ${index + 1} of ${notes.length}, page ${note.pageNumber}: ${note.text}`);
   if (!editingNumber) currentLabel.value = String(note.number);
-  track.style.setProperty("--scrubber-progress", String(progress));
-  // Match the native thumb's center, including its radius at both endpoints.
-  track.style.setProperty("--scrubber-thumb-x", `${7 + progress * Math.max(0, track.clientWidth - 14)}px`);
+  moveProgress(progress, smooth);
   previewNote(index);
 }
 
@@ -113,8 +147,12 @@ function trackPosition() {
     const delta = Math.abs(note.yRatio - yRatio);
     if (delta < distance) { distance = delta; index = i; }
   }
-  updateScrubber(index);
+  updateScrubber(index, true);
 }
+
+reducedMotion.addEventListener("change", () => {
+  if (selectedIndex >= 0) updateScrubber(selectedIndex);
+});
 
 function scheduleTracking() {
   if (trackingFrame || !notes.length) return;
