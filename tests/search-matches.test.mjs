@@ -2,6 +2,20 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { findSearchMatches } from "../src/viewer/search/search-matches.js";
 
+for (const leading of [14, 24]) {
+  test(`paragraph gaps stop matches while ${leading}-point wrapped lines remain searchable`, () => {
+    const item = (str, y) => ({ str, height: 12, transform: [12, 0, 0, 12, 72, y], hasEOL: true });
+    const items = [item("First wrapped", 700), item("line ends", 700 - leading),
+      item("Second paragraph", 700 - leading * 2 - 12),
+      item("continues here", 700 - leading * 3 - 12)];
+    assert.equal(findSearchMatches(items, "wrapped line").length, 1);
+    assert.equal(findSearchMatches(items, "ends Second").length, 0);
+    assert.equal(findSearchMatches(items, "paragraph continues").length, 1);
+    assert.deepEqual(findSearchMatches(items, "paragraph continues")[0].ranges,
+      [{ itemIndex: 2, start: 7, end: 16 }, { itemIndex: 3, start: 0, end: 9 }]);
+  });
+}
+
 test("multiline occurrences keep the source ranges for every matching line", () => {
   const items = [{ str: "Market structure", hasEOL: true }, { str: "reform continues." },
     { str: "Market structure reform" }];
