@@ -26,6 +26,23 @@ test("ordinary numbered paragraphs and page counters do not create notes", () =>
   assert.deepEqual(footnotesForPage([...body, item("1 A numbered paragraph", 12, 60, 700), item("2", 10, 300, 760)], viewport, 2), []);
 });
 
+test("split page counters are excluded from footnote text and highlights", () => {
+  const noteText = "See page 15 of 72 in the cited filing.";
+  const footerVariants = [
+    [item("Page 15 of", 8, 250, 744), item("72", 10, 300, 744)],
+    [item("Page", 8, 240, 744), item("15", 8, 265, 744), item("of", 8, 280, 744), item("72", 8, 300, 744)],
+    [item("15", 8, 265, 744), item("of 72", 8, 280, 744)],
+  ];
+  for (const footer of footerVariants) {
+    const notes = footnotesForPage([...body, item("44", 8, 60, 660),
+      item(noteText, 8, 80, 660), item("The footnote continues.", 8, 60, 676), ...footer], viewport, 15);
+    assert.equal(notes.length, 1);
+    assert.equal(notes[0].text, `${noteText} The footnote continues.`);
+    assert.equal(notes[0].highlightRegions.length, 2);
+    assert.ok(notes[0].highlightRegions.every((region) => region.top < 700 / 800));
+  }
+});
+
 async function loadScrubber(pages, operators) {
   const elements = new Map();
   const jumps = [];

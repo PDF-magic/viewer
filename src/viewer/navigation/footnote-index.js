@@ -108,10 +108,22 @@ export function candidateForPage(items, viewport, number, pageNumber, originPage
 }
 
 function positionedItems(items, viewport) {
-  return items.filter((item) => typeof item.str === "string" && item.str.trim()).flatMap((item) => {
+  const entries = items.filter((item) => typeof item.str === "string" && item.str.trim()).flatMap((item) => {
     const point = pageCoordinates(item, viewport);
     return point ? [{ ...point, item, text: item.str.trim(), height: Math.abs(item.height || item.transform?.[3] || 0) }] : [];
   });
+  const footerEntries = new Set();
+  // PDF text extraction can split a page counter into several spans, including
+  // spans with different fonts. Exclude the whole footer line before indexing.
+  for (const entry of entries) {
+    if (entry.yRatio < 0.8 || footerEntries.has(entry)) continue;
+    const line = entries.filter((other) => Math.abs(other.y - entry.y) <= Math.max(other.height, entry.height) * 0.4)
+      .sort((a, b) => a.x - b.x);
+    if (/^(?:Page\s*)?\d+\s*of\s*\d+$/i.test(joinNoteEntries(line))) {
+      for (const fragment of line) footerEntries.add(fragment);
+    }
+  }
+  return entries.filter((entry) => !footerEntries.has(entry));
 }
 
 function textRegion(entry, viewport) {
