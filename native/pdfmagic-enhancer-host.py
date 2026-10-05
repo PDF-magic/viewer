@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import base64
+from collections import deque
 import json
 import os
 from pathlib import Path
@@ -62,6 +64,7 @@ def unique_output(directory: Path, stem: str) -> Path:
         candidate.exists()
         or candidate.with_suffix(".txt").exists()
         or candidate.with_suffix(".tagging.json").exists()
+        or candidate.with_suffix(".review.jsonl").exists()
     ):
         candidate = directory / f"{stem}-enhanced-ocr-{index}.pdf"
         index += 1
@@ -196,6 +199,9 @@ def rename_for_ocr_title(output_path: Path) -> Path:
     ]
     if not all(source.exists() for source, _destination in moves):
         return output_path
+    review_path = output_path.with_suffix(".review.jsonl")
+    if review_path.exists():
+        moves.append((review_path, titled_output.with_suffix(".review.jsonl")))
 
     for source, destination in moves:
         source.replace(destination)
@@ -265,14 +271,49 @@ def stamp_source_url(output_path: Path, reference_url: str) -> None:
             reference_url,
         ],
         check=True,
+        stdout=sys.stderr,
     )
 
     qpdf = shutil.which("qpdf")
     if qpdf:
-        subprocess.run([qpdf, "--check", str(output_path)], check=True)
+        subprocess.run([qpdf, "--warning-exit-0", "--check", str(output_path)], check=True, stdout=sys.stderr)
 
 
-def enhance_pdf(source_url: str, reference_url: str) -> Path:
+def progress_from_log(line: str) -> dict[str, object] | None:
+    marker = re.search(r"PDF_MAGIC_PROGRESS (ocr|review|finalizing)(?: (\d+))?", line)
+    if marker:
+        event = {"type": "progress", "stage": marker[1]}
+        if marker[1] == "review" and marker[2]:
+            event.update(completed=0, total=int(marker[2]))
+        return event
+    reviewed = re.search(r"Reviewed page (\d+)/(\d+)", line)
+    if reviewed:
+        return {"type": "progress", "stage": "review", "completed": int(reviewed[1]), "total": int(reviewed[2])}
+    return None
+
+
+def run_enhancer(command: list[str], progress: bool) -> None:
+    if not progress:
+        result = subprocess.run(command, stdout=sys.stderr, stderr=subprocess.PIPE, text=True)
+        if result.returncode:
+            raise RuntimeError(result.stderr.strip()[-2000:] or f"PDF enhancement failed (exit {result.returncode})")
+        return
+    logs = deque(maxlen=80)
+    environment = {**os.environ, "PYTHONUNBUFFERED": "1"}
+    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                          text=True, bufsize=1, env=environment) as process:
+        for line in process.stdout:
+            logs.append(line)
+            print(line, file=sys.stderr, end="")
+            event = progress_from_log(line)
+            if event:
+                send_message(event)
+        code = process.wait()
+    if code:
+        raise RuntimeError("".join(logs).strip()[-2000:] or f"PDF enhancement failed (exit {code})")
+
+
+def enhance_pdf(source_url: str, reference_url: str, uploaded_path: Path | None = None, progress: bool = False) -> Path:
     config = load_config()
     enhancer_dir = Path(str(config["enhancer_dir"])).expanduser().resolve()
     enhancer = enhancer_dir / "ocr-scanned-pdf.sh"
@@ -281,17 +322,64 @@ def enhance_pdf(source_url: str, reference_url: str) -> Path:
 
     with tempfile.TemporaryDirectory(prefix="pdf-magic-enhancer-") as temp_name:
         temporary_directory = Path(temp_name)
-        input_path, is_local = input_from_url(source_url, temporary_directory)
-        output_directory = input_path.parent if is_local else Path.home() / "Downloads"
+        input_path, is_local = (
+            (uploaded_path, False) if uploaded_path is not None
+            else input_from_url(source_url, temporary_directory)
+        )
+        # Browser-launched helpers can create Downloads files yet be denied
+        # permission to replace them during tagging. Keep web copies in app data.
+        web_output_directory = (
+            Path.home() / "Library/Application Support/PDF Magic/Enhanced"
+            if sys.platform == "darwin"
+            else Path.home() / ".local/share/pdf-magic/enhanced"
+        )
+        output_directory = input_path.parent if is_local else web_output_directory
         output_path = unique_output(output_directory, safe_stem(source_url))
 
-        subprocess.run(
-            ["/bin/bash", str(enhancer), str(input_path), str(output_path)],
-            check=True,
+        run_enhancer(
+            ["/bin/bash", str(enhancer), str(input_path), str(output_path), "--force-ocr", "--ai-review"],
+            progress,
         )
+        if progress:
+            send_message({"type": "progress", "stage": "finalizing"})
         output_path = rename_for_ocr_title(output_path)
         stamp_source_url(output_path, reference_url)
         return output_path.resolve()
+
+
+def enhance_uploaded_pdf(message: dict[str, object]) -> Path:
+    source_url = str(message.get("sourceUrl") or "")
+    reference_url = str(message.get("referenceUrl") or "")
+    byte_length = message.get("byteLength")
+    if not source_url or not reference_url:
+        raise ValueError("sourceUrl and referenceUrl are required")
+    if type(byte_length) is not int or byte_length <= 0:
+        raise ValueError("positive PDF byteLength is required")
+    with tempfile.TemporaryDirectory(prefix="pdf-magic-upload-") as folder:
+        path = Path(folder) / "source.pdf"
+        received = 0
+        with path.open("wb") as output:
+            send_message({"ok": True})
+            while True:
+                chunk = read_message()
+                if chunk.get("action") == "enhance-pdf-finish":
+                    break
+                if chunk.get("action") != "enhance-pdf-chunk":
+                    raise ValueError("expected PDF chunk or finish")
+                data = base64.b64decode(chunk.get("data", ""), validate=True)
+                if not data or len(data) > 256 * 1024:
+                    raise ValueError("invalid PDF chunk size")
+                received += len(data)
+                if received > byte_length:
+                    raise ValueError("PDF upload exceeds declared byteLength")
+                output.write(data)
+                send_message({"ok": True})
+        if received != byte_length:
+            raise ValueError("incomplete PDF upload")
+        with path.open("rb") as uploaded:
+            if b"%PDF-" not in uploaded.read(1024):
+                raise ValueError("uploaded document is not a PDF")
+        return enhance_pdf(source_url, reference_url, uploaded_path=path, **({"progress": True} if message.get("progress") else {}))
 
 
 def stamp_mode() -> int:
@@ -327,12 +415,16 @@ def stamp_mode() -> int:
 
 
 def main() -> int:
+    # Browsers launched from Finder do not inherit the shell's Homebrew PATH.
+    os.environ["PATH"] = os.pathsep.join(
+        ["/opt/homebrew/bin", "/usr/local/bin", os.environ.get("PATH", os.defpath)]
+    )
     if len(sys.argv) > 1 and sys.argv[1] == "--stamp":
         return stamp_mode()
 
     try:
         message = read_message()
-        if message.get("action") != "enhance-pdf":
+        if message.get("action") not in {"enhance-pdf", "enhance-pdf-start"}:
             raise ValueError("unsupported native-host action")
 
         source_url = str(message.get("sourceUrl") or "")
@@ -340,7 +432,10 @@ def main() -> int:
         if not source_url or not reference_url:
             raise ValueError("sourceUrl and referenceUrl are required")
 
-        output_path = enhance_pdf(source_url, reference_url)
+        output_path = (
+            enhance_uploaded_pdf(message) if message["action"] == "enhance-pdf-start"
+            else enhance_pdf(source_url, reference_url, **({"progress": True} if message.get("progress") else {}))
+        )
         send_message(
             {
                 "ok": True,
