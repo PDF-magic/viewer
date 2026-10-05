@@ -235,6 +235,14 @@
   margin-inline: 0;
 }
 
+.search-control .search-nav-button {
+  width: 24px;
+}
+
+.search-control .search-nav-button + .search-nav-button {
+  margin-left: -2px;
+}
+
 .search-control input::-webkit-search-cancel-button {
   -webkit-appearance: none;
   width: 10px;
@@ -245,7 +253,7 @@
     linear-gradient(-45deg, transparent 43%, var(--search-text) 43% 57%, transparent 57%);
   cursor: pointer;
   filter: none;
-  opacity: 0.82;
+  opacity: 1;
 }
 
 .search-control input::-webkit-search-cancel-button:hover {
@@ -263,5 +271,8 @@
 
 @media (max-width: 1130px) {
   :where(:root:not(.toolbar-two-rows)) .search-control input { min-width: 0; }
-  :where(:root:not(.toolbar-two-rows)) .search-count { display: none; }
+}
+
+.search-control.search-count-crowded .search-count {
+  display: none;
 }

@@ -3,10 +3,18 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
 
-const source = readFileSync(new URL('../src/viewer/navigation/minimap.js', import.meta.url), 'utf8');
+const source = readFileSync(new URL('../src/viewer/navigation/minimap.js', import.meta.url), 'utf8')
+  .replace(/^import \{ pdfDocumentSessionReady \} from "\.\.\/pdf-document-session\.js";\n/, '')
+  .replace(/^import \{[\s\S]*?\} from "\.\/minimap-cache\.js";\n/, '');
 const styles = readFileSync(new URL('../src/viewer/navigation/minimap.css', import.meta.url), 'utf8');
+const viewerStyles = readFileSync(new URL('../src/viewer/viewer.css', import.meta.url), 'utf8');
+const viewerSource = readFileSync(new URL('../src/viewer/viewer.js', import.meta.url), 'utf8');
+const viewerMarkup = readFileSync(new URL('../src/viewer.html', import.meta.url), 'utf8');
+const toggleStyles = readFileSync(new URL('../src/viewer/theme/image-color-toggle.css', import.meta.url), 'utf8');
 function fixture(count, height = 900) {
-  const window = { innerHeight: height, scrollY: 0, addEventListener() {},
+  const windowEvents = [];
+  const window = { innerHeight: height, scrollY: 0, location: { pathname: '/src/viewer.html', search: '' }, addEventListener() {},
+    dispatchEvent(event) { windowEvents.push(event.type); },
     scrollTo({ top }) { this.scrollY = top; } };
   const tiles = Array.from({ length: count }, () => ({ clientWidth: 80, style: {} }));
   const pages = tiles.map((_, index) => ({ querySelector() { return null; },
@@ -14,18 +22,61 @@ function fixture(count, height = 900) {
   const listeners = {};
   const track = { clientHeight: height - 52, addEventListener(type, callback) { listeners[type] = callback; }, setAttribute() {} };
   const viewport = { style: {} };
+  const toggle = { checked: true, addEventListener(type, callback) { listeners[`toggle-${type}`] = callback; } };
+  const minimapPageContainer = {
+    children: tiles,
+    style: {},
+    querySelectorAll: selector => selector === '.minimap-page' ? tiles : [],
+    querySelector: () => null,
+    replaceChildren(...children) { this.children = children; },
+  };
   const elements = { '#viewer': { querySelectorAll: () => pages }, '#minimap': track,
-    '#minimap-pages': { children: tiles }, '#minimap-viewport': viewport };
+    '#minimap-pages': minimapPageContainer, '#minimap-viewport': viewport, '#show-minimap': toggle };
+  const classes = new Set();
   const document = { querySelector: selector => elements[selector],
-    documentElement: { scrollHeight: count * 1420 } };
+    documentElement: { scrollHeight: count * 1420, classList: {
+      contains: value => classes.has(value),
+      add(value) { classes.add(value); },
+      toggle(value, force) { force ? classes.add(value) : classes.delete(value); },
+    } } };
+  const storedValues = new Map();
+  const localStorage = {
+    getItem: key => storedValues.get(key) ?? null,
+    setItem: (key, value) => storedValues.set(key, value),
+  };
   const observer = class { observe() {} };
-  const context = vm.createContext({ document, window, MutationObserver: observer,
-    ResizeObserver: observer, WheelEvent: { DOM_DELTA_LINE: 1, DOM_DELTA_PAGE: 2 }, requestAnimationFrame() { return 1; } });
+  const chrome = { runtime: { getURL: value => value } };
+  const context = vm.createContext({ document, window, localStorage, chrome,
+    pdfDocumentSessionReady: new Promise(() => {}),
+    GlobalWorkerOptions: {}, VerbosityLevel: { ERRORS: 0 }, URLSearchParams, Event, MutationObserver: observer,
+    ResizeObserver: observer, CustomEvent: class extends Event {
+      constructor(type, options) { super(type); this.detail = options.detail; }
+    }, WheelEvent: { DOM_DELTA_LINE: 1, DOM_DELTA_PAGE: 2 }, requestAnimationFrame() { return 1; } });
   vm.runInContext(source, context);
   const sync = () => vm.runInContext('syncMinimap()', context);
   sync();
-  return { window, tiles, track, viewport, context, sync, listeners };
+  return { window, windowEvents, tiles, track, viewport, toggle, classes, storedValues, context, sync, listeners, minimapPageContainer };
 }
+
+test('switching to local view keeps thumbnails unclipped at the middle and end', () => {
+  const f = fixture(100);
+  const maximum = 100 * 1420 - f.window.innerHeight;
+  for (const scrollY of [maximum / 2, maximum]) {
+    f.window.scrollY = scrollY;
+    vm.runInContext('setMinimapMode("local")', f.context);
+    f.sync();
+    const height = parseFloat(f.minimapPageContainer.style.height);
+    const offset = vm.runInContext('mapOffset', f.context);
+    assert.equal(height, 100 * 112);
+    assert.ok(offset > f.track.clientHeight);
+    assert.ok(height - offset >= f.track.clientHeight);
+
+    vm.runInContext('setMinimapMode("overview")', f.context);
+    f.sync();
+    assert.equal(parseFloat(f.minimapPageContainer.style.height), f.track.clientHeight);
+    assert.equal(vm.runInContext('mapOffset', f.context), 0);
+  }
+});
 
 test('short documents keep fixed thumbnail heights at the top after resize', () => {
   const f = fixture(2);
@@ -79,6 +130,35 @@ test('dragging to the end reaches the document end for short and long maps', () 
 });
 
 
+test('dragging the viewport follows the latest pointer position immediately', () => {
+  const f = fixture(100);
+  f.track.getBoundingClientRect = () => ({ top: 0, height: f.track.clientHeight });
+  f.track.setPointerCapture = () => {};
+
+  let prevented = false;
+  f.listeners.pointerdown({
+    button: 0,
+    clientY: 9,
+    pointerId: 1,
+    preventDefault() { prevented = true; },
+  });
+  f.listeners.pointermove({
+    clientY: 100,
+    getCoalescedEvents() {
+      return [{ clientY: 400 }];
+    },
+  });
+
+  const viewportTop = 391;
+  const viewportTravel = vm.runInContext('mapHeight - viewportHeight', f.context);
+  const maximum = 100 * 1420 - f.window.innerHeight;
+  assert.ok(prevented);
+  assert.equal(parseFloat(f.viewport.style.top), viewportTop);
+  assert.ok(Math.abs(f.window.scrollY - viewportTop / viewportTravel * maximum) < 0.00001);
+  assert.match(source, /function scheduleSync\(\) \{[\s\S]*?syncFrame \|\| dragging/);
+});
+
+
 test('wheel navigation uses compact map travel and current scroll position in every delta mode', () => {
   for (const count of [2, 100]) {
     for (const deltaMode of [0, 1, 2]) {
@@ -98,4 +178,155 @@ test('wheel navigation uses compact map travel and current scroll position in ev
       assert.equal(f.window.scrollY, 0);
     }
   }
+});
+
+test('minimap toggle persists visibility and updates accessibility state', () => {
+  const f = fixture(3);
+  f.toggle.checked = false;
+  f.listeners['toggle-change']();
+  assert.ok(f.classes.has('minimap-disabled'));
+  assert.equal(f.track.tabIndex, -1);
+  assert.equal(f.storedValues.get('pdf-viewer-show-minimap'), 'false');
+
+  f.toggle.checked = true;
+  f.listeners['toggle-change']();
+  assert.ok(!f.classes.has('minimap-disabled'));
+  assert.equal(f.track.tabIndex, 0);
+  assert.equal(f.storedValues.get('pdf-viewer-show-minimap'), 'true');
+  assert.deepEqual(f.windowEvents, Array(5).fill('pdf-viewer-minimap-layout-change'));
+  assert.match(viewerMarkup, /id="show-minimap" class="checkbox-input" type="checkbox"/);
+  assert.doesNotMatch(viewerMarkup, /id="show-minimap"[\s\S]{0,120}toggle-switch/);
+  assert.match(toggleStyles, /\.checkbox-input:checked\s*\{/);
+});
+
+test('the document becomes ready before the minimap finishes in the background', () => {
+  assert.match(source, /MINIMAP_RENDER_CONCURRENCY\s*=\s*4/);
+  assert.match(source, /await Promise\.all\(/);
+  assert.match(source, /requestIdleCallback\(start, \{ timeout: 1200 \}\)/);
+  assert.match(source, /window\.addEventListener\("pdf-viewer-document-ready", scheduleThumbnailPreparation\)/);
+  assert.match(source, /void loadThumbnailDocument\(loadGeneration\)[\s\S]*?\.finally\(finishMinimapPreparation\)/);
+  assert.match(source, /classList\.add\("minimap-ready"\)/);
+  assert.match(source, /classList\.toggle\("minimap-preparing", false\)/);
+  assert.match(viewerSource, /requiredPageCount\s*=\s*Math\.min\(2, pdfDocument\.numPages\)/);
+  assert.match(viewerSource, /classList\.add\("document-ready"\)/);
+  assert.match(viewerSource, /dispatchEvent\(new Event\("pdf-viewer-document-ready"\)\)/);
+  assert.doesNotMatch(viewerSource, /minimap-ready/);
+  assert.match(viewerSource, /goToPage\(currentPage, "auto"\);\s*keepRenderWindow\(currentPage\);/);
+  assert.doesNotMatch(viewerSource, /status\.remove\(\)/);
+  assert.match(viewerStyles, /html:not\(\.document-ready\) \.page\s*\{[\s\S]*?visibility:\s*hidden/);
+  assert.match(viewerStyles, /\.document-ready \.status:not\(\.error\)\s*\{[\s\S]*?display:\s*none/);
+  assert.doesNotMatch(viewerStyles, /\.minimap-preparing \.page/);
+  assert.match(styles, /\.minimap-preparing \.minimap-shell\s*\{[\s\S]*?translateX\(110%\)/);
+  assert.match(styles, /transform 1100ms cubic-bezier/);
+});
+
+test('thumbnail edges fade softly into the minimap background', () => {
+  assert.doesNotMatch(styles, /\.minimap\s*\{[\s\S]*?border-left:/);
+  assert.match(styles, /\.minimap-strip\s*\{[\s\S]*?-webkit-mask-image:\s*linear-gradient\(/);
+  assert.match(styles, /\.minimap-strip\s*\{[\s\S]*?mask-image:\s*linear-gradient\(/);
+  assert.match(styles, /transparent[\s\S]*?#000 6%[\s\S]*?#000 94%[\s\S]*?transparent/);
+});
+
+test('overview thumbnails retain their compact default resolution', () => {
+  assert.match(source, /MINIMAP_THUMBNAIL_WIDTH\s*=\s*80/);
+  assert.match(source, /MINIMAP_THUMBNAIL_RENDER_WIDTH\s*=\s*50/);
+  assert.match(source, /renderWidth = MINIMAP_THUMBNAIL_RENDER_WIDTH/);
+  assert.match(source, /scale:\s*renderWidth\s*\/\s*Math\.max\(baseViewport\.width, 1\)/);
+});
+
+test('local thumbnails render at display density and keep a bounded cache while navigating', async () => {
+  const f = fixture(1000);
+  const renders = [];
+  f.context.yieldToBrowser = async () => {};
+  f.context.renderThumbnail = async (pageNumber, generation, width) => {
+    renders.push({ pageNumber, width });
+    return { width, height: width * 1.4, remove() {} };
+  };
+  f.tiles.forEach(tile => { tile.append = () => {}; });
+  f.window.devicePixelRatio = 2;
+  vm.runInContext('thumbnailDocument = { numPages: 1000 }; setMinimapMode("local")', f.context);
+  for (const ratio of [0, 0.25, 0.5, 0.75, 1]) {
+    f.window.scrollY = ratio * (1000 * 1420 - f.window.innerHeight);
+    f.sync();
+    await vm.runInContext('renderLocalThumbnails()', f.context);
+    // A sync starts the worker; let its pending render/yield microtasks finish.
+    await new Promise(resolve => setImmediate(resolve));
+    assert.ok(vm.runInContext('localThumbnails.size <= 32', f.context));
+    assert.ok(vm.runInContext('localThumbnailTargets.every(({ pageNumber }) => localThumbnails.has(pageNumber))', f.context));
+  }
+  assert.ok(renders.length > 32);
+  assert.ok(renders.every(({ width }) => width === 160));
+  const count = renders.length;
+  vm.runInContext('setMinimapMode("overview")', f.context);
+  f.sync();
+  await vm.runInContext('renderLocalThumbnails()', f.context);
+  assert.equal(renders.length, count);
+  vm.runInContext('clearLocalThumbnails()', f.context);
+  assert.equal(vm.runInContext('localThumbnails.size', f.context), 0);
+});
+
+test('local thumbnails discard pending renders after navigation or rotation', async () => {
+  const f = fixture(1000);
+  let completeRender;
+  const attached = [];
+  f.tiles.forEach((tile, index) => { tile.append = () => attached.push(index + 1); });
+  f.context.renderThumbnail = () => new Promise(resolve => { completeRender = resolve; });
+  f.context.yieldToBrowser = async () => {};
+  vm.runInContext('thumbnailDocument = { numPages: 1000 }; setMinimapMode("local")', f.context);
+  f.sync();
+  const canvas = { width: 80, height: 112 };
+  vm.runInContext('thumbnailGeneration += 1; clearLocalThumbnails()', f.context);
+  completeRender(canvas);
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+  assert.deepEqual(attached, []);
+  assert.equal(canvas.width, 0);
+  assert.equal(vm.runInContext('localThumbnails.size', f.context), 0);
+});
+
+test('persistent thumbnails and their work follow the global minimap preference', () => {
+  assert.match(source, /restoreCachedThumbnailStrip\(generation\)/);
+  assert.match(source, /void cacheThumbnailStrip\(strip\)/);
+  assert.match(source, /composeThumbnailStrip\(thumbnails\)/);
+  assert.match(source, /minimapPages\.append\(strip\)/);
+  assert.match(source, /"image\/png"/);
+  assert.match(source, /if \(thumbnailPreparationStarted \|\| !minimapEnabled\(\) \|\| window\.innerWidth <= 700\)/);
+  assert.match(source, /else \{\s*stopThumbnailPreparation\(\);/);
+  assert.match(source, /thumbnailLoadGeneration \+= 1;[\s\S]*?thumbnailDocument = undefined/);
+  assert.match(source, /scheduleThumbnailPreparation\(\);\s*$/);
+  assert.doesNotMatch(source, /void loadThumbnailDocument\(\)\.catch/);
+});
+
+test('thumbnail teardown tolerates documents without a destroy method', () => {
+  fixture(1);
+  assert.doesNotMatch(source, /thumbnailDocument\?\.destroy\(\)/);
+  assert.doesNotMatch(source, /documentToDestroy\.destroy\(\)/);
+});
+
+test('minimap shares the viewer document and its cached fingerprint', () => {
+  assert.match(source, /const session = await pdfDocumentSessionReady/);
+  assert.match(source, /thumbnailDocument = session\.document/);
+  assert.match(source, /thumbnailFingerprint = session\.fingerprint/);
+  assert.match(source, /cachedStripPromise = restoreCachedThumbnailStrip\(generation\);[\s\S]*?await waitForPageElements/);
+  assert.doesNotMatch(source, /getDocument\(/);
+  assert.doesNotMatch(source, /resolvePdfSource\(/);
+  assert.match(viewerSource, /publishPdfDocument\(pdfDocument, OPS\)/);
+});
+
+
+test('minimap exposes persistent local, side-swap, and collapse controls', () => {
+  assert.match(viewerMarkup, /id="minimap-swap-side"[\s\S]*id="minimap-mode"[\s\S]*id="minimap-collapse"/);
+  assert.match(source, /MINIMAP_MODE_STORAGE_KEY = "pdf-viewer-minimap-mode"/);
+  assert.match(source, /MINIMAP_SIDE_STORAGE_KEY = "pdf-viewer-minimap-side"/);
+  assert.match(source, /MINIMAP_COLLAPSED_STORAGE_KEY = "pdf-viewer-minimap-collapsed"/);
+  assert.match(source, /setMinimapMode\(minimapMode\(\) === "overview" \? "local" : "overview"\)/);
+  assert.match(source, /setMinimapCollapsed\(!minimapCollapsed\(\)\)/);
+  assert.match(styles, /\.minimap-left \.minimap-controls\s*\{[\s\S]*?flex-direction:\s*row-reverse/);
+  assert.match(styles, /\.minimap-collapsed \.minimap-collapse\s*\{[\s\S]*?display:\s*grid/);
+});
+
+test('local minimap keeps natural thumbnail scale and moves the page background', () => {
+  assert.match(source, /minimapMode\(\) === "overview"[\s\S]*?trackHeight \/ widthScaledHeight[\s\S]*?: 1/);
+  assert.match(source, /mapOffset =[\s\S]*?minimapMode\(\) === "local"[\s\S]*?viewportTop \+ viewportHeight \/ 2 - trackHeight \/ 2/);
+  assert.match(source, /minimapPages\.style\.transform = `translateY\(\$\{\-mapOffset\}px\)`/);
+  assert.match(source, /function pointerMapPosition\(event\)[\s\S]*?\+ mapOffset/);
 });

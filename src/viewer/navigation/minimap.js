@@ -1,35 +1,185 @@
+import { pdfDocumentSessionReady } from "../pdf-document-session.js";
+import {
+  createThumbnailCacheKey,
+  readThumbnailCache,
+  writeThumbnailCache,
+} from "./minimap-cache.js";
+
 const viewer = document.querySelector("#viewer");
+const minimapShell = document.querySelector("#minimap-shell");
 const minimap = document.querySelector("#minimap");
 const minimapPages = document.querySelector("#minimap-pages");
 const minimapViewport = document.querySelector("#minimap-viewport");
+const rotateLeftButton = document.querySelector("#rotate-left");
+const rotateRightButton = document.querySelector("#rotate-right");
+const minimapToggle = document.querySelector("#show-minimap");
+const minimapModeButton = document.querySelector("#minimap-mode");
+const minimapModeIcon = document.querySelector("#minimap-mode-icon");
+const minimapSwapSideButton = document.querySelector("#minimap-swap-side");
+const minimapCollapseButton = document.querySelector("#minimap-collapse");
 
+const MINIMAP_STORAGE_KEY = "pdf-viewer-show-minimap";
+const MINIMAP_MODE_STORAGE_KEY = "pdf-viewer-minimap-mode";
+const MINIMAP_SIDE_STORAGE_KEY = "pdf-viewer-minimap-side";
+const MINIMAP_COLLAPSED_STORAGE_KEY = "pdf-viewer-minimap-collapsed";
+const MINIMAP_RENDER_CONCURRENCY = 4;
 const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
+const MINIMAP_THUMBNAIL_WIDTH = 80;
+const MINIMAP_THUMBNAIL_RENDER_WIDTH = 50;
+const MINIMAP_STRIP_MAX_HEIGHT = 32767;
+const MINIMAP_LOCAL_CACHE_LIMIT = 32;
 const WHEEL_LINE_HEIGHT = 16;
-
 let syncFrame;
 let dragging = false;
 let dragOffset = 0;
 let viewportHeight = 18;
 let mapHeight = 0;
+let mapOffset = 0;
+let thumbnailDocument;
+let thumbnailFingerprint;
+let thumbnailGeneration = 0;
+let thumbnailLoadGeneration = 0;
+let thumbnailRotation = 0;
+let thumbnailPreparationStarted = false;
+let thumbnailPreparationCancel;
+const localThumbnails = new Map();
+let localThumbnailTargets = [];
+let localThumbnailRenderWidth = 0;
+let localThumbnailRendering = false;
 
 function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), maximum);
 }
 
+function minimapEnabled() {
+  return !document.documentElement.classList.contains("minimap-disabled");
+}
+
+function minimapCollapsed() {
+  return document.documentElement.classList.contains("minimap-collapsed");
+}
+
+function minimapMode() {
+  return document.documentElement.classList.contains("minimap-local") ? "local" : "overview";
+}
+
+function setMinimapAccessibility() {
+  const interactive = minimapEnabled() && !minimapCollapsed();
+  minimap.setAttribute("aria-hidden", String(!interactive));
+  minimap.tabIndex = interactive ? 0 : -1;
+  minimapShell?.setAttribute("data-collapsed", String(minimapCollapsed()));
+}
+
+function updateMinimapLayout(update) {
+  // Keep the same point on the page at the viewport center as its width changes.
+  const viewportY = window.innerHeight / 2;
+  const pages = Array.from(viewer.querySelectorAll(".page"));
+  const page = pages.find((element) => {
+    const rect = element.getBoundingClientRect();
+    return rect.top + rect.height > viewportY;
+  }) || pages.at(-1);
+  const rect = page?.getBoundingClientRect();
+  const anchor = rect?.height > 0
+    ? { page, ratio: (viewportY - rect.top) / rect.height, viewportY }
+    : null;
+
+  update();
+  window.dispatchEvent(new CustomEvent("pdf-viewer-minimap-layout-change", { detail: anchor }));
+}
+
+function setMinimapEnabled(enabled, persist = true) {
+  updateMinimapLayout(() => {
+    document.documentElement.classList.toggle("minimap-disabled", !enabled);
+  });
+  minimapToggle.checked = enabled;
+  setMinimapAccessibility();
+
+  if (persist) {
+    localStorage.setItem(MINIMAP_STORAGE_KEY, String(enabled));
+  }
+
+  if (enabled && !minimapCollapsed()) {
+    scheduleSync();
+  }
+}
+
+function setMinimapMode(mode, persist = true) {
+  const local = mode === "local";
+  document.documentElement.classList.toggle("minimap-local", local);
+  minimapModeButton?.setAttribute("aria-pressed", String(local));
+  if (minimapModeIcon) {
+    minimapModeIcon.textContent = local ? "☷" : "▥";
+  }
+  if (minimapModeButton) {
+    const label = local ? "Use full-document minimap" : "Use local page navigator";
+    minimapModeButton.setAttribute("aria-label", label);
+    minimapModeButton.title = label;
+  }
+
+  if (persist) {
+    localStorage.setItem(MINIMAP_MODE_STORAGE_KEY, local ? "local" : "overview");
+  }
+
+  scheduleSync();
+}
+
+function setMinimapSide(side, persist = true) {
+  const left = side === "left";
+  updateMinimapLayout(() => {
+    document.documentElement.classList.toggle("minimap-left", left);
+  });
+  if (minimapSwapSideButton) {
+    const label = left ? "Move minimap to the right" : "Move minimap to the left";
+    minimapSwapSideButton.setAttribute("aria-label", label);
+    minimapSwapSideButton.title = label;
+  }
+
+  if (persist) {
+    localStorage.setItem(MINIMAP_SIDE_STORAGE_KEY, left ? "left" : "right");
+  }
+
+  scheduleSync();
+}
+
+function setMinimapCollapsed(collapsed, persist = true) {
+  updateMinimapLayout(() => {
+    document.documentElement.classList.toggle("minimap-collapsed", collapsed);
+  });
+  if (minimapCollapseButton) {
+    const label = collapsed ? "Expand minimap" : "Collapse minimap";
+    minimapCollapseButton.setAttribute("aria-label", label);
+    minimapCollapseButton.setAttribute("aria-expanded", String(!collapsed));
+    minimapCollapseButton.title = label;
+  }
+  setMinimapAccessibility();
+
+  if (persist) {
+    localStorage.setItem(MINIMAP_COLLAPSED_STORAGE_KEY, String(collapsed));
+  }
+
+  if (!collapsed) {
+    scheduleSync();
+  }
+}
+
 function scheduleSync() {
-  if (syncFrame) {
+  if (!minimapEnabled() || syncFrame || dragging) {
     return;
   }
 
   syncFrame = requestAnimationFrame(() => {
     syncFrame = undefined;
+    if (dragging) {
+      return;
+    }
     syncMinimap();
   });
 }
 
 function ensureTiles(pages) {
-  if (minimapPages.children.length === pages.length) {
-    return Array.from(minimapPages.children);
+  const existingTiles = Array.from(minimapPages.querySelectorAll(".minimap-page"));
+  if (existingTiles.length === pages.length) {
+    return existingTiles;
   }
 
   const fragment = document.createDocumentFragment();
@@ -43,28 +193,6 @@ function ensureTiles(pages) {
 
   minimapPages.replaceChildren(fragment);
   return tiles;
-}
-
-function syncThumbnail(page, tile) {
-  const sourceCanvas = page.querySelector("canvas");
-  if (!sourceCanvas || tile.sourceCanvas === sourceCanvas) {
-    return;
-  }
-
-  let thumbnail = tile.querySelector("canvas");
-  if (!thumbnail) {
-    thumbnail = document.createElement("canvas");
-    tile.append(thumbnail);
-  }
-
-  const thumbnailWidth = 80;
-  const ratio = sourceCanvas.height / Math.max(sourceCanvas.width, 1);
-  thumbnail.width = thumbnailWidth;
-  thumbnail.height = Math.max(1, Math.round(thumbnailWidth * ratio));
-
-  const context = thumbnail.getContext("2d", { alpha: false });
-  context.drawImage(sourceCanvas, 0, 0, thumbnail.width, thumbnail.height);
-  tile.sourceCanvas = sourceCanvas;
 }
 
 function documentMetrics() {
@@ -81,7 +209,7 @@ function viewportTopFromScrollPosition() {
 }
 
 function syncMinimap() {
-  if (!minimap || minimap.clientHeight === 0) {
+  if (!minimap || minimap.clientHeight === 0 || minimapCollapsed()) {
     return;
   }
 
@@ -90,19 +218,28 @@ function syncMinimap() {
   const trackHeight = minimap.clientHeight;
   const { scrollMaximum } = documentMetrics();
 
-  // Keep page thumbnails contiguous and compress long documents to the available track height.
   const pageWidth = pages[0]?.getBoundingClientRect().width || 1;
-  const thumbnailWidth = tiles[0]?.clientWidth || 80;
+  const thumbnailWidth = tiles[0]?.clientWidth || MINIMAP_THUMBNAIL_WIDTH;
   const widthScale = thumbnailWidth / pageWidth;
   const widthScaledHeights = pages.map((page) => page.getBoundingClientRect().height * widthScale);
   const widthScaledHeight = widthScaledHeights.reduce((total, height) => total + height, 0);
-  const heightCompression = widthScaledHeight > trackHeight ? trackHeight / widthScaledHeight : 1;
+  const heightCompression =
+    minimapMode() === "overview" && widthScaledHeight > trackHeight
+      ? trackHeight / widthScaledHeight
+      : 1;
   const scale = widthScale * heightCompression;
   const tileHeights = pages.map((page) => page.getBoundingClientRect().height * scale);
   const contentHeight = tileHeights.reduce((total, height) => total + height, 0);
-  mapHeight = Math.min(trackHeight, contentHeight);
-  const scrollRatio = scrollMaximum > 0 ? clamp(window.scrollY / scrollMaximum, 0, 1) : 0;
+  mapHeight = minimapMode() === "overview" ? Math.min(trackHeight, contentHeight) : contentHeight;
 
+  // Clip the full thumbnail strip before moving it through the visible track.
+  minimapPages.style.height = `${mapHeight}px`;
+  const strip = minimapPages.querySelector(".minimap-strip");
+  if (strip) {
+    strip.style.height = `${mapHeight}px`;
+  }
+
+  const scrollRatio = scrollMaximum > 0 ? clamp(window.scrollY / scrollMaximum, 0, 1) : 0;
   let packedTop = 0;
   pages.forEach((page, index) => {
     const tile = tiles[index];
@@ -111,20 +248,407 @@ function syncMinimap() {
     tile.style.top = `${packedTop}px`;
     tile.style.height = `${tileHeight}px`;
     packedTop += tileHeight;
-    syncThumbnail(page, tile);
   });
 
   viewportHeight = Math.min(
-    mapHeight,
+    Math.max(mapHeight, 0),
     Math.max(18, window.innerHeight * scale),
   );
   const viewportTravel = Math.max(mapHeight - viewportHeight, 0);
   const viewportTop = clamp(scrollRatio, 0, 1) * viewportTravel;
+  const mapTravel = Math.max(mapHeight - trackHeight, 0);
+  mapOffset =
+    minimapMode() === "local"
+      ? clamp(viewportTop + viewportHeight / 2 - trackHeight / 2, 0, mapTravel)
+      : 0;
 
-  minimapViewport.style.top = `${viewportTop}px`;
+  minimapPages.style.transform = `translateY(${-mapOffset}px)`;
+  minimapViewport.style.top = `${viewportTop - mapOffset}px`;
   minimapViewport.style.height = `${viewportHeight}px`;
   minimap.setAttribute("aria-valuemax", String(Math.round(scrollMaximum)));
   minimap.setAttribute("aria-valuenow", String(Math.round(window.scrollY)));
+  updateLocalThumbnails(tiles, trackHeight);
+}
+
+function clearLocalThumbnails() {
+  for (const canvas of localThumbnails.values()) {
+    canvas.remove();
+    canvas.width = canvas.height = 0;
+  }
+  localThumbnails.clear();
+  localThumbnailTargets = [];
+}
+
+function updateLocalThumbnails(tiles, trackHeight) {
+  if (minimapMode() !== "local" || !thumbnailDocument) {
+    localThumbnailTargets = [];
+    return;
+  }
+
+  const renderWidth = Math.ceil(
+    (tiles[0]?.clientWidth || MINIMAP_THUMBNAIL_WIDTH) * clamp(window.devicePixelRatio || 1, 1, 3),
+  );
+  if (renderWidth !== localThumbnailRenderWidth) {
+    clearLocalThumbnails();
+    localThumbnailRenderWidth = renderWidth;
+  }
+
+  // Only sharpen the visible pages and one track of overscan on either side.
+  localThumbnailTargets = tiles.flatMap((tile, index) => {
+    const top = parseFloat(tile.style.top);
+    const bottom = top + parseFloat(tile.style.height);
+    return bottom >= mapOffset - trackHeight && top <= mapOffset + trackHeight * 2
+      ? [{ pageNumber: index + 1, tile }]
+      : [];
+  }).sort((a, b) => {
+    const center = mapOffset + trackHeight / 2;
+    const distance = ({ tile }) => Math.abs(parseFloat(tile.style.top) + parseFloat(tile.style.height) / 2 - center);
+    return distance(a) - distance(b);
+  }).slice(0, MINIMAP_LOCAL_CACHE_LIMIT);
+  for (const { pageNumber } of localThumbnailTargets) {
+    const cached = localThumbnails.get(pageNumber);
+    if (cached) {
+      localThumbnails.delete(pageNumber);
+      localThumbnails.set(pageNumber, cached);
+    }
+  }
+  void renderLocalThumbnails();
+}
+
+async function renderLocalThumbnails() {
+  if (localThumbnailRendering) {
+    return;
+  }
+  localThumbnailRendering = true;
+  try {
+    while (thumbnailDocument && minimapEnabled() && !minimapCollapsed() && minimapMode() === "local") {
+      const target = localThumbnailTargets.find(({ pageNumber }) => !localThumbnails.has(pageNumber));
+      if (!target) {
+        break;
+      }
+      const generation = thumbnailGeneration;
+      const width = localThumbnailRenderWidth;
+      const canvas = await renderThumbnail(target.pageNumber, generation, width);
+      if (!canvas || generation !== thumbnailGeneration || width !== localThumbnailRenderWidth ||
+          !localThumbnailTargets.some(({ tile }) => tile === target.tile)) {
+        if (canvas) {
+          canvas.width = canvas.height = 0;
+        }
+        continue;
+      }
+      canvas.className = "minimap-local-thumbnail";
+      target.tile.append(canvas);
+      localThumbnails.set(target.pageNumber, canvas);
+      while (localThumbnails.size > MINIMAP_LOCAL_CACHE_LIMIT) {
+        const oldest = localThumbnails.keys().next().value;
+        const evicted = localThumbnails.get(oldest);
+        evicted.remove();
+        evicted.width = evicted.height = 0;
+        localThumbnails.delete(oldest);
+      }
+      await yieldToBrowser();
+    }
+  } catch {
+    // Keep the overview strip as a fallback if a local preview cannot render.
+  } finally {
+    localThumbnailRendering = false;
+  }
+}
+
+function waitForPageElements(expectedCount) {
+  if (viewer.querySelectorAll(".page").length === expectedCount) {
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve) => {
+    const observer = new MutationObserver(() => {
+      if (viewer.querySelectorAll(".page").length !== expectedCount) {
+        return;
+      }
+
+      observer.disconnect();
+      resolve();
+    });
+
+    observer.observe(viewer, { childList: true });
+  });
+}
+
+function yieldToBrowser() {
+  return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function finishMinimapPreparation() {
+  const root = document.documentElement;
+  root.classList.add("minimap-ready");
+  requestAnimationFrame(() => root.classList.toggle("minimap-preparing", false));
+}
+
+async function loadThumbnailDocument(loadGeneration) {
+  const session = await pdfDocumentSessionReady;
+  if (!session) {
+    return;
+  }
+
+  if (loadGeneration !== thumbnailLoadGeneration || !minimapEnabled()) {
+    return;
+  }
+
+  thumbnailDocument = session.document;
+  thumbnailFingerprint = session.fingerprint;
+  const generation = ++thumbnailGeneration;
+  const cachedStripPromise = restoreCachedThumbnailStrip(generation);
+  await waitForPageElements(thumbnailDocument.numPages);
+  if (loadGeneration !== thumbnailLoadGeneration || !minimapEnabled()) {
+    return;
+  }
+  scheduleSync();
+  await renderAllThumbnails(generation, cachedStripPromise);
+}
+
+async function renderThumbnail(pageNumber, generation, renderWidth = MINIMAP_THUMBNAIL_RENDER_WIDTH) {
+  const page = await thumbnailDocument.getPage(pageNumber);
+  if (generation !== thumbnailGeneration) {
+    page.cleanup();
+    return null;
+  }
+
+  const baseViewport = page.getViewport({ scale: 1, rotation: thumbnailRotation });
+  const viewport = page.getViewport({
+    scale: renderWidth / Math.max(baseViewport.width, 1),
+    rotation: thumbnailRotation,
+  });
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d", { alpha: false });
+  canvas.width = Math.max(1, Math.round(viewport.width));
+  canvas.height = Math.max(1, Math.round(viewport.height));
+
+  try {
+    await page.render({ canvasContext: context, viewport }).promise;
+  } catch {
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  page.cleanup();
+  return generation === thumbnailGeneration ? canvas : null;
+}
+
+function cacheKey() {
+  return thumbnailFingerprint
+    ? createThumbnailCacheKey(thumbnailFingerprint, thumbnailRotation, MINIMAP_THUMBNAIL_RENDER_WIDTH)
+    : null;
+}
+
+function canvasToBlob(canvas) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => blob ? resolve(blob) : reject(new Error("Could not encode minimap thumbnail")),
+      "image/png",
+    );
+  });
+}
+
+async function canvasFromBlob(blob) {
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d", { alpha: false });
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  context.drawImage(bitmap, 0, 0);
+  bitmap.close();
+  return canvas;
+}
+
+function composeThumbnailStrip(thumbnails) {
+  const sourceHeight = thumbnails.reduce((total, thumbnail) => total + thumbnail.height, 0);
+  const heightScale = Math.min(1, MINIMAP_STRIP_MAX_HEIGHT / Math.max(sourceHeight, 1));
+  const strip = document.createElement("canvas");
+  const context = strip.getContext("2d", { alpha: false });
+  strip.className = "minimap-strip";
+  strip.width = MINIMAP_THUMBNAIL_RENDER_WIDTH;
+  strip.height = Math.max(1, Math.round(sourceHeight * heightScale));
+  context.fillStyle = "#fff";
+  context.fillRect(0, 0, strip.width, strip.height);
+
+  let sourceTop = 0;
+  thumbnails.forEach((thumbnail) => {
+    const top = Math.round(sourceTop * heightScale);
+    sourceTop += thumbnail.height;
+    const bottom = Math.round(sourceTop * heightScale);
+    context.drawImage(thumbnail, 0, top, strip.width, Math.max(1, bottom - top));
+  });
+  return strip;
+}
+
+function attachThumbnailStrip(strip) {
+  minimapPages.querySelector(".minimap-strip")?.remove();
+  minimapPages.append(strip);
+  strip.style.height = `${mapHeight}px`;
+}
+
+async function restoreCachedThumbnailStrip(generation) {
+  const key = cacheKey();
+  if (!key) {
+    return null;
+  }
+
+  try {
+    const blob = await readThumbnailCache(key, thumbnailDocument.numPages);
+    if (!blob || generation !== thumbnailGeneration) {
+      return null;
+    }
+    const strip = await canvasFromBlob(blob);
+    strip.className = "minimap-strip";
+    return strip;
+  } catch {
+    return null;
+  }
+}
+
+async function cacheThumbnailStrip(strip) {
+  const key = cacheKey();
+  if (!key) {
+    return;
+  }
+
+  try {
+    const blob = await canvasToBlob(strip);
+    await writeThumbnailCache(key, blob, thumbnailDocument.numPages);
+  } catch {
+    // Persistent caching is an optimization; rendering remains usable without it.
+  }
+}
+
+async function renderAllThumbnails(preparedGeneration, preparedCachedStrip) {
+  if (!thumbnailDocument || !minimapEnabled()) {
+    return;
+  }
+
+  const generation = preparedGeneration ?? ++thumbnailGeneration;
+  const pages = Array.from(viewer.querySelectorAll(".page"));
+  if (pages.length !== thumbnailDocument.numPages) {
+    return;
+  }
+
+  const tiles = ensureTiles(pages);
+  const cachedStrip = await (
+    preparedCachedStrip ?? restoreCachedThumbnailStrip(generation)
+  );
+  if (generation !== thumbnailGeneration || !minimapEnabled()) {
+    return;
+  }
+  if (cachedStrip && generation === thumbnailGeneration) {
+    attachThumbnailStrip(cachedStrip);
+    scheduleSync();
+    return;
+  }
+
+  const thumbnails = new Array(thumbnailDocument.numPages);
+  let nextPageNumber = 1;
+
+  // Render several thumbnails concurrently, but keep them off-DOM until the
+  // complete minimap can appear with the document.
+  async function renderNextThumbnail() {
+    while (nextPageNumber <= thumbnailDocument.numPages) {
+      const pageNumber = nextPageNumber;
+      nextPageNumber += 1;
+      const canvas = await renderThumbnail(pageNumber, generation);
+      if (!canvas || generation !== thumbnailGeneration) {
+        return;
+      }
+
+      thumbnails[pageNumber - 1] = canvas;
+      await yieldToBrowser();
+    }
+  }
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(MINIMAP_RENDER_CONCURRENCY, thumbnailDocument.numPages) },
+      () => renderNextThumbnail(),
+    ),
+  );
+
+  if (generation !== thumbnailGeneration) {
+    return;
+  }
+
+  const strip = composeThumbnailStrip(thumbnails);
+  attachThumbnailStrip(strip);
+  scheduleSync();
+  void cacheThumbnailStrip(strip);
+}
+
+function cancelScheduledThumbnailPreparation() {
+  thumbnailPreparationCancel?.();
+  thumbnailPreparationCancel = undefined;
+}
+
+function scheduleThumbnailPreparation() {
+  if (
+    !document.documentElement.classList.contains("document-ready") ||
+    thumbnailPreparationStarted ||
+    thumbnailPreparationCancel ||
+    !minimapEnabled() ||
+    window.innerWidth <= 700
+  ) {
+    return;
+  }
+
+  const root = document.documentElement;
+  root.classList.add("minimap-preparing");
+  root.classList.toggle("minimap-ready", false);
+
+  const start = () => {
+    thumbnailPreparationCancel = undefined;
+    startThumbnailPreparation();
+  };
+
+  if (typeof window.requestIdleCallback === "function") {
+    const handle = window.requestIdleCallback(start, { timeout: 1200 });
+    thumbnailPreparationCancel = () => window.cancelIdleCallback?.(handle);
+  } else {
+    const handle = setTimeout(start, 0);
+    thumbnailPreparationCancel = () => clearTimeout(handle);
+  }
+}
+
+function startThumbnailPreparation() {
+  if (thumbnailPreparationStarted || !minimapEnabled() || window.innerWidth <= 700) {
+    return;
+  }
+
+  thumbnailPreparationStarted = true;
+  const loadGeneration = ++thumbnailLoadGeneration;
+  void loadThumbnailDocument(loadGeneration)
+    .catch(() => {
+      if (loadGeneration === thumbnailLoadGeneration) {
+        thumbnailPreparationStarted = false;
+      }
+    })
+    .finally(finishMinimapPreparation);
+}
+
+function stopThumbnailPreparation() {
+  cancelScheduledThumbnailPreparation();
+  thumbnailLoadGeneration += 1;
+  thumbnailGeneration += 1;
+  clearLocalThumbnails();
+  thumbnailPreparationStarted = false;
+  minimapPages.replaceChildren();
+  thumbnailDocument = undefined;
+  thumbnailFingerprint = undefined;
+  document.documentElement.classList.toggle("minimap-preparing", false);
+}
+
+function rerenderThumbnails(delta) {
+  thumbnailRotation = (thumbnailRotation + delta + 360) % 360;
+  clearLocalThumbnails();
+  if (thumbnailDocument) {
+    void renderAllThumbnails();
+    scheduleSync();
+  }
 }
 
 function scrollFromViewportTop(viewportTop) {
@@ -132,6 +656,13 @@ function scrollFromViewportTop(viewportTop) {
   const viewportTravel = Math.max(mapHeight - viewportHeight, 0);
   const ratio = viewportTravel > 0 ? clamp(viewportTop / viewportTravel, 0, 1) : 0;
   window.scrollTo({ top: ratio * scrollMaximum, behavior: "auto" });
+}
+
+function dragViewportTo(viewportTop) {
+  const viewportTravel = Math.max(mapHeight - viewportHeight, 0);
+  const clampedTop = clamp(viewportTop, 0, viewportTravel);
+  minimapViewport.style.top = `${clampedTop - mapOffset}px`;
+  scrollFromViewportTop(clampedTop);
 }
 
 function normalizedWheelDelta(event) {
@@ -151,19 +682,23 @@ function pointerPosition(event) {
   return clamp(event.clientY - rect.top, 0, rect.height);
 }
 
+function pointerMapPosition(event) {
+  return pointerPosition(event) + mapOffset;
+}
+
 minimap.addEventListener("pointerdown", (event) => {
   if (event.button !== 0) {
     return;
   }
 
-  const y = pointerPosition(event);
-  const currentTop = Number.parseFloat(minimapViewport.style.top) || 0;
+  const y = pointerMapPosition(event);
+  const currentTop = viewportTopFromScrollPosition();
   const currentBottom = currentTop + viewportHeight;
 
   dragging = true;
   dragOffset = y >= currentTop && y <= currentBottom ? y - currentTop : viewportHeight / 2;
   minimap.setPointerCapture(event.pointerId);
-  scrollFromViewportTop(y - dragOffset);
+  dragViewportTo(y - dragOffset);
   event.preventDefault();
 });
 
@@ -172,7 +707,11 @@ minimap.addEventListener("pointermove", (event) => {
     return;
   }
 
-  scrollFromViewportTop(pointerPosition(event) - dragOffset);
+  const coalescedEvents = event.getCoalescedEvents?.();
+  const pointerEvent = coalescedEvents?.length
+    ? coalescedEvents[coalescedEvents.length - 1]
+    : event;
+  dragViewportTo(pointerMapPosition(pointerEvent) - dragOffset);
 });
 
 function endDrag(event) {
@@ -184,6 +723,7 @@ function endDrag(event) {
   if (minimap.hasPointerCapture(event.pointerId)) {
     minimap.releasePointerCapture(event.pointerId);
   }
+  scheduleSync();
 }
 
 minimap.addEventListener("pointerup", endDrag);
@@ -228,6 +768,39 @@ minimap.addEventListener("keydown", (event) => {
   event.preventDefault();
 });
 
+rotateLeftButton?.addEventListener("click", () => rerenderThumbnails(-90));
+rotateRightButton?.addEventListener("click", () => rerenderThumbnails(90));
+minimapModeButton?.addEventListener("click", () => {
+  setMinimapMode(minimapMode() === "overview" ? "local" : "overview");
+});
+minimapSwapSideButton?.addEventListener("click", () => {
+  setMinimapSide(document.documentElement.classList.contains("minimap-left") ? "right" : "left");
+});
+minimapCollapseButton?.addEventListener("click", () => {
+  setMinimapCollapsed(!minimapCollapsed());
+});
+minimapToggle.addEventListener("change", () => {
+  setMinimapEnabled(minimapToggle.checked);
+  if (minimapToggle.checked) {
+    scheduleThumbnailPreparation();
+  } else {
+    stopThumbnailPreparation();
+  }
+});
+
+const storedMinimapPreference = localStorage.getItem(MINIMAP_STORAGE_KEY);
+const storedMinimapMode = localStorage.getItem(MINIMAP_MODE_STORAGE_KEY);
+const storedMinimapSide = localStorage.getItem(MINIMAP_SIDE_STORAGE_KEY);
+const storedMinimapCollapsed = localStorage.getItem(MINIMAP_COLLAPSED_STORAGE_KEY);
+setMinimapMode(storedMinimapMode === "local" ? "local" : "overview", false);
+setMinimapSide(storedMinimapSide === "left" ? "left" : "right", false);
+setMinimapCollapsed(storedMinimapCollapsed === "true", false);
+setMinimapEnabled(storedMinimapPreference !== "false", false);
+
+if (!minimapEnabled() || window.innerWidth <= 700) {
+  finishMinimapPreparation();
+}
+
 const mutationObserver = new MutationObserver(scheduleSync);
 mutationObserver.observe(viewer, { childList: true, subtree: true });
 
@@ -235,6 +808,18 @@ const resizeObserver = new ResizeObserver(scheduleSync);
 resizeObserver.observe(viewer);
 
 window.addEventListener("scroll", scheduleSync, { passive: true });
-window.addEventListener("resize", scheduleSync);
+window.addEventListener("pdf-viewer-document-ready", scheduleThumbnailPreparation);
+window.addEventListener("resize", () => {
+  scheduleSync();
+  scheduleThumbnailPreparation();
+});
+window.addEventListener("pagehide", () => {
+  cancelScheduledThumbnailPreparation();
+  thumbnailLoadGeneration += 1;
+  thumbnailGeneration += 1;
+  thumbnailDocument = undefined;
+  thumbnailFingerprint = undefined;
+});
 
 scheduleSync();
+scheduleThumbnailPreparation();
