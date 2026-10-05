@@ -7,12 +7,17 @@ function requestIdFromLocation() {
 }
 
 function findComposer() {
-  return (
+  const composer = (
     document.querySelector("#prompt-textarea") ||
     document.querySelector('[contenteditable="true"][data-lexical-editor="true"]') ||
     document.querySelector('[contenteditable="true"][role="textbox"]') ||
     document.querySelector("textarea")
   );
+  if (!composer || !composer.isConnected || !composer.getClientRects().length) return null;
+  if (composer instanceof HTMLTextAreaElement) {
+    return !composer.disabled && !composer.readOnly ? composer : null;
+  }
+  return composer.isContentEditable ? composer : null;
 }
 
 function findSendButton() {
@@ -58,24 +63,21 @@ function setComposerText(composer, text) {
 }
 
 function waitFor(getValue, timeoutMs) {
-  const startedAt = Date.now();
-
   return new Promise((resolve) => {
+    let observer;
+    let timeout;
+    const finish = (value) => {
+      observer?.disconnect();
+      window.clearTimeout(timeout);
+      resolve(value);
+    };
     const check = () => {
       const value = getValue();
-      if (value) {
-        resolve(value);
-        return;
-      }
-
-      if (Date.now() - startedAt >= timeoutMs) {
-        resolve(null);
-        return;
-      }
-
-      window.setTimeout(check, 100);
+      if (value) finish(value);
     };
-
+    observer = new MutationObserver(check);
+    observer.observe(document, { childList: true, subtree: true, attributes: true });
+    timeout = window.setTimeout(() => finish(null), timeoutMs);
     check();
   });
 }
@@ -99,7 +101,7 @@ async function submitPendingSummary() {
     return;
   }
 
-  const composer = await waitFor(findComposer, 20000);
+  let composer = await waitFor(findComposer, 20000);
   if (!composer) {
     return;
   }
@@ -107,8 +109,16 @@ async function submitPendingSummary() {
   setComposerText(composer, payload.prompt);
 
   const sendButton = await waitFor(() => {
+    const currentComposer = findComposer();
+    if (!currentComposer) return null;
+    // Hydration can replace the editor after it first appears.
+    if (currentComposer !== composer) {
+      composer = currentComposer;
+      setComposerText(composer, payload.prompt);
+      return null;
+    }
     const button = findSendButton();
-    return button && !button.disabled ? button : null;
+    return button && !button.disabled && button.getClientRects().length ? button : null;
   }, 5000);
 
   if (!sendButton) {
