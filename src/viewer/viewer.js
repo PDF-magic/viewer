@@ -7,6 +7,7 @@ import { findSearchMatches } from "./search/search-matches.js";
 import { highlightTextLayer, registerSearchText } from "./search/search-highlight.js";
 import { normalizeSearchText } from "./search/search-text.js";
 import { PagePreviews } from "./page-previews.js";
+import { preparePrintDocument } from "./print-renderer.js";
 import { highlightFootnote, renderFootnoteHighlight } from "./navigation/footnote-highlight.js";
 
 const sourceMode = window.location.pathname.includes("/src/");
@@ -1137,23 +1138,26 @@ async function printPdf() {
   }
 
   setToolsMenuOpen(false);
-  showToast("Preparing pages for print…");
-  renderingAllPages = true;
-  try {
-    await queueAllPages();
-  } finally {
-    renderingAllPages = false;
-  }
+  let cleanupPrintDocument;
 
-  const overlays = [...document.querySelectorAll(".page-image-overlay")];
-  for (const overlay of overlays) {
-    overlay.style.display = "none";
+  try {
+    cleanupPrintDocument = await preparePrintDocument({
+      pdfDocument,
+      rotation,
+      onProgress(pageNumber, pageCount) {
+        showToast(`Preparing page ${pageNumber} of ${pageCount} for print…`);
+      },
+    });
+    document.documentElement.classList.add("pdf-print-ready");
+    window.print();
+  } catch (error) {
+    console.error("Could not prepare PDF for printing.", error);
+    showToast("Could not prepare PDF for printing");
+  } finally {
+    document.documentElement.classList.remove("pdf-print-ready");
+    cleanupPrintDocument?.();
+    keepRenderWindow(currentPage);
   }
-  window.print();
-  for (const overlay of overlays) {
-    overlay.style.display = document.documentElement.dataset.theme === "dark" ? "block" : "none";
-  }
-  keepRenderWindow(currentPage);
 }
 
 async function downloadPdf() {
