@@ -33,7 +33,7 @@
       "js": [
         "src/content/chatgpt-summary.js"
       ],
-      "run_at": "document_idle"
+      "run_at": "document_start"
     }
   ],
   "icons": {
