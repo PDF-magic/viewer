@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import base64
+from collections import deque
 import json
 import os
 from pathlib import Path
@@ -278,7 +279,41 @@ def stamp_source_url(output_path: Path, reference_url: str) -> None:
         subprocess.run([qpdf, "--warning-exit-0", "--check", str(output_path)], check=True, stdout=sys.stderr)
 
 
-def enhance_pdf(source_url: str, reference_url: str, uploaded_path: Path | None = None) -> Path:
+def progress_from_log(line: str) -> dict[str, object] | None:
+    marker = re.search(r"PDF_MAGIC_PROGRESS (ocr|review|finalizing)(?: (\d+))?", line)
+    if marker:
+        event = {"type": "progress", "stage": marker[1]}
+        if marker[1] == "review" and marker[2]:
+            event.update(completed=0, total=int(marker[2]))
+        return event
+    reviewed = re.search(r"Reviewed page (\d+)/(\d+)", line)
+    if reviewed:
+        return {"type": "progress", "stage": "review", "completed": int(reviewed[1]), "total": int(reviewed[2])}
+    return None
+
+
+def run_enhancer(command: list[str], progress: bool) -> None:
+    if not progress:
+        result = subprocess.run(command, stdout=sys.stderr, stderr=subprocess.PIPE, text=True)
+        if result.returncode:
+            raise RuntimeError(result.stderr.strip()[-2000:] or f"PDF enhancement failed (exit {result.returncode})")
+        return
+    logs = deque(maxlen=80)
+    environment = {**os.environ, "PYTHONUNBUFFERED": "1"}
+    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                          text=True, bufsize=1, env=environment) as process:
+        for line in process.stdout:
+            logs.append(line)
+            print(line, file=sys.stderr, end="")
+            event = progress_from_log(line)
+            if event:
+                send_message(event)
+        code = process.wait()
+    if code:
+        raise RuntimeError("".join(logs).strip()[-2000:] or f"PDF enhancement failed (exit {code})")
+
+
+def enhance_pdf(source_url: str, reference_url: str, uploaded_path: Path | None = None, progress: bool = False) -> Path:
     config = load_config()
     enhancer_dir = Path(str(config["enhancer_dir"])).expanduser().resolve()
     enhancer = enhancer_dir / "ocr-scanned-pdf.sh"
@@ -301,15 +336,12 @@ def enhance_pdf(source_url: str, reference_url: str, uploaded_path: Path | None 
         output_directory = input_path.parent if is_local else web_output_directory
         output_path = unique_output(output_directory, safe_stem(source_url))
 
-        result = subprocess.run(
+        run_enhancer(
             ["/bin/bash", str(enhancer), str(input_path), str(output_path), "--force-ocr", "--ai-review"],
-            stdout=sys.stderr,
-            stderr=subprocess.PIPE,
-            text=True,
+            progress,
         )
-        if result.returncode:
-            detail = result.stderr.strip()[-2000:]
-            raise RuntimeError(detail or f"PDF enhancement failed (exit {result.returncode})")
+        if progress:
+            send_message({"type": "progress", "stage": "finalizing"})
         output_path = rename_for_ocr_title(output_path)
         stamp_source_url(output_path, reference_url)
         return output_path.resolve()
@@ -347,7 +379,7 @@ def enhance_uploaded_pdf(message: dict[str, object]) -> Path:
         with path.open("rb") as uploaded:
             if b"%PDF-" not in uploaded.read(1024):
                 raise ValueError("uploaded document is not a PDF")
-        return enhance_pdf(source_url, reference_url, uploaded_path=path)
+        return enhance_pdf(source_url, reference_url, uploaded_path=path, **({"progress": True} if message.get("progress") else {}))
 
 
 def stamp_mode() -> int:
@@ -402,7 +434,7 @@ def main() -> int:
 
         output_path = (
             enhance_uploaded_pdf(message) if message["action"] == "enhance-pdf-start"
-            else enhance_pdf(source_url, reference_url)
+            else enhance_pdf(source_url, reference_url, **({"progress": True} if message.get("progress") else {}))
         )
         send_message(
             {

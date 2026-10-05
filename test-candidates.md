@@ -8,3 +8,5 @@
 - [September 2, 2026 — 2.5 MB](https://www.govinfo.gov/content/pkg/FR-2026-09-02/pdf/FR-2026-09-02.pdf)
 - [September 8, 2026 — 2.3 MB](https://www.govinfo.gov/content/pkg/FR-2026-09-08/pdf/FR-2026-09-08.pdf)
 - [September 3, 2026 — 2.2 MB](https://www.govinfo.gov/content/pkg/FR-2026-09-03/pdf/FR-2026-09-03.pdf)
+
+tereres a preblm where the FR full day relalese have the same footen numebr muletwilp tiems. ilke if you want note 4 there aru 10 of them andit just goes to the clasees nt one. it soheldhandel erepeat footens and dispay them as opetns in the litte popet wehn you enter anumber to seachofr

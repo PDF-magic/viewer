@@ -17,6 +17,45 @@ spec.loader.exec_module(host)
 
 
 class NativeEnhancerTests(unittest.TestCase):
+    def test_progress_stream_contains_framed_updates_and_final_result(self):
+        with tempfile.TemporaryDirectory() as folder:
+            directory = Path(folder).resolve()
+            source = directory / "scan.pdf"
+            source.write_bytes(b"%PDF-1.7\n")
+            (directory / "ocr-scanned-pdf.sh").write_text(
+                'printf "PDF_MAGIC_PROGRESS ocr 2\\n"\n'
+                'printf "PDF_MAGIC_PROGRESS review 2\\n"\n'
+                'printf "Reviewed page 1/2\\nReviewed page 2/2\\n"\n'
+                'printf "PDF_MAGIC_PROGRESS finalizing\\n"\n'
+                'cp "$1" "$2"\n'
+            )
+            bootstrap = f"""
+import importlib.util
+spec = importlib.util.spec_from_file_location('host', {str(HOST)!r})
+host = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(host)
+host.load_config = lambda: {{'enhancer_dir': {folder!r}}}
+host.stamp_source_url = lambda *_: None
+raise SystemExit(host.main())
+"""
+            message = json.dumps({"action": "enhance-pdf", "sourceUrl": source.as_uri(),
+                                  "referenceUrl": "https://example.com/scan.pdf", "progress": True}).encode()
+            result = subprocess.run([sys.executable, "-c", bootstrap],
+                                    input=struct.pack("<I", len(message)) + message,
+                                    capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stderr.decode())
+            frames = []
+            offset = 0
+            while offset < len(result.stdout):
+                length = struct.unpack("<I", result.stdout[offset:offset + 4])[0]
+                frames.append(json.loads(result.stdout[offset + 4:offset + 4 + length]))
+                offset += 4 + length
+            self.assertEqual(offset, len(result.stdout))
+            self.assertEqual(frames[0], {"type": "progress", "stage": "ocr"})
+            self.assertIn({"type": "progress", "stage": "review", "completed": 1, "total": 2}, frames)
+            self.assertTrue(frames[-1]["ok"])
+            self.assertTrue(frames[-1]["outputUrl"].endswith("scan-enhanced-ocr.pdf"))
+
     def test_uploaded_pdf_uses_browser_bytes_without_http_download(self):
         data = b"%PDF-1.7\nloaded browser data"
         messages = [

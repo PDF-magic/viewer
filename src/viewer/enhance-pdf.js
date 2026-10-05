@@ -9,19 +9,47 @@ const installLink = document.querySelector("#install-enhancer");
 const sectionNav = document.querySelector("#section-nav");
 const pageNumberInput = document.querySelector("#page-number");
 const toast = document.querySelector("#toast");
+const progressContainer = document.querySelector("#enhance-progress");
+const progressBar = document.querySelector("#enhance-progress-bar");
+const progressLabel = document.querySelector("#enhance-progress-label");
 const defaultTitle = enhanceButton.title;
 let titleResetTimer;
 let toastTimer;
 
+function updateEnhancementProgress(stage, completed, total) {
+  progressContainer.hidden = false;
+  document.documentElement.classList.add("enhancement-active");
+  const labels = {
+    preparing: "Preparing enhancement…",
+    upload: "Sending PDF for enhancement…",
+    ocr: "Recognizing text on every page…",
+    review: "Reviewing with AI…",
+    finalizing: "Building sections and saving PDF…",
+    complete: "Enhanced PDF ready",
+  };
+  let label = labels[stage] || labels.preparing;
+  if (Number.isFinite(completed) && Number.isFinite(total) && total > 0) {
+    const percentage = Math.round(Math.min(1, Math.max(0, completed / total)) * 100);
+    progressBar.value = percentage;
+    label = stage === "review"
+      ? `AI review · ${completed} of ${total} pages · ${percentage}%`
+      : `${label} ${percentage}%`;
+  } else {
+    progressBar.removeAttribute("value");
+  }
+  progressLabel.textContent = label;
+}
+
 async function enhanceLoadedPdf(sourceUrl, referenceUrl) {
-  const session = await pdfDocumentSessionReady;
-  if (!session?.document) throw new Error("PDF has not finished loading");
-  const data = await session.document.getData();
   const port = chrome.runtime.connectNative(NATIVE_HOST);
   let pending;
   let disconnected = false;
   let disconnectMessage;
   port.onMessage.addListener((response) => {
+    if (response?.type === "progress") {
+      updateEnhancementProgress(response.stage, response.completed, response.total);
+      return;
+    }
     const request = pending;
     pending = null;
     if (!response?.ok) {
@@ -49,7 +77,14 @@ async function enhanceLoadedPdf(sourceUrl, referenceUrl) {
     });
   }
   try {
-    await request({ action: "enhance-pdf-start", sourceUrl, referenceUrl, byteLength: data.length });
+    if (new URL(sourceUrl).protocol === "file:") {
+      return await request({ action: "enhance-pdf", sourceUrl, referenceUrl, progress: true });
+    }
+    const session = await pdfDocumentSessionReady;
+    if (!session?.document) throw new Error("PDF has not finished loading");
+    const data = await session.document.getData();
+    updateEnhancementProgress("upload", 0, data.length);
+    await request({ action: "enhance-pdf-start", sourceUrl, referenceUrl, byteLength: data.length, progress: true });
     // Acknowledge each chunk so large PDFs do not fill the native-message queue.
     const chunkSize = 256 * 1024;
     for (let offset = 0; offset < data.length; offset += chunkSize) {
@@ -59,7 +94,9 @@ async function enhanceLoadedPdf(sourceUrl, referenceUrl) {
         binary += String.fromCharCode(...chunk.subarray(index, index + 8192));
       }
       await request({ action: "enhance-pdf-chunk", data: btoa(binary) });
+      updateEnhancementProgress("upload", Math.min(offset + chunkSize, data.length), data.length);
     }
+    updateEnhancementProgress("ocr");
     return await request({ action: "enhance-pdf-finish" });
   } finally {
     port.disconnect();
@@ -111,6 +148,7 @@ async function enhanceCurrentPdf() {
   enhanceButton.title = "Enhancing PDF…";
   enhanceButton.setAttribute("aria-label", enhanceButton.title);
   showToast("Enhancing PDF…");
+  updateEnhancementProgress("preparing");
 
   try {
     const [source, referenceUrl] = await Promise.all([
@@ -122,17 +160,14 @@ async function enhanceCurrentPdf() {
       throw new Error("PDF source URL unavailable");
     }
 
-    const response = source.originalUrl.protocol === "file:"
-      ? await chrome.runtime.sendNativeMessage(NATIVE_HOST, {
-        action: "enhance-pdf", sourceUrl: source.originalUrl.href, referenceUrl,
-      })
-      : await enhanceLoadedPdf(source.originalUrl.href, referenceUrl);
+    const response = await enhanceLoadedPdf(source.originalUrl.href, referenceUrl);
 
     if (!response?.ok || !response.outputUrl) {
       throw new Error(response?.error || "PDF enhancer did not return a local copy");
     }
 
     showToast("Enhanced PDF ready");
+    updateEnhancementProgress("complete", 1, 1);
     await replaceCurrentTab(response.outputUrl);
   } catch (error) {
     const message = error?.message || "Could not enhance PDF";
@@ -144,6 +179,8 @@ async function enhanceCurrentPdf() {
       showTemporaryTitle("Could not enhance PDF");
     }
   } finally {
+    progressContainer.hidden = true;
+    document.documentElement.classList.remove("enhancement-active");
     enhanceButton.disabled = false;
     if (enhanceButton.title === "Enhancing PDF…") {
       enhanceButton.title = defaultTitle;
