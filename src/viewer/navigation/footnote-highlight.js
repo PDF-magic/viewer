@@ -1,4 +1,5 @@
 import { createHighlightGroup, createHighlightLayer } from "../highlight-regions.js";
+import { selectionLines } from "../selection/selection-lines.js";
 
 let activeRegions = [];
 let activeSearchResult = false;
@@ -17,9 +18,20 @@ export function renderFootnoteHighlight(page, pageNumber, rotation) {
   page.querySelector(".footnote-highlight-layer")?.remove();
   const regions = activeRegions.filter((region) => region.pageNumber === pageNumber);
   if (!regions.length) return;
+  const sideways = ((rotation + 360) % 180) === 90;
+  const width = Math.max(1, sideways ? page.clientHeight : page.clientWidth);
+  const height = Math.max(1, sideways ? page.clientWidth : page.clientHeight);
+  const lines = selectionLines(regions.map(region => ({
+    left: region.left * width, right: (region.left + region.width) * width,
+    top: region.top * height, bottom: (region.top + region.height) * height,
+  })));
+  const connectedRegions = lines.map(line => ({
+    left: line.left / width, top: line.top / height,
+    width: (line.right - line.left) / width, height: (line.bottom - line.top) / height,
+  }));
   const layer = createHighlightLayer("footnote-highlight-layer", 1, 1);
   const className = activeSearchResult ? "footnote-highlight footnote-search-result" : "footnote-highlight";
-  layer.append(createHighlightGroup(regions.map(region => rotatedRegion(region, rotation)), className));
+  layer.append(createHighlightGroup(connectedRegions.map(region => rotatedRegion(region, rotation)), className));
   page.append(layer);
 }
 
