@@ -183,7 +183,7 @@ function paintSelection() {
         }
       }
     }
-    const lines = selectionLines(rectangles);
+    const lines = selectionLines(rectangles, 2);
     if (!lines.length) continue;
     const scaleX = layer.clientWidth / bounds.width;
     const scaleY = layer.clientHeight / bounds.height;

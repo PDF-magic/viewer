@@ -60,8 +60,10 @@ async function findFootnoteTarget(pdfDocument, number, originPage, requestId) {
   return best || null;
 }
 
-function scrollToTarget(target) {
-  window.dispatchEvent(new CustomEvent("pdf-viewer-footnote-jump", { detail: target }));
+function scrollToTarget(target, searchResult = false) {
+  window.dispatchEvent(new CustomEvent("pdf-viewer-footnote-jump", {
+    detail: { ...target, searchResult },
+  }));
 }
 
 async function jumpToFootnote(rawNumber) {
@@ -101,7 +103,7 @@ async function jumpToFootnote(rawNumber) {
     return;
   }
 
-  scrollToTarget(target);
+  scrollToTarget(target, true);
   setStatus(`Footnote ${number} · page ${target.pageNumber}`, "success");
 }
 

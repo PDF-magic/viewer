@@ -7,9 +7,9 @@
   --minimap-accent: var(--accent);
 }
 
-.text-layer .search-highlight {
-  background: color-mix(in srgb, var(--accent) 42%, transparent);
-  box-shadow: inset 0 0 0 0.06em color-mix(in srgb, var(--accent) 65%, transparent);
+.search-highlight-group .highlight-region-fill,
+.footnote-highlight .highlight-region-fill {
+  fill: color-mix(in srgb, var(--accent) 42%, transparent);
 }
 
 .tool-toggle input[type="checkbox"] {

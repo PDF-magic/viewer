@@ -1,5 +1,6 @@
 import { findSearchMatches } from "./search-matches.js";
 import { createHighlightGroup, createHighlightLayer } from "../highlight-regions.js";
+import { selectionLines } from "../selection/selection-lines.js";
 
 const content = new WeakMap();
 
@@ -66,7 +67,14 @@ export function highlightTextLayer(textLayer, query) {
     }
   }
   for (const [ordinal, rects] of rectangles) {
-    const group = createHighlightGroup(rects, "search-highlight-group");
+    const lines = selectionLines(rects.map(rect => ({
+      left: rect.left, top: rect.top,
+      right: rect.left + rect.width, bottom: rect.top + rect.height,
+    })), 2);
+    const group = createHighlightGroup(lines.map(line => ({
+      left: line.left, top: line.top,
+      width: line.right - line.left, height: line.bottom - line.top,
+    })), "search-highlight-group", 2);
     group.dataset.searchOrdinal = ordinal;
     layer.append(group);
   }

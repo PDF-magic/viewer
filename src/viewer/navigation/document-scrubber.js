@@ -12,6 +12,7 @@ let notes = [];
 let navigationFrame;
 let trackingFrame;
 let pendingIndex = 0;
+let pendingSearchResult = false;
 let dragging = false;
 let editingNumber = false;
 let choosingOccurrence = false;
@@ -64,6 +65,11 @@ function previewNote(index) {
   }
 }
 
+function sizeCurrentNumber() {
+  const digits = Math.max(2, currentLabel.value.length);
+  scrubber.style.setProperty("--scrubber-number-width", `calc(${digits}ch + 12px)`);
+}
+
 function updateScrubber(index, smooth = false) {
   const note = notes[index];
   if (!note) return;
@@ -73,17 +79,19 @@ function updateScrubber(index, smooth = false) {
   range.value = String(index + 1);
   range.setAttribute("aria-valuetext", `Footnote ${note.number}, ${index + 1} of ${notes.length}, page ${note.pageNumber}: ${note.text}`);
   if (!editingNumber) currentLabel.value = String(note.number);
+  sizeCurrentNumber();
   moveProgress(progress, smooth);
   previewNote(index);
 }
 
-function navigateToFootnote(value) {
+function navigateToFootnote(value, searchResult = false) {
   pendingIndex = clampIndex(value);
+  pendingSearchResult = searchResult;
   updateScrubber(pendingIndex);
   if (navigationFrame) return;
   navigationFrame = requestAnimationFrame(() => {
     navigationFrame = undefined;
-    scrollToTarget(notes[pendingIndex]);
+    scrollToTarget(notes[pendingIndex], pendingSearchResult);
   });
 }
 
@@ -99,7 +107,7 @@ function closeChoices() {
 function chooseOccurrence(index) {
   closeChoices();
   editingNumber = false;
-  navigateToFootnote(index + 1);
+  navigateToFootnote(index + 1, true);
   currentLabel.blur();
 }
 
@@ -168,6 +176,7 @@ currentLabel?.addEventListener("focus", () => {
 });
 currentLabel?.addEventListener("click", () => currentLabel.select());
 currentLabel?.addEventListener("input", () => {
+  sizeCurrentNumber();
   currentLabel.setCustomValidity("");
   if (choosingOccurrence) closeChoices();
 });
@@ -206,7 +215,7 @@ currentLabel?.addEventListener("keydown", (event) => {
     return;
   }
   editingNumber = false;
-  navigateToFootnote(targetIndex + 1);
+  navigateToFootnote(targetIndex + 1, true);
   currentLabel.blur();
 });
 

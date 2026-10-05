@@ -29,7 +29,7 @@ function createAccentColorSetting(color) {
     return;
   }
 
-  const label = document.createElement("label");
+  const label = document.createElement("div");
   label.className = "tool-button accent-color-setting";
   label.title = "Choose the viewer accent color";
 
@@ -45,6 +45,8 @@ function createAccentColorSetting(color) {
 
   accentColorInput.addEventListener("input", () => {
     applyAccentColor(accentColorInput.value);
+    accentHexInput.value = accentColorInput.value;
+    accentHexInput.setCustomValidity("");
   });
 
   accentColorInput.addEventListener("change", async () => {
@@ -71,10 +73,6 @@ function createAccentColorSetting(color) {
     if (accentHexInput.checkValidity()) {
       await chrome.storage.local.set({ [ACCENT_COLOR_STORAGE_KEY]: applyAccentColor(accentHexInput.value) });
     }
-  });
-  accentColorInput.addEventListener("input", () => {
-    accentHexInput.value = accentColorInput.value;
-    accentHexInput.setCustomValidity("");
   });
   label.append(text, accentHexInput, accentColorInput);
 

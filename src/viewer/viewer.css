@@ -676,7 +676,7 @@ input {
   position: relative;
   min-width: 0;
   height: 18px;
-  margin-left: 42px;
+  margin-left: calc(var(--scrubber-number-width, 32px) + 14px);
   --scrubber-progress: 0;
 }
 
@@ -686,7 +686,8 @@ input {
   left: calc(var(--scrubber-thumb-x, 7px) - 12px);
   transform: translate(-100%, -50%);
   z-index: 1;
-  width: 4ch;
+  box-sizing: border-box;
+  width: var(--scrubber-number-width, 32px);
   min-width: 28px;
   border: 0;
   font-family: inherit;
