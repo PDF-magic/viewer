@@ -9,7 +9,7 @@ const imageToggleSource = readFileSync(new URL('../src/viewer/theme/image-color-
 test('theme color control is loaded with the existing theme module', () => {
   assert.match(imageToggleSource, /import "\.\/accent-color\.js";/);
   assert.match(accentSource, /text\.textContent = "Theme color";/);
-  assert.match(accentSource, /accentColorInput\.type = "color";/);
+  assert.match(accentSource, /accentColorInput\.type = "button";/);
 });
 
 test('theme color persists globally and keeps Studio green as the default', () => {

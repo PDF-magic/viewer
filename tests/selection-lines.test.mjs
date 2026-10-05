@@ -40,3 +40,12 @@ test('separate columns at the same baseline keep their own bands', () => {
   assert.equal(lines[0].right, 100);
   assert.equal(lines[1].left, 250);
 });
+
+
+test('a later italic fragment bridges all previously separate bands', () => {
+  assert.deepEqual(selectionLines([
+    { left: 10, right: 50, top: 10, bottom: 25 },
+    { left: 90, right: 130, top: 10, bottom: 25 },
+    { left: 45, right: 95, top: 11, bottom: 26 },
+  ]), [{ left: 10, right: 130, top: 10, bottom: 26 }]);
+});

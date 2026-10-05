@@ -3,19 +3,28 @@ export function selectionLines(rectangles) {
   const lines = [];
   for (const rect of rectangles.filter(r => r.right > r.left && r.bottom > r.top)
     .sort((a, b) => a.top - b.top || a.left - b.left)) {
-    const height = rect.bottom - rect.top;
-    const line = lines.find(candidate => {
-      const overlap = Math.min(candidate.bottom, rect.bottom) - Math.max(candidate.top, rect.top);
-      const sameLine = overlap > Math.min(candidate.bottom - candidate.top, height) * 0.5;
-      const horizontalGap = Math.max(candidate.left - rect.right, rect.left - candidate.right, 0);
-      return sameLine && horizontalGap <= height * 1.5;
-    });
-    if (line) {
-      line.left = Math.min(line.left, rect.left);
-      line.right = Math.max(line.right, rect.right);
-      line.top = Math.min(line.top, rect.top);
-      line.bottom = Math.max(line.bottom, rect.bottom);
-    } else lines.push({ ...rect });
+    const merged = { ...rect };
+    // A late fragment can bridge two bands already seen (italic spans often
+    // have a different top edge). Merge every connected band, transitively.
+    let changed;
+    do {
+      changed = false;
+      for (let index = lines.length - 1; index >= 0; index--) {
+        const candidate = lines[index];
+        const height = merged.bottom - merged.top;
+        const overlap = Math.min(candidate.bottom, merged.bottom) - Math.max(candidate.top, merged.top);
+        const sameLine = overlap > Math.min(candidate.bottom - candidate.top, height) * 0.5;
+        const horizontalGap = Math.max(candidate.left - merged.right, merged.left - candidate.right, 0);
+        if (!sameLine || horizontalGap > height * 1.5) continue;
+        merged.left = Math.min(merged.left, candidate.left);
+        merged.right = Math.max(merged.right, candidate.right);
+        merged.top = Math.min(merged.top, candidate.top);
+        merged.bottom = Math.max(merged.bottom, candidate.bottom);
+        lines.splice(index, 1);
+        changed = true;
+      }
+    } while (changed);
+    lines.push(merged);
   }
   lines.sort((a, b) => a.top - b.top);
   for (let index = 1; index < lines.length; index++) {

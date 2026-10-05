@@ -64,6 +64,11 @@ function previewNote(index) {
   }
 }
 
+function sizeCurrentNumber() {
+  const digits = Math.max(2, currentLabel.value.length);
+  scrubber.style.setProperty("--scrubber-number-width", `calc(${digits}ch + 12px)`);
+}
+
 function updateScrubber(index, smooth = false) {
   const note = notes[index];
   if (!note) return;
@@ -73,6 +78,7 @@ function updateScrubber(index, smooth = false) {
   range.value = String(index + 1);
   range.setAttribute("aria-valuetext", `Footnote ${note.number}, ${index + 1} of ${notes.length}, page ${note.pageNumber}: ${note.text}`);
   if (!editingNumber) currentLabel.value = String(note.number);
+  sizeCurrentNumber();
   moveProgress(progress, smooth);
   previewNote(index);
 }
@@ -168,6 +174,7 @@ currentLabel?.addEventListener("focus", () => {
 });
 currentLabel?.addEventListener("click", () => currentLabel.select());
 currentLabel?.addEventListener("input", () => {
+  sizeCurrentNumber();
   currentLabel.setCustomValidity("");
   if (choosingOccurrence) closeChoices();
 });

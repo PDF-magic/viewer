@@ -29,27 +29,24 @@ function createAccentColorSetting(color) {
     return;
   }
 
-  const label = document.createElement("label");
+  const label = document.createElement("div");
   label.className = "tool-button accent-color-setting";
   label.title = "Choose the viewer accent color";
 
   const text = document.createElement("span");
   text.textContent = "Theme color";
 
-  accentColorInput = document.createElement("input");
+  accentColorInput = document.createElement("button");
   accentColorInput.id = "theme-accent-color";
   accentColorInput.className = "accent-color-input";
-  accentColorInput.type = "color";
-  accentColorInput.value = color;
-  accentColorInput.setAttribute("aria-label", "Theme color");
+  accentColorInput.type = "button";
+  accentColorInput.style.backgroundColor = color;
+  accentColorInput.setAttribute("aria-label", "Edit theme color in HEX");
+  accentColorInput.title = "Edit HEX color";
 
-  accentColorInput.addEventListener("input", () => {
-    applyAccentColor(accentColorInput.value);
-  });
-
-  accentColorInput.addEventListener("change", async () => {
-    const nextColor = applyAccentColor(accentColorInput.value);
-    await chrome.storage.local.set({ [ACCENT_COLOR_STORAGE_KEY]: nextColor });
+  accentColorInput.addEventListener("click", () => {
+    accentHexInput.focus();
+    accentHexInput.select();
   });
 
   accentHexInput = document.createElement("input");
@@ -64,17 +61,13 @@ function createAccentColorSetting(color) {
     const valid = HEX_COLOR_PATTERN.test(accentHexInput.value);
     accentHexInput.setCustomValidity(valid ? "" : "Enter a HEX color such as #43af49");
     if (valid) {
-      accentColorInput.value = applyAccentColor(accentHexInput.value);
+      accentColorInput.style.backgroundColor = applyAccentColor(accentHexInput.value);
     }
   });
   accentHexInput.addEventListener("change", async () => {
     if (accentHexInput.checkValidity()) {
       await chrome.storage.local.set({ [ACCENT_COLOR_STORAGE_KEY]: applyAccentColor(accentHexInput.value) });
     }
-  });
-  accentColorInput.addEventListener("input", () => {
-    accentHexInput.value = accentColorInput.value;
-    accentHexInput.setCustomValidity("");
   });
   label.append(text, accentHexInput, accentColorInput);
 
@@ -99,7 +92,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 
   const color = applyAccentColor(changes[ACCENT_COLOR_STORAGE_KEY].newValue);
   if (accentColorInput) {
-    accentColorInput.value = color;
+    accentColorInput.style.backgroundColor = color;
     accentHexInput.value = color;
     accentHexInput.setCustomValidity("");
   }

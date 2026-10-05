@@ -391,3 +391,19 @@ test("Federal Register repeated note 4 entries appear separately with their text
   assert.equal(jumps[0].number, 4);
   assert.equal(jumps[0].pageNumber, 2);
 });
+
+
+test("large footnote numbers and typed digits reserve enough space beside the slider", async () => {
+  const { context, element, properties } = await loadScrubber([noteItems]);
+  vm.runInContext("notes[0].number = 123456; updateScrubber(0)", context);
+  assert.equal(element("#document-scrubber-current").value, "123456");
+  assert.equal(properties["--scrubber-number-width"], "calc(6ch + 12px)");
+  const input = element("#document-scrubber-current");
+  input.focus();
+  input.value = "123456789";
+  input.listeners.input();
+  assert.equal(properties["--scrubber-number-width"], "calc(9ch + 12px)");
+  input.blur();
+  assert.equal(input.value, "123456");
+  assert.equal(properties["--scrubber-number-width"], "calc(6ch + 12px)");
+});
