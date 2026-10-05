@@ -36,17 +36,22 @@ function createAccentColorSetting(color) {
   const text = document.createElement("span");
   text.textContent = "Theme color";
 
-  accentColorInput = document.createElement("button");
+  accentColorInput = document.createElement("input");
   accentColorInput.id = "theme-accent-color";
   accentColorInput.className = "accent-color-input";
-  accentColorInput.type = "button";
-  accentColorInput.style.backgroundColor = color;
-  accentColorInput.setAttribute("aria-label", "Edit theme color in HEX");
-  accentColorInput.title = "Edit HEX color";
+  accentColorInput.type = "color";
+  accentColorInput.value = color;
+  accentColorInput.setAttribute("aria-label", "Theme color");
 
-  accentColorInput.addEventListener("click", () => {
-    accentHexInput.focus();
-    accentHexInput.select();
+  accentColorInput.addEventListener("input", () => {
+    applyAccentColor(accentColorInput.value);
+    accentHexInput.value = accentColorInput.value;
+    accentHexInput.setCustomValidity("");
+  });
+
+  accentColorInput.addEventListener("change", async () => {
+    const nextColor = applyAccentColor(accentColorInput.value);
+    await chrome.storage.local.set({ [ACCENT_COLOR_STORAGE_KEY]: nextColor });
   });
 
   accentHexInput = document.createElement("input");
@@ -61,7 +66,7 @@ function createAccentColorSetting(color) {
     const valid = HEX_COLOR_PATTERN.test(accentHexInput.value);
     accentHexInput.setCustomValidity(valid ? "" : "Enter a HEX color such as #43af49");
     if (valid) {
-      accentColorInput.style.backgroundColor = applyAccentColor(accentHexInput.value);
+      accentColorInput.value = applyAccentColor(accentHexInput.value);
     }
   });
   accentHexInput.addEventListener("change", async () => {
@@ -92,7 +97,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 
   const color = applyAccentColor(changes[ACCENT_COLOR_STORAGE_KEY].newValue);
   if (accentColorInput) {
-    accentColorInput.style.backgroundColor = color;
+    accentColorInput.value = color;
     accentHexInput.value = color;
     accentHexInput.setCustomValidity("");
   }
