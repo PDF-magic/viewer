@@ -1,3 +1,5 @@
+@import url("./loading-screen.css");
+
 .annotation-layer {
   position: absolute;
   inset: 0;

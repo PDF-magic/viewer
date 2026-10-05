@@ -22,6 +22,29 @@
   flex: 1;
 }
 
+.checkbox-input {
+  appearance: none;
+  flex: 0 0 auto;
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--control-bg) center / 12px 12px no-repeat;
+  cursor: pointer;
+}
+
+.checkbox-input:checked {
+  border-color: #43af49;
+  background-color: #43af49;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='white' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.4' d='m3.5 8.5 3 3 6-7'/%3E%3C/svg%3E");
+}
+
+.checkbox-input:focus-visible {
+  outline: 2px solid var(--text);
+  outline-offset: 2px;
+}
+
 .toggle-input {
   position: absolute;
   width: 1px;

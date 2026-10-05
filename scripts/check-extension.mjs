@@ -1,4 +1,4 @@
-import { access, readFile } from "node:fs/promises";
+import { access, readFile, readdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
 function fail(message) {
@@ -45,6 +45,7 @@ async function validateManifest(path, expected) {
 
   const viewerHtml = await readFile(join(root, pdfHandler.handler_url), "utf8");
   for (const [, asset] of viewerHtml.matchAll(/(?:src|href)="([^"]+)"/g)) {
+    if (/^https?:\/\//i.test(asset)) continue;
     await requireFile(join(root, dirname(pdfHandler.handler_url), asset), `${path} viewer asset`);
   }
   for (const contentScript of manifest.content_scripts || []) {
@@ -82,13 +83,19 @@ for (const path of [
 }
 
 const sourceViewer = await readFile("src/viewer/viewer.js", "utf8");
+const sourcePdfSource = await readFile("src/viewer/pdf-source.js", "utf8");
 const sourceBackground = await readFile("src/background.js", "utf8");
-const builtViewer = await readFile("dist/viewer/viewer.js", "utf8");
+const builtViewerModules = await Promise.all(
+  ["dist/viewer/viewer.js", "dist/viewer/navigation/minimap.js", ...(
+    await readdir("dist/viewer/chunks")
+  ).filter((name) => name.endsWith(".js")).map((name) => join("dist/viewer/chunks", name))]
+    .map((path) => readFile(path, "utf8")),
+);
 
-if (!sourceViewer.includes("chrome.mimeHandler.getStreamInfo")) {
-  fail("src/viewer/viewer.js must consume the intercepted PDF stream with chrome.mimeHandler.getStreamInfo()");
+if (!sourceViewer.includes('resolvePdfSource()') || !sourcePdfSource.includes("chrome.mimeHandler.getStreamInfo")) {
+  fail("The source viewer must consume the intercepted PDF stream through the shared PDF source");
 }
-if (!builtViewer.includes("mimeHandler.getStreamInfo")) {
+if (!builtViewerModules.some((module) => module.includes("mimeHandler.getStreamInfo"))) {
   fail("dist/viewer/viewer.js lost the MIME-handler stream code during bundling");
 }
 if (!sourceBackground.includes("chrome.mimeHandler")) {

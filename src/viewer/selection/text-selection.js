@@ -1,3 +1,5 @@
+import { selectionLines } from "./selection-lines.js";
+
 const textLayers = new Map();
 let pointerDown = false;
 
@@ -143,3 +145,69 @@ window.addEventListener("blur", () => {
   pointerDown = false;
   resetAllTextLayers();
 });
+
+// Paint once per visual line; PDF spans can overlap, especially around italics.
+let paintFrame = 0;
+const selectionOverlays = new Map();
+function paintSelection() {
+  paintFrame = 0;
+  for (const overlay of selectionOverlays.values()) overlay.remove();
+  selectionOverlays.clear();
+  const selection = document.getSelection();
+  if (!selection || selection.isCollapsed) return;
+  for (const layer of textLayers.keys()) {
+    if (!layer.isConnected) continue;
+    const rectangles = [];
+    const walker = document.createTreeWalker(layer, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      for (let index = 0; index < selection.rangeCount; index++) {
+        const selected = selection.getRangeAt(index);
+        if (!selected.intersectsNode(node)) continue;
+        const range = document.createRange();
+        range.selectNodeContents(node);
+        if (selected.startContainer === node) range.setStart(node, selected.startOffset);
+        if (selected.endContainer === node) range.setEnd(node, selected.endOffset);
+        rectangles.push(...Array.from(range.getClientRects(), rect => ({
+          left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+        })));
+      }
+    }
+    const lines = selectionLines(rectangles);
+    if (!lines.length) continue;
+    const bounds = layer.getBoundingClientRect();
+    const scaleX = layer.clientWidth / bounds.width;
+    const scaleY = layer.clientHeight / bounds.height;
+    const namespace = "http://www.w3.org/2000/svg";
+    const overlay = document.createElementNS(namespace, "svg");
+    overlay.classList.add("text-selection-overlay");
+    overlay.setAttribute("aria-hidden", "true");
+    const addRect = (left, top, right, bottom, radius = 2) => {
+      const rect = document.createElementNS(namespace, "rect");
+      rect.setAttribute("x", (left - bounds.left) * scaleX);
+      rect.setAttribute("y", (top - bounds.top) * scaleY);
+      rect.setAttribute("width", (right - left) * scaleX);
+      rect.setAttribute("height", (bottom - top) * scaleY);
+      rect.setAttribute("rx", radius);
+      overlay.append(rect);
+    };
+    for (const line of lines) addRect(line.left, line.top, line.right, line.bottom);
+    for (let index = 1; index < lines.length; index++) {
+      const previous = lines[index - 1], current = lines[index];
+      const left = Math.max(previous.left, current.left) + 2 / scaleX;
+      const right = Math.min(previous.right, current.right) - 2 / scaleX;
+      if (previous.bottom === current.top && right > left) {
+        addRect(left, current.top - 2 / scaleY, right, current.top + 2 / scaleY, 0);
+      }
+    }
+    layer.append(overlay);
+    selectionOverlays.set(layer, overlay);
+  }
+}
+function scheduleSelectionPaint() {
+  if (!paintFrame) paintFrame = requestAnimationFrame(paintSelection);
+}
+document.addEventListener("selectionchange", scheduleSelectionPaint);
+window.addEventListener("resize", scheduleSelectionPaint);
+const selectionResizeObserver = new ResizeObserver(scheduleSelectionPaint);
+selectionResizeObserver.observe(document.querySelector("#viewer"));
