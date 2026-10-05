@@ -90,6 +90,8 @@ test("footnote navigation scrolls once to the note without an intermediate page 
     pdfDocument: {},
     pageElements: [null, { getBoundingClientRect: () => ({ top: 10000, height: 1200 }) }],
     setCurrentPage: (pageNumber) => events.push({ pageNumber }),
+    highlightFootnote() {},
+    rotation: 0,
     document: { querySelector: (selector) => ({ getBoundingClientRect: () => ({ height: selector === ".toolbar" ? 52 : 28 }) }) },
     window: { innerHeight: 900, scrollY: 200, scrollTo: (options) => events.push(options) },
   });

@@ -96,6 +96,7 @@ export function candidateForPage(items, viewport, number, pageNumber, originPage
       xRatio: coordinates.xRatio,
       yRatio: coordinates.yRatio,
       label: text,
+      highlightRegions: [{ pageNumber, ...textRegion({ ...coordinates, height: itemHeight, item }, viewport) }],
     };
 
     if (!best || candidate.score > best.score) {
@@ -111,6 +112,34 @@ function positionedItems(items, viewport) {
     const point = pageCoordinates(item, viewport);
     return point ? [{ ...point, item, text: item.str.trim(), height: Math.abs(item.height || item.transform?.[3] || 0) }] : [];
   });
+}
+
+function textRegion(entry, viewport) {
+  return {
+    left: entry.x / viewport.width,
+    top: (entry.y - entry.height) / viewport.height,
+    width: Math.max(entry.item.width || entry.height, 1) / viewport.width,
+    height: entry.height * 1.2 / viewport.height,
+  };
+}
+
+function highlightRegions(entries, viewport, pageNumber) {
+  const lines = [];
+  for (const entry of entries) {
+    const region = textRegion(entry, viewport);
+    const line = lines.find((line) => Math.abs(line.baseline - entry.y) <= entry.height * 0.6);
+    if (line) {
+      const right = Math.max(line.left + line.width, region.left + region.width);
+      const bottom = Math.max(line.top + line.height, region.top + region.height);
+      line.left = Math.min(line.left, region.left);
+      line.top = Math.min(line.top, region.top);
+      line.width = right - line.left;
+      line.height = bottom - line.top;
+    } else {
+      lines.push({ ...region, baseline: entry.y });
+    }
+  }
+  return lines.map(({ baseline, ...region }) => ({ pageNumber, ...region }));
 }
 
 function readingOrder(a, b) {
@@ -258,14 +287,17 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
         (!next || entry.y < next.yRatio * viewport.height - 2) && isPreviewText(entry, note.textHeight) &&
         !(/^\d+$/.test(entry.text) && entry.yRatio > 0.92)).sort(readingOrder);
       const text = joinNoteEntries(textEntries).replace(markerPattern(note.number), "").trim();
+      const marker = entries.find((entry) => entry.xRatio === note.xRatio && entry.yRatio === note.yRatio);
+      const highlightedEntries = marker && !textEntries.includes(marker) ? [marker, ...textEntries] : textEntries;
       if (text.length >= 3) result.push({ ...note, text, endPageNumber: pageNumber, endColumnIndex: column.index,
+        highlightRegions: highlightRegions(highlightedEntries, viewport, pageNumber),
         continues: !next && textEntries.at(-1)?.yRatio >= 0.88 });
     }
   }
   return result;
 }
 
-function continuationInColumn(column, viewport, previousNote, pageNotes) {
+function continuationInColumn(column, viewport, previousNote, pageNotes, pageNumber = previousNote.endPageNumber + 1) {
   const firstNote = pageNotes.find((note) => note.columnIndex === column.index);
   const separator = column.rules.sort((a, b) => a.y - b.y)[0];
   if (!separator) return null;
@@ -273,7 +305,8 @@ function continuationInColumn(column, viewport, previousNote, pageNotes) {
     (!firstNote || entry.y < firstNote.yRatio * viewport.height - 2) && isPreviewText(entry, previousNote.textHeight))
     .sort(readingOrder);
   const text = joinNoteEntries(entries);
-  return text ? { text, continues: !firstNote && entries.at(-1)?.yRatio >= 0.88 } : null;
+  return text ? { text, highlightRegions: highlightRegions(entries, viewport, pageNumber),
+    continues: !firstNote && entries.at(-1)?.yRatio >= 0.88 } : null;
 }
 
 export function footnoteContinuationForPage(items, viewport, operatorList, previousNote, pageNotes, operatorIds) {
@@ -289,10 +322,11 @@ export function appendFootnotesForPage(index, items, viewport, pageNumber, opera
     const adjacent = previous && (previous.endPageNumber === pageNumber - 1 && column.index === 0 ||
       previous.endPageNumber === pageNumber && previous.endColumnIndex === column.index - 1);
     if (previous?.continues && adjacent) {
-      const continuation = continuationInColumn(column, viewport, previous, pageNotes);
+      const continuation = continuationInColumn(column, viewport, previous, pageNotes, pageNumber);
       previous.continues = Boolean(continuation?.continues);
       if (continuation) {
         previous.text += ` ${continuation.text}`;
+        previous.highlightRegions.push(...continuation.highlightRegions);
         previous.endPageNumber = pageNumber;
         previous.endColumnIndex = column.index;
       }

@@ -938,6 +938,20 @@ input {
   color: transparent;
 }
 
+.footnote-highlight-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.footnote-highlight {
+  position: absolute;
+  border-radius: 2px;
+  background: rgb(255 193 7 / 30%);
+  box-shadow: 0 0 0 1px rgb(255 193 7 / 55%);
+}
+
 .status {
   margin-top: 18vh;
   color: var(--muted);
