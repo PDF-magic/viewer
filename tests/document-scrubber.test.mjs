@@ -22,14 +22,19 @@ test("ordinary numbered paragraphs and page counters do not create notes", () =>
   assert.deepEqual(footnotesForPage([...body, item("1 A numbered paragraph", 12, 60, 700), item("2", 10, 300, 760)], viewport, 2), []);
 });
 
-async function loadScrubber(pages) {
+async function loadScrubber(pages, operators) {
   const elements = new Map();
   const jumps = [];
   const frames = [];
   const properties = {};
   function element(selector) {
     if (!elements.has(selector)) elements.set(selector, {
-      hidden: true, value: "1", clientWidth: 600, listeners: {}, attributes: {},
+      hidden: true, value: "1", clientWidth: 600, listeners: {}, attributes: {}, children: [],
+      classList: { add() {}, remove() {} },
+      contains(target) { return this.children.includes(target); },
+      replaceChildren() { this.children = []; this.textContent = ""; },
+      append(child) { this.children.push(child); },
+      focus() { this.listeners.focus?.(); },
       style: { setProperty: (key, value) => { properties[key] = value; } },
       addEventListener(name, callback) { this.listeners[name] = callback; },
       setAttribute(name, value) { this.attributes[name] = value; },
@@ -42,11 +47,19 @@ async function loadScrubber(pages) {
     return elements.get(selector);
   }
   const context = vm.createContext({
-    document: { querySelector: element, documentElement: element("root"), elementFromPoint: () => null },
+    document: { createElement: () => element(Symbol()), querySelector: element, documentElement: element("root"), elementFromPoint: () => null },
     window: { addEventListener() {}, innerHeight: 800, innerWidth: 1000 },
-    pdfDocumentSessionReady: Promise.resolve({ document: {
+    pdfDocumentSessionReady: Promise.resolve({ operators, document: {
       numPages: pages.length,
-      getPage: async (number) => ({ getTextContent: async () => ({ items: pages[number - 1] }), getViewport: () => viewport, getOperatorList: async () => ({ argsArray: [] }) }),
+      getPage: async (number) => {
+        const page = pages[number - 1];
+        return {
+          getTextContent: async () => ({ items: page.items || page }),
+          getViewport: () => page.items ? { width: page.width, height: page.height,
+            convertToViewportPoint: (x, y) => [x, page.height - y] } : viewport,
+          getOperatorList: async () => page.operators || { argsArray: [] },
+        };
+      },
     } }),
     appendFootnotesForPage, scrollToTarget: (note) => jumps.push(note),
     requestAnimationFrame: (callback) => { frames.push(callback); return frames.length; },
@@ -263,4 +276,64 @@ test("release numbers on page 151 remain in the continued note, not the note ind
     convertToViewportPoint: (x, y) => [x, page.height - y],
   }, page.pageNumber);
   assert.ok(fallback.every((note) => ![2023, 9908, 99098, 99108].includes(note.number)));
+});
+
+
+test("repeated note numbers offer every occurrence and wait for a selection", async () => {
+  const { element, jumps, frames } = await loadScrubber([noteItems, noteItems, noteItems]);
+  const field = element("#document-scrubber-current");
+  const preview = element("#document-scrubber-preview");
+  field.listeners.focus();
+  field.value = "7";
+  field.listeners.keydown({ key: "Enter", preventDefault() {} });
+  assert.equal(jumps.length, 0);
+  assert.equal(field.attributes["aria-expanded"], "true");
+  assert.equal(preview.attributes.role, "group");
+  assert.equal(preview.children.length, 4);
+  assert.match(preview.children[3].textContent, /Page 3\nFirst note text/);
+  // Moving focus into the popup must preserve the choices.
+  field.listeners.blur({ relatedTarget: preview.children[3] });
+  assert.equal(preview.children.length, 4);
+  preview.children[3].listeners.click();
+  while (frames.length) frames.shift()();
+  assert.equal(jumps.length, 1);
+  assert.equal(jumps[0].pageNumber, 3);
+  assert.equal(jumps[0].number, 7);
+  assert.equal(field.attributes["aria-expanded"], "false");
+  assert.equal(preview.attributes.role, "tooltip");
+});
+
+test("editing or escaping repeated-number choices cancels without navigation", async () => {
+  const { element, jumps } = await loadScrubber([noteItems, noteItems]);
+  const field = element("#document-scrubber-current");
+  const preview = element("#document-scrubber-preview");
+  field.listeners.focus();
+  field.value = "42";
+  field.listeners.keydown({ key: "Enter", preventDefault() {} });
+  field.value = "7";
+  field.listeners.input();
+  assert.equal(field.attributes["aria-expanded"], "false");
+  field.listeners.keydown({ key: "Enter", preventDefault() {} });
+  preview.listeners.keydown({ key: "Escape", preventDefault() {} });
+  assert.equal(jumps.length, 0);
+  assert.equal(field.attributes["aria-expanded"], "false");
+  assert.equal(field.value, "7");
+});
+
+test("Federal Register repeated note 4 entries appear separately with their text", async () => {
+  const fixture = federalRegisterFixture();
+  const pages = fixture.pages.filter((page) => [77, 78, 151].includes(page.pageNumber));
+  const { element, jumps, frames } = await loadScrubber(pages, fixture.operatorIds);
+  const field = element("#document-scrubber-current");
+  field.listeners.focus();
+  field.value = "4";
+  field.listeners.keydown({ key: "Enter", preventDefault() {} });
+  const choices = element("#document-scrubber-preview").children.slice(1);
+  assert.equal(choices.length, 3);
+  assert.equal(new Set(choices.map((choice) => choice.textContent)).size, 3);
+  assert.equal(jumps.length, 0);
+  choices[1].listeners.click();
+  while (frames.length) frames.shift()();
+  assert.equal(jumps[0].number, 4);
+  assert.equal(jumps[0].pageNumber, 2);
 });

@@ -14,6 +14,7 @@ let trackingFrame;
 let pendingIndex = 0;
 let dragging = false;
 let editingNumber = false;
+let choosingOccurrence = false;
 
 function clampIndex(value) {
   return Math.min(Math.max((Number.parseInt(value, 10) || 1) - 1, 0), notes.length - 1);
@@ -21,7 +22,7 @@ function clampIndex(value) {
 
 function previewNote(index) {
   const note = notes[index];
-  if (!note) return;
+  if (!note || choosingOccurrence) return;
   const text = `Note ${note.number} at ${note.pageNumber}\n${note.text}`;
   if (preview.textContent !== text) {
     preview.textContent = text;
@@ -50,6 +51,43 @@ function navigateToFootnote(value) {
     navigationFrame = undefined;
     scrollToTarget(notes[pendingIndex]);
   });
+}
+
+function closeChoices() {
+  choosingOccurrence = false;
+  preview.setAttribute("role", "tooltip");
+  preview.classList.remove("document-scrubber-choices");
+  currentLabel.setAttribute("aria-expanded", "false");
+  previewNote(clampIndex(range.value));
+}
+
+function chooseOccurrence(index) {
+  closeChoices();
+  editingNumber = false;
+  navigateToFootnote(index + 1);
+  currentLabel.blur();
+}
+
+function showChoices(number, matches) {
+  choosingOccurrence = true;
+  preview.replaceChildren();
+  preview.setAttribute("role", "group");
+  preview.setAttribute("aria-label", `Footnote ${number} occurrences`);
+  preview.classList.add("document-scrubber-choices");
+  currentLabel.setAttribute("aria-expanded", "true");
+  const heading = document.createElement("div");
+  heading.textContent = `Footnote ${number} · ${matches.length} matches`;
+  preview.append(heading);
+  for (const index of matches) {
+    const note = notes[index];
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "document-scrubber-choice";
+    button.textContent = `Page ${note.pageNumber}\n${note.text}`;
+    button.addEventListener("click", () => chooseOccurrence(index));
+    preview.append(button);
+  }
+  preview.scrollTop = 0;
 }
 
 function trackPosition() {
@@ -90,8 +128,13 @@ currentLabel?.addEventListener("focus", () => {
   currentLabel.select();
 });
 currentLabel?.addEventListener("click", () => currentLabel.select());
-currentLabel?.addEventListener("input", () => currentLabel.setCustomValidity(""));
-currentLabel?.addEventListener("blur", () => {
+currentLabel?.addEventListener("input", () => {
+  currentLabel.setCustomValidity("");
+  if (choosingOccurrence) closeChoices();
+});
+currentLabel?.addEventListener("blur", (event) => {
+  if (choosingOccurrence && preview.contains(event?.relatedTarget)) return;
+  if (choosingOccurrence) closeChoices();
   editingNumber = false;
   currentLabel.setCustomValidity("");
   updateScrubber(clampIndex(range.value));
@@ -100,6 +143,7 @@ currentLabel?.addEventListener("blur", () => {
 currentLabel?.addEventListener("keydown", (event) => {
   if (event.key === "Escape") {
     event.preventDefault();
+    if (choosingOccurrence) closeChoices();
     currentLabel.blur();
     return;
   }
@@ -107,12 +151,16 @@ currentLabel?.addEventListener("keydown", (event) => {
   event.preventDefault();
   const rawNumber = currentLabel.value.trim();
   const number = /^\d+$/.test(rawNumber) ? Number(rawNumber) : NaN;
-  const currentIndex = clampIndex(range.value);
-  let targetIndex = -1;
+  const matches = [];
   for (let index = 0; index < notes.length; index += 1) {
-    if (notes[index].number === number && (targetIndex < 0 ||
-      Math.abs(index - currentIndex) < Math.abs(targetIndex - currentIndex))) targetIndex = index;
+    if (notes[index].number === number) matches.push(index);
   }
+  if (matches.length > 1) {
+    currentLabel.setCustomValidity("");
+    showChoices(number, matches);
+    return;
+  }
+  const targetIndex = matches[0] ?? -1;
   if (targetIndex < 0) {
     currentLabel.setCustomValidity("Enter a footnote number found in this document.");
     currentLabel.reportValidity();
@@ -123,7 +171,27 @@ currentLabel?.addEventListener("keydown", (event) => {
   currentLabel.blur();
 });
 
-range?.addEventListener("input", () => navigateToFootnote(range.value));
+preview?.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || !choosingOccurrence) return;
+  event.preventDefault();
+  closeChoices();
+  editingNumber = false;
+  updateScrubber(clampIndex(range.value));
+  currentLabel.focus();
+});
+track?.addEventListener("focusout", (event) => {
+  if (!choosingOccurrence || track.contains(event.relatedTarget)) return;
+  closeChoices();
+  editingNumber = false;
+  updateScrubber(clampIndex(range.value));
+  scheduleTracking();
+});
+
+range?.addEventListener("input", () => {
+  if (choosingOccurrence) closeChoices();
+  editingNumber = false;
+  navigateToFootnote(range.value);
+});
 range?.addEventListener("change", () => navigateToFootnote(range.value));
 range?.addEventListener("pointerdown", () => { dragging = true; });
 window.addEventListener("pointerup", () => { dragging = false; });

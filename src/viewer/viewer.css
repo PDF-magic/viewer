@@ -730,6 +730,32 @@ input {
   visibility: visible;
 }
 
+.document-scrubber-preview.document-scrubber-choices {
+  visibility: visible;
+}
+
+.document-scrubber-choice {
+  display: block;
+  width: 100%;
+  margin-top: 6px;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--control-bg);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.document-scrubber-choice:hover,
+.document-scrubber-choice:focus-visible {
+  background: var(--control-hover);
+  outline: 1px solid var(--search-focus-border);
+}
+
 /* Keep the hover area connected across the gap above the slider. */
 .document-scrubber-track:hover::before,
 .document-scrubber-track:focus-within::before {
