@@ -28,8 +28,12 @@
   top: 0;
 }
 
-/* Native selection paints overlapping PDF fragments independently. */
+/* Keep native highlighting until a custom overlay has actually been painted. */
 .text-layer ::selection {
+  background: var(--selection-bg, rgb(77 154 255 / 45%));
+}
+
+.text-layer.selection-painted ::selection {
   background: transparent;
 }
 
