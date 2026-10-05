@@ -5,7 +5,7 @@ function isTextItem(item) {
   return Boolean(item && typeof item === "object" && "str" in item && typeof item.str === "string");
 }
 
-function continuesWrappedUrl(previous, current) {
+export function continuesWrappedUrl(previous, current) {
   if (!previous.hasEOL || !previous.str || !current.str) {
     return false;
   }

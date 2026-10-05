@@ -1,3 +1,5 @@
+import { createHighlightGroup, createHighlightLayer } from "../highlight-regions.js";
+
 let activeRegions = [];
 
 function rotatedRegion(region, rotation) {
@@ -14,17 +16,8 @@ export function renderFootnoteHighlight(page, pageNumber, rotation) {
   page.querySelector(".footnote-highlight-layer")?.remove();
   const regions = activeRegions.filter((region) => region.pageNumber === pageNumber);
   if (!regions.length) return;
-  const layer = document.createElement("div");
-  layer.className = "footnote-highlight-layer";
-  layer.setAttribute("aria-hidden", "true");
-  for (const region of regions) {
-    const mark = document.createElement("div");
-    mark.className = "footnote-highlight";
-    for (const [property, value] of Object.entries(rotatedRegion(region, rotation))) {
-      mark.style[property] = `${value * 100}%`;
-    }
-    layer.append(mark);
-  }
+  const layer = createHighlightLayer("footnote-highlight-layer", 1, 1);
+  layer.append(createHighlightGroup(regions.map(region => rotatedRegion(region, rotation)), "footnote-highlight"));
   page.append(layer);
 }
 

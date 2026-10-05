@@ -3,8 +3,9 @@ import { EventBus, PDFLinkService } from "../../node_modules/pdfjs-dist/web/pdf_
 import { abandonPdfDocumentSession, publishPdfDocument } from "./pdf-document-session.js";
 import { resolveDocumentReferenceUrl } from "./document-reference-url.js";
 import { resolvePdfSource } from "./pdf-source.js";
-import { mergeWrappedUrlTextItems } from "./search/search-text-normalization.js";
-import { normalizeSearchText, prepareSearchText } from "./search/search-text.js";
+import { findSearchMatches } from "./search/search-matches.js";
+import { highlightTextLayer, registerSearchText } from "./search/search-highlight.js";
+import { normalizeSearchText } from "./search/search-text.js";
 import { PagePreviews } from "./page-previews.js";
 import { highlightFootnote, renderFootnoteHighlight } from "./navigation/footnote-highlight.js";
 
@@ -623,40 +624,6 @@ function toggleTheme() {
   setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
 }
 
-function highlightTextLayer(textLayer, query) {
-  const normalizedQuery = query.toLocaleLowerCase().trim();
-
-  for (const span of textLayer.querySelectorAll("span")) {
-    const text = span.dataset.searchText ?? span.textContent ?? "";
-    span.dataset.searchText = text;
-    span.replaceChildren(text);
-
-    if (!normalizedQuery) {
-      continue;
-    }
-
-    const comparableText = text.toLocaleLowerCase();
-    const fragment = document.createDocumentFragment();
-    let cursor = 0;
-    let matchIndex = comparableText.indexOf(normalizedQuery);
-
-    while (matchIndex !== -1) {
-      fragment.append(text.slice(cursor, matchIndex));
-      const highlight = document.createElement("mark");
-      highlight.className = "search-highlight";
-      highlight.textContent = text.slice(matchIndex, matchIndex + normalizedQuery.length);
-      fragment.append(highlight);
-      cursor = matchIndex + normalizedQuery.length;
-      matchIndex = comparableText.indexOf(normalizedQuery, cursor);
-    }
-
-    if (cursor > 0) {
-      fragment.append(text.slice(cursor));
-      span.replaceChildren(fragment);
-    }
-  }
-}
-
 function refreshSearchHighlights(query = completedSearchQuery) {
   for (const pageElement of pageElements) {
     const textLayer = pageElement.querySelector(".text-layer");
@@ -736,11 +703,9 @@ async function renderPageNow(pageNumber) {
   canvas.style.width = `${viewport.width}px`;
   canvas.style.height = `${viewport.height}px`;
 
+  const textContent = await page.getTextContent({ includeMarkedContent: true, disableNormalization: true });
   const textLayerTask = new TextLayer({
-    textContentSource: page.streamTextContent({
-      includeMarkedContent: true,
-      disableNormalization: true,
-    }),
+    textContentSource: textContent,
     container: textLayer,
     viewport,
   });
@@ -802,7 +767,7 @@ async function renderPageNow(pageNumber) {
   }
 
   container.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
-  highlightTextLayer(textLayer, completedSearchQuery);
+  registerSearchText(textLayer, textContent.items.filter(item => "str" in item), textLayerTask.textDivs);
   container.replaceChildren(
     canvas,
     ...(imageOverlay ? [imageOverlay] : []),
@@ -810,6 +775,7 @@ async function renderPageNow(pageNumber) {
     ...(annotations.length ? [annotationLayer] : []),
   );
   container.classList.add("rendered");
+  highlightTextLayer(textLayer, completedSearchQuery);
   renderFootnoteHighlight(container, pageNumber, rotation);
   renderedPages.add(pageNumber);
   pagePreviews?.hide(pageNumber);
@@ -939,20 +905,13 @@ function createPagePlaceholders(sampleViewport) {
   viewer.append(fragment);
 }
 
-async function getPageSearchText(pageNumber) {
-  if (pageTextCache.has(pageNumber)) {
-    return pageTextCache.get(pageNumber);
-  }
-
+async function getPageSearchItems(pageNumber) {
+  if (pageTextCache.has(pageNumber)) return pageTextCache.get(pageNumber);
   const page = await pdfDocument.getPage(pageNumber);
-  const textContent = await page.getTextContent();
-  const searchableItems = mergeWrappedUrlTextItems(textContent.items);
-  const text = normalizeSearchText(
-    searchableItems.map((item) => ("str" in item ? item.str : "")).join(" "),
-  );
-
-  pageTextCache.set(pageNumber, text);
-  return text;
+  const content = await page.getTextContent({ includeMarkedContent: true, disableNormalization: true });
+  const items = content.items.filter(item => "str" in item);
+  pageTextCache.set(pageNumber, items);
+  return items;
 }
 
 function clearSearchPageMarker() {
@@ -994,6 +953,7 @@ function showSearchMatch(index, behavior = "auto") {
   const pageElement = pageElements[match.pageNumber - 1];
   if (pageElement) {
     pageElement.dataset.searchMatchOrdinal = String(match.ordinal);
+    pageElement.dataset.searchQuery = completedSearchQuery;
     pageElement.classList.add("search-match-page");
   }
 
@@ -1003,7 +963,6 @@ function showSearchMatch(index, behavior = "auto") {
 
 async function runSearch(rawQuery) {
   const query = normalizeSearchText(rawQuery);
-  const comparableQuery = prepareSearchText(query, query);
   const requestId = ++searchRequestId;
   const searchStartPage = currentPage;
 
@@ -1024,23 +983,10 @@ async function runSearch(rawQuery) {
   const matches = [];
 
   for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
-    const pageText = await getPageSearchText(pageNumber);
-    const comparablePageText = prepareSearchText(pageText, query);
-
-    if (requestId !== searchRequestId) {
-      return;
-    }
-
-    let offset = 0;
-    let ordinal = 0;
-    while (offset <= comparablePageText.length - comparableQuery.length) {
-      const matchOffset = comparablePageText.indexOf(comparableQuery, offset);
-      if (matchOffset === -1) {
-        break;
-      }
-
-      matches.push({ pageNumber, offset: matchOffset, ordinal: ordinal++ });
-      offset = matchOffset + Math.max(comparableQuery.length, 1);
+    const items = await getPageSearchItems(pageNumber);
+    if (requestId !== searchRequestId) return;
+    for (const { offset, ordinal } of findSearchMatches(items, query)) {
+      matches.push({ pageNumber, offset, ordinal });
     }
   }
 

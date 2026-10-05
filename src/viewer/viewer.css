@@ -23,6 +23,8 @@
   --search-empty: #c43f3f;
   --search-empty-ring: rgb(196 63 63 / 16%);
   --search-clear-filter: invert(1);
+  --selection-bg: rgb(77 154 255 / 45%);
+  --highlight-outline: rgb(67 175 73 / 95%);
   background: var(--body-bg);
   color: var(--text);
 }
@@ -924,7 +926,7 @@ input {
 }
 
 .text-layer ::selection {
-  background: rgb(77 154 255 / 45%);
+  background: var(--selection-bg);
 }
 
 .text-layer br::selection {
@@ -932,26 +934,33 @@ input {
 }
 
 .text-layer .search-highlight {
-  margin-block: -0.06em;
-  padding: 0.06em 0;
-  border-radius: 0.14em;
-  background: rgb(67 175 73 / 42%);
-  box-shadow: inset 0 0 0 0.06em rgb(67 175 73 / 65%);
+  padding: 0;
+  background: transparent;
   color: transparent;
 }
 
+.search-highlight-layer,
 .footnote-highlight-layer {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   z-index: 2;
   pointer-events: none;
+  overflow: visible;
 }
 
-.footnote-highlight {
-  position: absolute;
-  border-radius: 2px;
-  background: rgb(255 193 7 / 30%);
-  box-shadow: 0 0 0 1px rgb(255 193 7 / 55%);
+.highlight-region-fill {
+  fill: var(--selection-bg);
+  stroke: none;
+}
+
+.highlight-region-outline {
+  fill: none;
+  stroke: var(--highlight-outline);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: square;
 }
 
 .status {

@@ -36,7 +36,7 @@ function refreshActiveSearchCue() {
 
   const searchPosition = parseSearchPosition();
   const page = viewer.querySelector(".page.search-match-page");
-  const highlights = page ? [...page.querySelectorAll(".search-highlight")] : [];
+  const highlights = page ? [...page.querySelectorAll(".search-highlight-group")] : [];
   const activeOrdinal = Number.parseInt(page?.dataset.searchMatchOrdinal ?? "", 10);
 
   removeSearchCues();
@@ -46,12 +46,12 @@ function refreshActiveSearchCue() {
     return;
   }
 
-  if (!highlights[activeOrdinal]) {
+  const activeHighlight = highlights.find(highlight => Number(highlight.dataset.searchOrdinal) === activeOrdinal);
+  if (!activeHighlight) {
     return;
   }
 
-  const activeHighlight = highlights[activeOrdinal];
-  const scrollKey = `${page.dataset.page ?? ""}:${activeOrdinal}:${searchPosition.position}/${searchPosition.total}`;
+  const scrollKey = `${page.dataset.searchQuery ?? ""}:${page.dataset.page ?? ""}:${activeOrdinal}:${searchPosition.position}/${searchPosition.total}`;
   activeHighlight.classList.add(ACTIVE_CLASS);
 
   if (scrollKey !== lastScrolledMatchKey) {
@@ -85,8 +85,8 @@ function scheduleSearchCueRefresh() {
 function nodeContainsSearchHighlight(node) {
   return (
     node instanceof Element &&
-    (node.matches(".text-layer, .search-highlight") ||
-      Boolean(node.querySelector(".text-layer, .search-highlight")))
+    (node.matches(".text-layer, .search-highlight-layer") ||
+      Boolean(node.querySelector(".text-layer, .search-highlight-layer")))
   );
 }
 
@@ -114,7 +114,7 @@ const viewerObserver = new MutationObserver((mutations) => {
 
 viewerObserver.observe(viewer, {
   attributes: true,
-  attributeFilter: ["class", "data-search-match-ordinal"],
+  attributeFilter: ["class", "data-search-match-ordinal", "data-search-query"],
   childList: true,
   subtree: true,
 });
