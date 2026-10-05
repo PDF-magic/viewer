@@ -1,4 +1,9 @@
-import { formatMetadataDate } from "./metadata-date.js";
+import { formatMetadataDate, formatRelativeMetadataDate } from "./metadata-date.js";
+
+const RELATIVE_DATES_KEY = "pdf-viewer-relative-dates";
+const relativeDatesToggle = document.querySelector("#relative-metadata-dates");
+let relativeDates = localStorage.getItem(RELATIVE_DATES_KEY) === "true";
+const originalDates = new WeakMap();
 
 const params = new URLSearchParams(window.location.search);
 const explicitSource = params.get("url");
@@ -58,12 +63,39 @@ function formatVisibleMetadataDates() {
       continue;
     }
 
-    const formatted = formatMetadataDate(description.textContent);
+    if (!originalDates.has(description)) {
+      originalDates.set(description, description.textContent);
+    }
+    const original = originalDates.get(description);
+    const formatted = relativeDates
+      ? formatRelativeMetadataDate(original)
+      : formatMetadataDate(original);
+    description.title = formatMetadataDate(original);
     if (formatted !== description.textContent) {
       description.textContent = formatted;
     }
   }
 }
+
+if (relativeDatesToggle) {
+  relativeDatesToggle.checked = relativeDates;
+  relativeDatesToggle.addEventListener("change", () => {
+    relativeDates = relativeDatesToggle.checked;
+    localStorage.setItem(RELATIVE_DATES_KEY, String(relativeDates));
+    formatVisibleMetadataDates();
+  });
+}
+
+window.addEventListener("storage", (event) => {
+  if (event.key === RELATIVE_DATES_KEY) {
+    relativeDates = event.newValue === "true";
+    if (relativeDatesToggle) relativeDatesToggle.checked = relativeDates;
+    formatVisibleMetadataDates();
+  }
+});
+setInterval(() => {
+  if (relativeDates && !document.hidden) formatVisibleMetadataDates();
+}, 60_000);
 
 const metadataList = document.querySelector("#section-metadata-list");
 if (metadataList) {

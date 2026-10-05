@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { formatMetadataDate } from "../src/viewer/metadata-date.js";
+import { formatMetadataDate, formatRelativeMetadataDate } from "../src/viewer/metadata-date.js";
 
 test("formats PDF dates in UTC", () => {
   assert.equal(
@@ -32,4 +32,15 @@ test("formats timezone-aware XMP dates in UTC", () => {
 test("leaves dates without a known timezone unchanged", () => {
   assert.equal(formatMetadataDate("D:20261204090400"), "D:20261204090400");
   assert.equal(formatMetadataDate("not a date"), "not a date");
+});
+
+test("relative dates show compact years, days, hours and minutes", () => {
+  const start = Date.parse("2024-01-01T00:00:00Z");
+  const elapsed = ((365 * 2 + 14) * 24 * 60 + 3 * 60 + 5) * 60_000;
+  assert.equal(formatRelativeMetadataDate("D:20240101000000Z", start + elapsed), "2y 14d 3h 5m ago");
+  assert.equal(formatRelativeMetadataDate("2024-01-01T01:00:00+01:00", start + 60_000), "1m ago");
+  assert.equal(formatRelativeMetadataDate("2024-01-01T00:00:00Z", start + 500), "just now");
+  assert.equal(formatRelativeMetadataDate("2024-01-01T00:00:00Z", start - 3600_000), "in 1h");
+  assert.equal(formatRelativeMetadataDate("D:20240101000000", start), "D:20240101000000");
+  assert.equal(formatRelativeMetadataDate("unknown", start), "unknown");
 });
