@@ -731,6 +731,8 @@ input {
 }
 
 .document-scrubber-preview.document-scrubber-choices {
+  width: min(560px, 80vw);
+  left: clamp(0px, calc(var(--scrubber-preview-x, var(--scrubber-thumb-x, 7px)) - min(280px, 40vw)), max(0px, calc(100% - min(560px, 80vw))));
   visibility: visible;
 }
 
