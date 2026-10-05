@@ -29,6 +29,29 @@ function loadFootnoteHelpers() {
   return context;
 }
 
+test("inline font fragments do not split a single-column footnote highlight", () => {
+  const { footnotesForPage } = loadFootnoteHelpers();
+  const viewport = { width: 612, height: 792, convertToViewportPoint: (x, y) => [x, y] };
+  const item = (str, x, y, width, height = 12) => ({ str, width, height, transform: [1, 0, 0, height, x, y] });
+  const items = [];
+  for (let line = 0; line < 10; line++) {
+    const y = 200 + line * 17;
+    items.push(item("Body prefix", 72, y, 141), item("changed font", 216, y, 149),
+      item("body suffix", 368, y, 170));
+  }
+  items.push(item("13", 72, 630, 7, 7), item("Interestingly, this happened despite", 82, 634, 169),
+    item("substantive", 254, 634, 54), item("prevention planning in Section VI", 311, 634, 224),
+    item("disclosure framework continues", 72, 651, 466),
+    item("14", 72, 680, 7, 7), item("See another note.", 82, 684, 140));
+  const notes = footnotesForPage(items, viewport, 6, [{ x: 72, y: 620, width: 240 },
+    { x: 254, y: 635, width: 280 }, { x: 270, y: 652, width: 266 }]);
+  const note = notes.find(note => note.number === 13);
+  assert.match(note.text, /despite substantive prevention planning/);
+  assert.equal(note.highlightRegions.length, 2);
+  assert.ok(note.highlightRegions[0].left + note.highlightRegions[0].width > 0.87);
+  assert.doesNotMatch(note.text, /another note/);
+});
+
 test("footnote navigation is exposed in the tools menu", () => {
   assert.match(markup, /id="footnote-jump"/);
   assert.match(markup, /id="footnote-number"/);

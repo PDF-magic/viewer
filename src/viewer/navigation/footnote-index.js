@@ -210,8 +210,18 @@ function columnsForPage(entries, viewport, rules) {
   const starts = [];
   const candidates = [...rules.map((rule) => rule.x), ...[...counts].filter(([, count]) => count >= 8).map(([x]) => x)].sort((a, b) => a - b);
   for (const x of candidates) if (!starts.length || x - starts.at(-1) > viewport.width * 0.18) starts.push(x);
-  // Wide body lines indicate a single-column document, despite short text fragments.
-  const wideLines = entries.filter((entry) => entry.yRatio > 0.1 && entry.item.width > viewport.width * 0.55).length;
+  // Font changes split a visual line into PDF items. Count the connected line,
+  // otherwise repeated inline fragments can masquerade as another column.
+  const visualLines = [];
+  for (const entry of [...entries].sort(readingOrder)) {
+    if (entry.yRatio <= 0.1) continue;
+    const right = entry.x + Math.abs(entry.item.width || 0);
+    const line = visualLines.find(line => Math.abs(line.y - entry.y) < 2 &&
+      entry.x >= line.left && entry.x - line.right <= Math.max(line.height, entry.height));
+    if (line) line.right = Math.max(line.right, right);
+    else visualLines.push({ left: entry.x, right, y: entry.y, height: entry.height });
+  }
+  const wideLines = visualLines.filter(line => line.right - line.left > viewport.width * 0.55).length;
   const distinctRules = new Set(rules.map((rule) => Math.round(rule.x / 12))).size;
   if (starts.length < 2 || (wideLines >= 5 && distinctRules < 2)) return [{ index: 0, left: 0, right: viewport.width, margin: rules[0]?.x || 0 }];
   return starts.map((x, index) => ({ index, left: Math.max(0, x - 12), right: (starts[index + 1] || viewport.width + 12) - 12, margin: x }));
@@ -224,6 +234,11 @@ function isPreviewText(entry, height) {
 
 function pageLayout(items, viewport, rules) {
   const entries = positionedItems(items, viewport);
+  // Link underlines and strike-throughs are drawing paths too. A separator
+  // sits between lines, rather than touching a text baseline.
+  rules = rules.filter(rule => !entries.some(entry =>
+    Math.abs(rule.y - entry.y) <= entry.height * 0.3 &&
+    rule.x < entry.x + Math.abs(entry.item.width || 0) && rule.x + rule.width > entry.x));
   const columns = columnsForPage(entries, viewport, rules);
   return columns.map((column) => ({ ...column,
     entries: entries.filter((entry) => entry.x >= column.left && entry.x < column.right),
