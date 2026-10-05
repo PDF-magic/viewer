@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import base64
 from collections import deque
+import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -15,10 +17,115 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 from urllib.parse import unquote, urlparse
 from urllib.request import Request, urlopen
 
 HOST_CONFIG = Path.home() / ".config" / "pdf-magic" / "enhancer-host.json"
+
+
+def document_hash(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def read_job(path: Path) -> dict[str, object]:
+    try:
+        value = json.loads(path.read_text())
+        return value if isinstance(value, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def write_job(path: Path, state: dict[str, object]) -> None:
+    with tempfile.NamedTemporaryFile(mode="w", dir=path.parent, delete=False) as output:
+        temporary = Path(output.name)
+        json.dump(state, output)
+    try:
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def completed_output(state: dict[str, object]) -> Path | None:
+    if state.get("status") != "complete" or not isinstance(state.get("output"), str):
+        return None
+    output = Path(state["output"])
+    try:
+        if output.is_file() and document_hash(output) == state.get("outputHash"):
+            return output
+    except OSError:
+        pass
+    return None
+
+
+def shared_enhancement(input_path: Path, create, progress: bool, directory: Path) -> Path:
+    """Serialize owners by input bytes and let duplicate hosts follow their job."""
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    identity = document_hash(input_path)
+    state_path = directory / f"{identity}.json"
+    waited = False
+    last_event = None
+
+    def notify(event):
+        if progress:
+            try:
+                send_message(event)
+            except BrokenPipeError:
+                # Closing the initiating tab must not discard a shared job.
+                pass
+
+    with (directory / f"{identity}.lock").open("a") as lock:
+        while True:
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                waited = True
+                event = read_job(state_path).get("progress")
+                if progress and isinstance(event, dict) and event != last_event:
+                    notify(event)
+                    last_event = event
+                time.sleep(0.25)
+        try:
+            state = read_job(state_path)
+            cached = completed_output(state)
+            if cached is not None:
+                return cached
+            if waited and state.get("status") == "failed":
+                raise RuntimeError(str(state.get("error") or "Shared PDF enhancement failed"))
+            state = {"status": "running"}
+            write_job(state_path, state)
+
+            def report(event):
+                state["progress"] = event
+                write_job(state_path, state)
+                notify(event)
+
+            try:
+                output = create(report).resolve()
+                output_hash = document_hash(output)
+                state = {"status": "complete", "output": str(output), "outputHash": output_hash}
+                write_job(state_path, state)
+                # An enhanced PDF is also an alias for the completed result.
+                # Never overwrite another job that is already running for it.
+                if output_hash != identity:
+                    with (directory / f"{output_hash}.lock").open("a") as alias_lock:
+                        try:
+                            fcntl.flock(alias_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        except BlockingIOError:
+                            pass
+                        else:
+                            write_job(directory / f"{output_hash}.json", state)
+                return output
+            except Exception as error:
+                write_job(state_path, {"status": "failed", "error": str(error)})
+                raise
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
 
 
 def read_message() -> dict[str, object]:
@@ -292,8 +399,8 @@ def progress_from_log(line: str) -> dict[str, object] | None:
     return None
 
 
-def run_enhancer(command: list[str], progress: bool) -> None:
-    if not progress:
+def run_enhancer(command: list[str], progress: bool, report_progress=None) -> None:
+    if not progress and report_progress is None:
         result = subprocess.run(command, stdout=sys.stderr, stderr=subprocess.PIPE, text=True)
         if result.returncode:
             raise RuntimeError(result.stderr.strip()[-2000:] or f"PDF enhancement failed (exit {result.returncode})")
@@ -307,7 +414,10 @@ def run_enhancer(command: list[str], progress: bool) -> None:
             print(line, file=sys.stderr, end="")
             event = progress_from_log(line)
             if event:
-                send_message(event)
+                if report_progress is not None:
+                    report_progress(event)
+                elif progress:
+                    send_message(event)
         code = process.wait()
     if code:
         raise RuntimeError("".join(logs).strip()[-2000:] or f"PDF enhancement failed (exit {code})")
@@ -334,17 +444,18 @@ def enhance_pdf(source_url: str, reference_url: str, uploaded_path: Path | None 
             else Path.home() / ".local/share/pdf-magic/enhanced"
         )
         output_directory = input_path.parent if is_local else web_output_directory
-        output_path = unique_output(output_directory, safe_stem(source_url))
+        def create(report):
+            output_path = unique_output(output_directory, safe_stem(source_url))
+            run_enhancer(
+                ["/bin/bash", str(enhancer), str(input_path), str(output_path), "--force-ocr", "--ai-review"],
+                progress, report_progress=report,
+            )
+            report({"type": "progress", "stage": "finalizing"})
+            output_path = rename_for_ocr_title(output_path)
+            stamp_source_url(output_path, reference_url)
+            return output_path
 
-        run_enhancer(
-            ["/bin/bash", str(enhancer), str(input_path), str(output_path), "--force-ocr", "--ai-review"],
-            progress,
-        )
-        if progress:
-            send_message({"type": "progress", "stage": "finalizing"})
-        output_path = rename_for_ocr_title(output_path)
-        stamp_source_url(output_path, reference_url)
-        return output_path.resolve()
+        return shared_enhancement(input_path, create, progress, web_output_directory / ".jobs")
 
 
 def enhance_uploaded_pdf(message: dict[str, object]) -> Path:

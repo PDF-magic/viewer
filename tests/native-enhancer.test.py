@@ -6,6 +6,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -17,6 +18,123 @@ spec.loader.exec_module(host)
 
 
 class NativeEnhancerTests(unittest.TestCase):
+    def test_duplicate_processes_share_progress_and_one_result(self):
+        with tempfile.TemporaryDirectory() as folder:
+            directory = Path(folder)
+            first = directory / "first.pdf"
+            second = directory / "second.pdf"
+            first.write_bytes(b"%PDF-1.7\nidentical document")
+            second.write_bytes(first.read_bytes())
+            bootstrap = f"""
+import importlib.util, sys, time
+from pathlib import Path
+spec = importlib.util.spec_from_file_location('host', {str(HOST)!r})
+host = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(host)
+directory = Path({folder!r})
+def create(report):
+    with (directory / 'runs').open('a') as counter:
+        counter.write('run\\n')
+    report({{'type': 'progress', 'stage': 'review', 'completed': 1, 'total': 2}})
+    (directory / 'started').touch()
+    time.sleep(0.8)
+    output = directory / 'enhanced.pdf'
+    output.write_bytes(b'%PDF-1.7\\nenhanced output')
+    return output
+result = host.shared_enhancement(Path(sys.argv[1]), create, True, directory / 'jobs')
+host.send_message({{'ok': True, 'outputUrl': result.as_uri()}})
+"""
+            owner = subprocess.Popen([sys.executable, "-c", bootstrap, str(first)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            follower = None
+            try:
+                deadline = time.monotonic() + 5
+                while not (directory / "started").exists():
+                    if owner.poll() is not None or time.monotonic() > deadline:
+                        self.fail("owner did not start")
+                    time.sleep(0.01)
+                follower = subprocess.Popen([sys.executable, "-c", bootstrap, str(second)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                streams = [owner.communicate(timeout=5), follower.communicate(timeout=5)]
+                self.assertEqual(owner.returncode, 0, streams[0][1])
+                self.assertEqual(follower.returncode, 0, streams[1][1])
+                self.assertEqual((directory / "runs").read_text(), "run\n")
+                results = []
+                for stdout, _ in streams:
+                    frames = []
+                    offset = 0
+                    while offset < len(stdout):
+                        length = struct.unpack("<I", stdout[offset:offset + 4])[0]
+                        frames.append(json.loads(stdout[offset + 4:offset + 4 + length]))
+                        offset += 4 + length
+                    self.assertIn({"type": "progress", "stage": "review", "completed": 1, "total": 2}, frames)
+                    results.append(frames[-1]["outputUrl"])
+                self.assertEqual(results[0], results[1])
+            finally:
+                for process in [owner, follower]:
+                    if process is not None and process.poll() is None:
+                        process.kill()
+                        process.communicate()
+
+    def test_completed_output_is_reused_and_hash_is_verified(self):
+        with tempfile.TemporaryDirectory() as folder:
+            directory = Path(folder)
+            source = directory / "scan.pdf"
+            output = directory / "enhanced.pdf"
+            source.write_bytes(b"original PDF")
+            jobs = directory / "jobs"
+            def create(report):
+                output.write_bytes(b"enhanced PDF")
+                return output
+            with patch.object(host, "send_message"):
+                first = host.shared_enhancement(source, create, True, jobs)
+                def unexpected(report):
+                    self.fail("a duplicate request started OCR")
+                self.assertEqual(host.shared_enhancement(source, unexpected, True, jobs), first)
+                self.assertEqual(host.shared_enhancement(output, unexpected, True, jobs), first)
+                output.write_bytes(b"changed output")
+                self.assertEqual(host.shared_enhancement(source, create, False, jobs), first)
+                self.assertEqual(output.read_bytes(), b"enhanced PDF")
+
+    def test_stale_job_can_retry_and_changed_input_starts_new_job(self):
+        with tempfile.TemporaryDirectory() as folder:
+            directory = Path(folder)
+            source = directory / "scan.pdf"
+            output = directory / "enhanced.pdf"
+            jobs = directory / "jobs"
+            jobs.mkdir()
+            source.write_bytes(b"first PDF")
+            host.write_job(jobs / (host.document_hash(source) + ".json"), {"status": "running"})
+            def create(report):
+                output.write_bytes(source.read_bytes() + b" enhanced")
+                return output
+            host.shared_enhancement(source, create, False, jobs)
+            source.write_bytes(b"second PDF")
+            host.shared_enhancement(source, create, False, jobs)
+            self.assertEqual(output.read_bytes(), b"second PDF enhanced")
+
+    def test_failed_job_releases_lock_and_can_retry(self):
+        with tempfile.TemporaryDirectory() as folder:
+            directory = Path(folder)
+            source = directory / "scan.pdf"
+            source.write_bytes(b"PDF")
+            def fail(report):
+                raise RuntimeError("OCR failed")
+            with self.assertRaisesRegex(RuntimeError, "OCR failed"):
+                host.shared_enhancement(source, fail, False, directory / "jobs")
+            def succeed(report):
+                return source
+            self.assertEqual(host.shared_enhancement(source, succeed, False, directory / "jobs"), source.resolve())
+
+    def test_closed_tab_does_not_discard_shared_job(self):
+        with tempfile.TemporaryDirectory() as folder:
+            directory = Path(folder)
+            source = directory / "scan.pdf"
+            source.write_bytes(b"PDF")
+            def create(report):
+                report({"type": "progress", "stage": "review", "completed": 1, "total": 1})
+                return source
+            with patch.object(host, "send_message", side_effect=BrokenPipeError):
+                self.assertEqual(host.shared_enhancement(source, create, True, directory / "jobs"), source.resolve())
+
     def test_progress_stream_contains_framed_updates_and_final_result(self):
         with tempfile.TemporaryDirectory() as folder:
             directory = Path(folder).resolve()
@@ -35,6 +153,7 @@ spec = importlib.util.spec_from_file_location('host', {str(HOST)!r})
 host = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(host)
 host.load_config = lambda: {{'enhancer_dir': {folder!r}}}
+host.Path.home = lambda: host.Path({folder!r})
 host.stamp_source_url = lambda *_: None
 raise SystemExit(host.main())
 """
@@ -106,6 +225,7 @@ spec = importlib.util.spec_from_file_location('host', {str(HOST)!r})
 host = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(host)
 host.load_config = lambda: {{'enhancer_dir': {folder!r}}}
+host.Path.home = lambda: host.Path({folder!r})
 host.stamp_source_url = lambda *_: None
 raise SystemExit(host.main())
 """
@@ -130,14 +250,12 @@ raise SystemExit(host.main())
     def test_ocr_failure_reports_the_underlying_reason(self):
         with tempfile.TemporaryDirectory() as folder:
             directory = Path(folder)
-            (directory / "ocr-scanned-pdf.sh").touch()
+            (directory / "ocr-scanned-pdf.sh").write_text('echo "This PDF is digitally signed." >&2\nexit 3\n')
             source = directory / "scan.pdf"
             source.write_bytes(b"%PDF-1.7")
             with patch.object(host, "load_config", return_value={"enhancer_dir": folder}), \
                  patch.object(host, "input_from_url", return_value=(source, True)), \
-                 patch.object(host.subprocess, "run", return_value=subprocess.CompletedProcess(
-                     [], 3, stderr="This PDF is digitally signed."
-                 )):
+                 patch.object(host.Path, "home", return_value=directory):
                 with self.assertRaisesRegex(RuntimeError, "digitally signed"):
                     host.enhance_pdf(source.as_uri(), "https://example.com/scan.pdf")
 
