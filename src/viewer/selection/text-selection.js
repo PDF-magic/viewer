@@ -2,6 +2,8 @@ import { selectionLines } from "./selection-lines.js";
 
 const textLayers = new Map();
 let pointerDown = false;
+let paintFrame = 0;
+const selectionOverlays = new Map();
 
 function textLayersInNode(node) {
   if (!(node instanceof Element)) {
@@ -45,6 +47,7 @@ function registerTextLayer(textLayer) {
   endOfContent.setAttribute("aria-hidden", "true");
   textLayer.append(endOfContent);
   textLayers.set(textLayer, endOfContent);
+  scheduleSelectionPaint();
 }
 
 function unregisterTextLayer(textLayer) {
@@ -147,35 +150,41 @@ window.addEventListener("blur", () => {
 });
 
 // Paint once per visual line; PDF spans can overlap, especially around italics.
-let paintFrame = 0;
-const selectionOverlays = new Map();
 function paintSelection() {
   paintFrame = 0;
   for (const overlay of selectionOverlays.values()) overlay.remove();
   selectionOverlays.clear();
+  for (const layer of textLayers.keys()) layer.classList.remove("selection-painted");
   const selection = document.getSelection();
   if (!selection || selection.isCollapsed) return;
   for (const layer of textLayers.keys()) {
     if (!layer.isConnected) continue;
+    const bounds = layer.getBoundingClientRect();
+    if (!bounds.width || !bounds.height || !layer.clientWidth || !layer.clientHeight) continue;
     const rectangles = [];
     const walker = document.createTreeWalker(layer, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
       const node = walker.currentNode;
       for (let index = 0; index < selection.rangeCount; index++) {
         const selected = selection.getRangeAt(index);
-        if (!selected.intersectsNode(node)) continue;
-        const range = document.createRange();
-        range.selectNodeContents(node);
-        if (selected.startContainer === node) range.setStart(node, selected.startOffset);
-        if (selected.endContainer === node) range.setEnd(node, selected.endOffset);
-        rectangles.push(...Array.from(range.getClientRects(), rect => ({
-          left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
-        })));
+        // Rendering can replace range endpoints while pages enter/leave the
+        // render window. Leave native highlighting visible if a range is stale.
+        try {
+          if (!selected.intersectsNode(node)) continue;
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          if (selected.startContainer === node) range.setStart(node, selected.startOffset);
+          if (selected.endContainer === node) range.setEnd(node, selected.endOffset);
+          rectangles.push(...Array.from(range.getClientRects(), rect => ({
+            left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
+          })));
+        } catch {
+          continue;
+        }
       }
     }
     const lines = selectionLines(rectangles);
     if (!lines.length) continue;
-    const bounds = layer.getBoundingClientRect();
     const scaleX = layer.clientWidth / bounds.width;
     const scaleY = layer.clientHeight / bounds.height;
     const namespace = "http://www.w3.org/2000/svg";
@@ -202,6 +211,7 @@ function paintSelection() {
     }
     layer.append(overlay);
     selectionOverlays.set(layer, overlay);
+    layer.classList.add("selection-painted");
   }
 }
 function scheduleSelectionPaint() {
