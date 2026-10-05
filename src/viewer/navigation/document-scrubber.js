@@ -12,6 +12,7 @@ let notes = [];
 let navigationFrame;
 let trackingFrame;
 let pendingIndex = 0;
+let pendingSearchResult = false;
 let dragging = false;
 let editingNumber = false;
 let choosingOccurrence = false;
@@ -83,13 +84,14 @@ function updateScrubber(index, smooth = false) {
   previewNote(index);
 }
 
-function navigateToFootnote(value) {
+function navigateToFootnote(value, searchResult = false) {
   pendingIndex = clampIndex(value);
+  pendingSearchResult = searchResult;
   updateScrubber(pendingIndex);
   if (navigationFrame) return;
   navigationFrame = requestAnimationFrame(() => {
     navigationFrame = undefined;
-    scrollToTarget(notes[pendingIndex]);
+    scrollToTarget(notes[pendingIndex], pendingSearchResult);
   });
 }
 
@@ -105,7 +107,7 @@ function closeChoices() {
 function chooseOccurrence(index) {
   closeChoices();
   editingNumber = false;
-  navigateToFootnote(index + 1);
+  navigateToFootnote(index + 1, true);
   currentLabel.blur();
 }
 
@@ -213,7 +215,7 @@ currentLabel?.addEventListener("keydown", (event) => {
     return;
   }
   editingNumber = false;
-  navigateToFootnote(targetIndex + 1);
+  navigateToFootnote(targetIndex + 1, true);
   currentLabel.blur();
 });
 

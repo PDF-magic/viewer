@@ -84,7 +84,7 @@ async function loadScrubber(pages, operators) {
         };
       },
     } }),
-    appendFootnotesForPage, scrollToTarget: (note) => jumps.push(note),
+    appendFootnotesForPage, scrollToTarget: (note, searchResult) => jumps.push({ ...note, searchResult }),
     requestAnimationFrame: (callback) => { frames.push(callback); return frames.length; },
     cancelAnimationFrame: (id) => { frames[id - 1] = () => {}; },
     performance: { now: () => 0 },
@@ -178,6 +178,12 @@ test("typing a displayed note number navigates by number, not slider index", asy
   assert.equal(jumps[0].number, 42);
   assert.equal(jumps[0].pageNumber, 2);
   assert.equal(element("#document-scrubber-range").value, "2");
+  assert.equal(jumps[0].searchResult, true);
+  const range = element("#document-scrubber-range");
+  range.value = "1";
+  range.listeners.input();
+  while (frames.length) frames.shift()();
+  assert.equal(jumps.at(-1).searchResult, false);
 });
 
 test("invalid typed numbers stay editable and Escape restores the active number", async () => {

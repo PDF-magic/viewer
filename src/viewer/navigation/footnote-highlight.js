@@ -1,6 +1,7 @@
 import { createHighlightGroup, createHighlightLayer } from "../highlight-regions.js";
 
 let activeRegions = [];
+let activeSearchResult = false;
 
 function rotatedRegion(region, rotation) {
   const { left, top, width, height } = region;
@@ -17,12 +18,14 @@ export function renderFootnoteHighlight(page, pageNumber, rotation) {
   const regions = activeRegions.filter((region) => region.pageNumber === pageNumber);
   if (!regions.length) return;
   const layer = createHighlightLayer("footnote-highlight-layer", 1, 1);
-  layer.append(createHighlightGroup(regions.map(region => rotatedRegion(region, rotation)), "footnote-highlight"));
+  const className = activeSearchResult ? "footnote-highlight footnote-search-result" : "footnote-highlight";
+  layer.append(createHighlightGroup(regions.map(region => rotatedRegion(region, rotation)), className));
   page.append(layer);
 }
 
 export function highlightFootnote(target, pages, rotation) {
   activeRegions = target.highlightRegions || [];
+  activeSearchResult = target.searchResult === true;
   for (const [index, page] of pages.entries()) {
     renderFootnoteHighlight(page, index + 1, rotation);
   }
