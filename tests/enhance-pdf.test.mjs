@@ -9,7 +9,7 @@ const markup = readFileSync(new URL("../src/viewer.html", import.meta.url), "utf
 
 async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new Uint8Array([37, 80, 68, 70, 45]), sourceUrl = "https://example.com/source.pdf") {
   const elements = new Map();
-  for (const id of ["enhance-nav", "enhance-pdf", "install-enhancer", "section-nav", "page-number", "toast", "enhance-progress", "enhance-progress-bar", "enhance-progress-label"]) {
+  for (const id of ["enhance-nav", "enhance-pdf", "install-enhancer", "section-nav", "page-number", "toast", "enhance-progress", "enhance-progress-bar", "enhance-progress-label", "enhance-progress-percentage"]) {
     elements.set(`#${id}`, {
       hidden: id !== "enhance-pdf",
       title: "Enhance PDF",
@@ -18,6 +18,7 @@ async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new U
       removeAttribute() {},
       addEventListener() {},
       classList: { add() {}, remove() {} },
+      style: { setProperty() {} },
     });
   }
   elements.get("#page-number").value = pageNumber;
@@ -39,6 +40,7 @@ async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new U
               messageListener({ type: "progress", stage: "review", completed: 2, total: 4 });
               progressSnapshots.push({ label: elements.get("#enhance-progress-label").textContent,
                 value: elements.get("#enhance-progress-bar").value,
+                percentage: elements.get("#enhance-progress-percentage").textContent,
                 hidden: elements.get("#enhance-progress").hidden });
               messageListener(await sendNativeMessage());
             } else {
@@ -116,7 +118,7 @@ test("remote enhancement sends loaded PDF bytes in bounded chunks", async () => 
 
 test("progress events update the bar without consuming the final response", async () => {
   const { progressSnapshots, elements, destinations } = await enhancerFixture(async () => ({ ok: true, outputUrl: "file:///tmp/enhanced.pdf" }));
-  assert.deepEqual(progressSnapshots, [{ label: "AI review · 2 of 4 pages · 50%", value: 50, hidden: false }]);
+  assert.deepEqual(progressSnapshots, [{ label: "Enhancing · 2 of 4 pages", value: 50, percentage: "50%", hidden: false }]);
   assert.equal(destinations.length, 1);
   assert.equal(elements.get("#enhance-progress").hidden, true);
 });

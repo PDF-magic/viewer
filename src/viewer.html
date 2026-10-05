@@ -151,6 +151,10 @@
             <span>Show minimap</span>
             <input id="show-minimap" class="checkbox-input" type="checkbox" checked />
           </label>
+          <label class="tool-toggle" title="Show created and modified dates as elapsed time; hover over a date for its UTC timestamp">
+            <span>Relative dates</span>
+            <input id="relative-metadata-dates" class="checkbox-input" type="checkbox" />
+          </label>
           <label class="tool-toggle" title="Keep embedded PDF images in their original colors in dark mode">
             <span>Preserve image colors</span>
             <input id="preserve-image-colors" class="toggle-input" type="checkbox" checked />
@@ -162,7 +166,10 @@
 
     <div id="enhance-progress" class="enhance-progress" hidden>
       <div id="enhance-progress-label" class="enhance-progress-label" role="status" aria-live="polite">Preparing enhancement…</div>
-      <progress id="enhance-progress-bar" max="100" aria-labelledby="enhance-progress-label"></progress>
+      <div class="enhance-progress-track">
+        <progress id="enhance-progress-bar" max="100" aria-labelledby="enhance-progress-label"></progress>
+        <span id="enhance-progress-percentage" class="enhance-progress-percentage" aria-hidden="true" hidden></span>
+      </div>
     </div>
 
     <main id="viewer" class="viewer" aria-live="polite">

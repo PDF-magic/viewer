@@ -12,6 +12,7 @@ const toast = document.querySelector("#toast");
 const progressContainer = document.querySelector("#enhance-progress");
 const progressBar = document.querySelector("#enhance-progress-bar");
 const progressLabel = document.querySelector("#enhance-progress-label");
+const progressPercentage = document.querySelector("#enhance-progress-percentage");
 const defaultTitle = enhanceButton.title;
 let titleResetTimer;
 let toastTimer;
@@ -23,7 +24,7 @@ function updateEnhancementProgress(stage, completed, total) {
     preparing: "Preparing enhancement…",
     upload: "Sending PDF for enhancement…",
     ocr: "Recognizing text on every page…",
-    review: "Reviewing with AI…",
+    review: "Enhancing…",
     finalizing: "Building sections and saving PDF…",
     complete: "Enhanced PDF ready",
   };
@@ -31,11 +32,15 @@ function updateEnhancementProgress(stage, completed, total) {
   if (Number.isFinite(completed) && Number.isFinite(total) && total > 0) {
     const percentage = Math.round(Math.min(1, Math.max(0, completed / total)) * 100);
     progressBar.value = percentage;
+    progressContainer.style.setProperty("--enhance-progress-position", `${percentage}%`);
+    progressPercentage.textContent = `${percentage}%`;
+    progressPercentage.hidden = false;
     label = stage === "review"
-      ? `AI review · ${completed} of ${total} pages · ${percentage}%`
-      : `${label} ${percentage}%`;
+      ? `Enhancing · ${completed} of ${total} pages`
+      : label;
   } else {
     progressBar.removeAttribute("value");
+    progressPercentage.hidden = true;
   }
   progressLabel.textContent = label;
 }

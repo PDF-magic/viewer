@@ -80,3 +80,28 @@ export function formatMetadataDate(value) {
   const minutes = String(date.getUTCMinutes()).padStart(2, "0");
   return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()} at ${date.getUTCHours()}:${minutes} UTC`;
 }
+
+export function formatRelativeMetadataDate(value, now = Date.now()) {
+  if (typeof value !== "string") {
+    return value;
+  }
+  const date = parseMetadataDate(value.trim());
+  if (!date) {
+    return value;
+  }
+
+  const elapsed = now - date.getTime();
+  let remaining = Math.floor(Math.abs(elapsed) / 60_000);
+  if (remaining === 0) {
+    return elapsed < 0 ? "in less than 1m" : "just now";
+  }
+  const parts = [];
+  for (const [unit, minutes] of [["y", 525600], ["d", 1440], ["h", 60], ["m", 1]]) {
+    const count = Math.floor(remaining / minutes);
+    remaining %= minutes;
+    if (count) {
+      parts.push(`${count}${unit}`);
+    }
+  }
+  return elapsed < 0 ? `in ${parts.join(" ")}` : `${parts.join(" ")} ago`;
+}

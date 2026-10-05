@@ -127,6 +127,25 @@ input {
   color: var(--muted);
 }
 
+.enhance-progress-track { position: relative; }
+
+.enhance-progress-percentage {
+  position: absolute;
+  top: 50%;
+  left: clamp(0px, calc(var(--enhance-progress-position, 0%) - 22px), calc(100% - 44px));
+  transform: translateY(-50%);
+  width: 44px;
+  border: 1px solid var(--page-border);
+  border-radius: 10px;
+  background: var(--toolbar-bg);
+  color: var(--text);
+  text-align: center;
+  font-size: 11px;
+  line-height: 16px;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+
 .enhance-progress progress {
   display: block;
   width: 100%;
