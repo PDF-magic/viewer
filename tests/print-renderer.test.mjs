@@ -25,7 +25,7 @@ test("print metrics preserve rotated physical dimensions", () => {
 test("print CSS removes browser page margins and uses the dedicated print document", () => {
   const styles = readFileSync(new URL("../src/viewer/viewer.css", import.meta.url), "utf8");
 
-  assert.match(styles, /@page\s*{\s*margin:\s*0;/);
+  assert.match(styles, /^@page\s*{\s*margin:\s*0;/m);
   assert.match(styles, /:root\.pdf-print-ready \.viewer[\s\S]*display:\s*none !important;/);
   assert.match(styles, /:root\.pdf-print-ready \.print-document\s*{\s*display:\s*block;/);
 });

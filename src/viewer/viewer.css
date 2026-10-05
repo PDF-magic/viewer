@@ -1028,11 +1028,11 @@ input {
   }
 }
 
-@media print {
-  @page {
-    margin: 0;
-  }
+@page {
+  margin: 0;
+}
 
+@media print {
   :root,
   :root[data-theme="light"] {
     --page-filter: none;
