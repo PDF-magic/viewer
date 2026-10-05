@@ -1,0 +1,79 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [4 0 R 6 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 800] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>
+endobj
+5 0 obj
+<< /Length 1227 >>
+stream
+BT /F1 18 Tf 60 735 Td (Footnote across columns and pages) Tj ET
+BT /F1 11 Tf 60 708 Td (Page 1: select footnote 44, then scroll through its yellow highlight.) Tj ET
+BT /F1 12 Tf 60 596 Td (See) Tj ET
+BT /F1 6 Tf 82 600 Td (44) Tj ET
+BT /F1 12 Tf 94 596 Td (the continuing footnote.) Tj ET
+BT /F1 12 Tf 60 572 Td (This is body text, outside the note.) Tj ET
+BT /F1 12 Tf 324 596 Td (Read the left note block first,) Tj ET
+BT /F1 12 Tf 324 572 Td (then the right note block.) Tj ET
+BT /F1 12 Tf 324 548 Td (The continuation reaches page 2.) Tj ET
+0.5 w 60 160 m 160 160 l S
+0.5 w 324 160 m 424 160 l S
+BT /F1 6 Tf 60 134 Td (44) Tj ET
+BT /F1 8 Tf 72 130 Td (START: page 1, left column.) Tj ET
+BT /F1 8 Tf 60 114 Td (This is one footnote with three blocks.) Tj ET
+BT /F1 8 Tf 60 98 Td (Its next block is in the right column.) Tj ET
+BT /F1 8 Tf 60 82 Td (Continue reading to the right...) Tj ET
+BT /F1 8 Tf 324 130 Td (MIDDLE: page 1, right column.) Tj ET
+BT /F1 8 Tf 324 114 Td (This text still belongs to footnote 44.) Tj ET
+BT /F1 8 Tf 324 98 Td (No new footnote number appears here.) Tj ET
+BT /F1 8 Tf 324 82 Td (Continue on the following page...) Tj ET
+BT /F1 8 Tf 266 40 Td (Page 1 of) Tj ET
+BT /F1 10 Tf 307 40 Td (2) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 600 800] /Resources << /Font << /F1 3 0 R >> >> /Contents 7 0 R >>
+endobj
+7 0 obj
+<< /Length 915 >>
+stream
+BT /F1 18 Tf 60 735 Td (Footnote across columns and pages) Tj ET
+BT /F1 11 Tf 60 708 Td (Page 2: select footnote 44, then scroll through its yellow highlight.) Tj ET
+BT /F1 12 Tf 60 596 Td (Main article resumes on this page.) Tj ET
+BT /F1 12 Tf 60 572 Td (Body text should stay unhighlighted.) Tj ET
+BT /F1 12 Tf 324 596 Td (Footnote 44 ends in the left column.) Tj ET
+BT /F1 12 Tf 324 572 Td (Footnote 45 is a separate note.) Tj ET
+0.5 w 60 160 m 160 160 l S
+0.5 w 324 160 m 424 160 l S
+BT /F1 8 Tf 60 140 Td (END: page 2, left column.) Tj ET
+BT /F1 8 Tf 60 124 Td (This completes the same footnote 44.) Tj ET
+BT /F1 8 Tf 60 108 Td (The next numbered note is excluded.) Tj ET
+BT /F1 6 Tf 60 86 Td (45) Tj ET
+BT /F1 8 Tf 72 82 Td (Separate footnote: do not highlight) Tj ET
+BT /F1 8 Tf 60 66 Td (this text when footnote 44 is selected.) Tj ET
+BT /F1 8 Tf 266 40 Td (Page 2 of) Tj ET
+BT /F1 10 Tf 307 40 Td (2) Tj ET
+endstream
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000191 00000 n 
+0000000317 00000 n 
+0000001596 00000 n 
+0000001722 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+2688
+%%EOF

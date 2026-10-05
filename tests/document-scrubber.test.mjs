@@ -16,10 +16,31 @@ test("index extracts note numbers and text, excluding footer page numbers", () =
   assert.equal(notes[0].text, "First note text Continued citation");
   assert.equal(notes[1].text, "Second note text");
   assert.equal(notes[1].pageNumber, 9);
+  assert.equal(notes[0].highlightRegions.length, 2);
+  assert.ok(notes[0].highlightRegions.every((region) => region.pageNumber === 9 && region.top < 704 / 800));
+  assert.equal(notes[0].highlightRegions[0].left, 60 / 600);
+  assert.equal(notes[1].highlightRegions.length, 1);
 });
 
 test("ordinary numbered paragraphs and page counters do not create notes", () => {
   assert.deepEqual(footnotesForPage([...body, item("1 A numbered paragraph", 12, 60, 700), item("2", 10, 300, 760)], viewport, 2), []);
+});
+
+test("split page counters are excluded from footnote text and highlights", () => {
+  const noteText = "See page 15 of 72 in the cited filing.";
+  const footerVariants = [
+    [item("Page 15 of", 8, 250, 744), item("72", 10, 300, 744)],
+    [item("Page", 8, 240, 744), item("15", 8, 265, 744), item("of", 8, 280, 744), item("72", 8, 300, 744)],
+    [item("15", 8, 265, 744), item("of 72", 8, 280, 744)],
+  ];
+  for (const footer of footerVariants) {
+    const notes = footnotesForPage([...body, item("44", 8, 60, 660),
+      item(noteText, 8, 80, 660), item("The footnote continues.", 8, 60, 676), ...footer], viewport, 15);
+    assert.equal(notes.length, 1);
+    assert.equal(notes[0].text, `${noteText} The footnote continues.`);
+    assert.equal(notes[0].highlightRegions.length, 2);
+    assert.ok(notes[0].highlightRegions.every((region) => region.top < 700 / 800));
+  }
 });
 
 async function loadScrubber(pages, operators) {
@@ -170,6 +191,8 @@ test("note 12 includes its unnumbered continuation on the next page without body
   assert.match(continuation.text, /^implementation details involving/);
   assert.match(continuation.text, /issuer’s insider offering transactions\.$/);
   assert.doesNotMatch(continuation.text, /The present processing|Page 9 of 64|EDGAR Next Machine/);
+  assert.ok(continuation.highlightRegions.length > 1);
+  assert.ok(continuation.highlightRegions.every((region) => region.pageNumber === note.pageNumber + 1));
   // A bottom-page paragraph remains eligible, but the next numbered note stops it.
   assert.equal(continuation.continues, true);
   assert.equal(footnoteContinuationForPage(page.items, viewport, { argsArray: [] }, note, []), null);
@@ -211,6 +234,9 @@ test("a footnote continues into the next column and stops before its next marker
   assert.match(note.text, /Those comments are addressed in a separate rulemaking/);
   assert.match(note.text, /FR-2025-0063-01\/comments\.$/);
   assert.doesNotMatch(note.text, /This commenter also noted/);
+  assert.ok(note.highlightRegions.some((region) => region.left < 0.2));
+  assert.ok(note.highlightRegions.some((region) => region.left > 0.3));
+  assert.ok(note.highlightRegions.every((region) => region.pageNumber === note.pageNumber));
 });
 
 test("article dividers do not attach a new article to a completed footnote", () => {

@@ -6,6 +6,7 @@ import { resolvePdfSource } from "./pdf-source.js";
 import { mergeWrappedUrlTextItems } from "./search/search-text-normalization.js";
 import { normalizeSearchText, prepareSearchText } from "./search/search-text.js";
 import { PagePreviews } from "./page-previews.js";
+import { highlightFootnote, renderFootnoteHighlight } from "./navigation/footnote-highlight.js";
 
 const sourceMode = window.location.pathname.includes("/src/");
 
@@ -282,6 +283,7 @@ function goToFootnote(target) {
   if (!page) return;
 
   setCurrentPage(target.pageNumber);
+  highlightFootnote(target, pageElements, rotation);
   const toolbarHeight = document.querySelector(".toolbar")?.getBoundingClientRect().height || 52;
   const scrubberHeight = document.querySelector("#document-scrubber")?.getBoundingClientRect().height || 0;
   const readableHeight = Math.max(1, window.innerHeight - toolbarHeight - scrubberHeight);
@@ -808,6 +810,7 @@ async function renderPageNow(pageNumber) {
     ...(annotations.length ? [annotationLayer] : []),
   );
   container.classList.add("rendered");
+  renderFootnoteHighlight(container, pageNumber, rotation);
   renderedPages.add(pageNumber);
   pagePreviews?.hide(pageNumber);
   markDocumentReady();
