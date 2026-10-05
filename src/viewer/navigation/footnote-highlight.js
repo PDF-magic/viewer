@@ -24,7 +24,7 @@ export function renderFootnoteHighlight(page, pageNumber, rotation) {
   const lines = selectionLines(regions.map(region => ({
     left: region.left * width, right: (region.left + region.width) * width,
     top: region.top * height, bottom: (region.top + region.height) * height,
-  })));
+  })), 2);
   const connectedRegions = lines.map(line => ({
     left: line.left / width, top: line.top / height,
     width: (line.right - line.left) / width, height: (line.bottom - line.top) / height,

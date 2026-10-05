@@ -70,11 +70,11 @@ export function highlightTextLayer(textLayer, query) {
     const lines = selectionLines(rects.map(rect => ({
       left: rect.left, top: rect.top,
       right: rect.left + rect.width, bottom: rect.top + rect.height,
-    })));
+    })), 2);
     const group = createHighlightGroup(lines.map(line => ({
       left: line.left, top: line.top,
       width: line.right - line.left, height: line.bottom - line.top,
-    })), "search-highlight-group");
+    })), "search-highlight-group", 2);
     group.dataset.searchOrdinal = ordinal;
     layer.append(group);
   }

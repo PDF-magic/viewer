@@ -2,6 +2,20 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { selectionLines } from '../src/viewer/selection/selection-lines.js';
 
+test('highlight padding expands connected lines without changing text bounds', () => {
+  const rectangles = [
+    { left: 10, right: 180, top: 10, bottom: 25 },
+    { left: 10, right: 100, top: 30, bottom: 45 },
+  ];
+  const lines = selectionLines(rectangles, 2);
+  assert.deepEqual(lines, [
+    { left: 8, right: 182, top: 8, bottom: 29.5 },
+    { left: 8, right: 102, top: 25.5, bottom: 47 },
+  ]);
+  assert.equal(rectangles[0].bottom, 25);
+  assert.equal(rectangles[1].top, 30);
+});
+
 test('overlapping italic fragments become one band without internal bars', () => {
   assert.deepEqual(selectionLines([
     {left: 10, right: 80, top: 10, bottom: 25},

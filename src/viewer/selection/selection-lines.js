@@ -1,5 +1,5 @@
 // Merge text-node fragments on the same baseline before joining neighboring lines.
-export function selectionLines(rectangles) {
+export function selectionLines(rectangles, padding = 0) {
   const lines = [];
   for (const rect of rectangles.filter(r => r.right > r.left && r.bottom > r.top)
     .sort((a, b) => a.top - b.top || a.left - b.left)) {
@@ -37,5 +37,9 @@ export function selectionLines(rectangles) {
       previous.bottom = current.top = middle;
     }
   }
-  return lines;
+  return lines.map(line => ({
+    ...line,
+    left: line.left - padding, right: line.right + padding,
+    top: line.top - padding, bottom: line.bottom + padding,
+  }));
 }
