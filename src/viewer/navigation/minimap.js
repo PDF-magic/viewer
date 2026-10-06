@@ -63,6 +63,15 @@ function minimapMode() {
   return document.documentElement.classList.contains("minimap-local") ? "local" : "overview";
 }
 
+function displayedMinimapMode(widthScaledHeight, trackHeight) {
+  return minimapMode() === "local" || widthScaledHeight <= trackHeight ? "local" : "overview";
+}
+
+function localMinimapActive() {
+  return minimapMode() === "local" ||
+    document.documentElement.classList.contains("minimap-local-active");
+}
+
 function setMinimapAccessibility() {
   const interactive = minimapEnabled() && !minimapCollapsed();
   minimap.setAttribute("aria-hidden", String(!interactive));
@@ -223,14 +232,19 @@ function syncMinimap() {
   const widthScale = thumbnailWidth / pageWidth;
   const widthScaledHeights = pages.map((page) => page.getBoundingClientRect().height * widthScale);
   const widthScaledHeight = widthScaledHeights.reduce((total, height) => total + height, 0);
+  const displayMode = displayedMinimapMode(widthScaledHeight, trackHeight);
+  document.documentElement.classList.toggle(
+    "minimap-local-active",
+    displayMode === "local" && minimapMode() !== "local",
+  );
   const heightCompression =
-    minimapMode() === "overview" && widthScaledHeight > trackHeight
+    displayMode === "overview" && widthScaledHeight > trackHeight
       ? trackHeight / widthScaledHeight
       : 1;
   const scale = widthScale * heightCompression;
   const tileHeights = pages.map((page) => page.getBoundingClientRect().height * scale);
   const contentHeight = tileHeights.reduce((total, height) => total + height, 0);
-  mapHeight = minimapMode() === "overview" ? Math.min(trackHeight, contentHeight) : contentHeight;
+  mapHeight = displayMode === "overview" ? Math.min(trackHeight, contentHeight) : contentHeight;
 
   // Clip the full thumbnail strip before moving it through the visible track.
   minimapPages.style.height = `${mapHeight}px`;
@@ -258,7 +272,7 @@ function syncMinimap() {
   const viewportTop = clamp(scrollRatio, 0, 1) * viewportTravel;
   const mapTravel = Math.max(mapHeight - trackHeight, 0);
   mapOffset =
-    minimapMode() === "local"
+    displayMode === "local"
       ? clamp(viewportTop + viewportHeight / 2 - trackHeight / 2, 0, mapTravel)
       : 0;
 
@@ -280,7 +294,7 @@ function clearLocalThumbnails() {
 }
 
 function updateLocalThumbnails(tiles, trackHeight) {
-  if (minimapMode() !== "local" || !thumbnailDocument) {
+  if (!localMinimapActive() || !thumbnailDocument) {
     localThumbnailTargets = [];
     return;
   }
@@ -321,7 +335,7 @@ async function renderLocalThumbnails() {
   }
   localThumbnailRendering = true;
   try {
-    while (thumbnailDocument && minimapEnabled() && !minimapCollapsed() && minimapMode() === "local") {
+    while (thumbnailDocument && minimapEnabled() && !minimapCollapsed() && localMinimapActive()) {
       const target = localThumbnailTargets.find(({ pageNumber }) => !localThumbnails.has(pageNumber));
       if (!target) {
         break;
