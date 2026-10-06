@@ -181,10 +181,11 @@ raise SystemExit(host.main())
             {"action": "enhance-pdf-chunk", "data": base64.b64encode(data).decode()},
             {"action": "enhance-pdf-finish"},
         ]
-        def enhance(source_url, reference_url, uploaded_path):
+        def enhance(source_url, reference_url, uploaded_path, enhancement_mode="deep"):
             self.assertEqual(uploaded_path.read_bytes(), data)
             self.assertEqual(source_url, "https://www.sec.gov/example.pdf")
             self.assertEqual(reference_url, source_url)
+            self.assertEqual(enhancement_mode, "deep")
             return Path("/tmp/enhanced.pdf")
         with patch.object(host, "read_message", side_effect=messages), \
              patch.object(host, "send_message") as send, \
@@ -209,6 +210,12 @@ raise SystemExit(host.main())
                     "byteLength": 10,
                 })
             enhance.assert_not_called()
+
+    def test_enhancement_options_scale_review_depth(self):
+        self.assertEqual(host.enhancement_options("deep"), ["--force-ocr", "--ai-review"])
+        self.assertEqual(host.enhancement_options("light"), ["--skip-text"])
+        with self.assertRaisesRegex(ValueError, "unsupported enhancement mode"):
+            host.enhancement_options("unknown")
 
     def test_noisy_ocr_preserves_native_response_frame(self):
         with tempfile.TemporaryDirectory() as folder:

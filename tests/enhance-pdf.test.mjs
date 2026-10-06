@@ -7,7 +7,7 @@ const source = readFileSync(new URL("../src/viewer/enhance-pdf.js", import.meta.
   .replace(/^import .*;\n/gm, "");
 const markup = readFileSync(new URL("../src/viewer.html", import.meta.url), "utf8");
 
-async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new Uint8Array([37, 80, 68, 70, 45]), sourceUrl = "https://example.com/source.pdf") {
+async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new Uint8Array([37, 80, 68, 70, 45]), sourceUrl = "https://example.com/source.pdf", documentOverrides = {}) {
   const elements = new Map();
   for (const id of ["enhance-nav", "enhance-pdf", "install-enhancer", "section-nav", "page-number", "toast", "enhance-progress", "enhance-progress-bar", "enhance-progress-label", "enhance-progress-percentage"]) {
     elements.set(`#${id}`, {
@@ -60,7 +60,7 @@ async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new U
     MutationObserver: class { observe() {} },
     setTimeout() {}, clearTimeout() {}, URL,
     btoa: (binary) => Buffer.from(binary, "binary").toString("base64"),
-    pdfDocumentSessionReady: Promise.resolve({ document: { getData: async () => data } }),
+    pdfDocumentSessionReady: Promise.resolve({ document: { getData: async () => data, ...documentOverrides } }),
     window: { location: { href: "chrome-extension://viewer/src/viewer.html?url=https%3A%2F%2Fexample.com%2Fsource.pdf#page=9" } },
     resolvePdfSource: async () => ({ originalUrl: new URL(sourceUrl) }),
     resolveDocumentReferenceUrl: async () => "https://example.com/source.pdf",
@@ -116,6 +116,37 @@ test("remote enhancement sends loaded PDF bytes in bounded chunks", async () => 
   assert.equal(messages.at(-1).action, "enhance-pdf-finish");
 });
 
+test("modern word-processor PDFs use the light enhancement path", async () => {
+  const text = "A clean born-digital paragraph with enough embedded text to preserve directly.";
+  const { messages } = await enhancerFixture(
+    async () => ({ ok: true, outputUrl: "file:///tmp/enhanced.pdf" }),
+    "1",
+    new Uint8Array([37, 80, 68, 70, 45]),
+    "https://example.com/source.pdf",
+    {
+      numPages: 3,
+      getMetadata: async () => ({ info: { Creator: "Microsoft Word for Microsoft 365" } }),
+      getPage: async () => ({ getTextContent: async () => ({ items: [{ str: text }] }) }),
+    },
+  );
+  assert.equal(messages[0].enhancementMode, "light");
+});
+
+test("OCR text layers without born-digital metadata keep deep review", async () => {
+  const { messages } = await enhancerFixture(
+    async () => ({ ok: true, outputUrl: "file:///tmp/enhanced.pdf" }),
+    "1",
+    new Uint8Array([37, 80, 68, 70, 45]),
+    "https://example.com/source.pdf",
+    {
+      numPages: 3,
+      getMetadata: async () => ({ info: { Creator: "Adobe Acrobat" } }),
+      getPage: async () => ({ getTextContent: async () => ({ items: [{ str: "OCR text ".repeat(100) }] }) }),
+    },
+  );
+  assert.equal(messages[0].enhancementMode, "deep");
+});
+
 test("progress events update the bar without consuming the final response", async () => {
   const { progressSnapshots, elements, destinations } = await enhancerFixture(async () => ({ ok: true, outputUrl: "file:///tmp/enhanced.pdf" }));
   assert.deepEqual(progressSnapshots, [{ label: "Enhancing · 2 of 4 pages", value: 50, percentage: "50%", hidden: false }]);
@@ -128,5 +159,6 @@ test("local PDFs use a persistent native connection for progress", async () => {
   assert.equal(messages.length, 1);
   assert.equal(messages[0].action, "enhance-pdf");
   assert.equal(messages[0].progress, true);
+  assert.equal(messages[0].enhancementMode, "deep");
   assert.equal(progressSnapshots[0].value, 50);
 });
