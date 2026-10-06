@@ -112,11 +112,11 @@
   height: 100%;
 }
 
-.minimap-local .minimap-page {
+:is(.minimap-local, .minimap-local-active) .minimap-page {
   z-index: 1;
 }
 
-.minimap-local .minimap-local-thumbnail {
+:is(.minimap-local, .minimap-local-active) .minimap-local-thumbnail {
   display: block;
 }
 
@@ -158,7 +158,7 @@
   filter: invert(1) brightness(2.4) contrast(1.1) invert(1);
 }
 
-.minimap-local .minimap-strip {
+:is(.minimap-local, .minimap-local-active) .minimap-strip {
   opacity: 1;
 }
 
