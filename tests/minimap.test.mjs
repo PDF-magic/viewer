@@ -15,7 +15,7 @@ function fixture(count, height = 900) {
   const windowEvents = [];
   const window = { innerHeight: height, scrollY: 0, location: { pathname: '/src/viewer.html', search: '' }, addEventListener() {},
     dispatchEvent(event) { windowEvents.push(event.type); },
-    scrollTo({ top }) { this.scrollY = top; } };
+    scrollTo({ top, behavior }) { this.scrollY = top; this.lastScrollBehavior = behavior; } };
   const tiles = Array.from({ length: count }, () => ({ clientWidth: 80, style: {} }));
   const pages = tiles.map((_, index) => ({ querySelector() { return null; },
     getBoundingClientRect() { return { width: 1000, height: 1400, top: index * 1420 - window.scrollY }; } }));
@@ -127,6 +127,14 @@ test('dragging to the end reaches the document end for short and long maps', () 
     vm.runInContext('scrollFromViewportTop(0)', f.context);
     assert.equal(f.window.scrollY, 0);
   }
+});
+
+
+test('minimap navigation bypasses the viewer smooth-scroll CSS', () => {
+  const f = fixture(100);
+  vm.runInContext('scrollFromViewportTop((mapHeight - viewportHeight) / 2)', f.context);
+  assert.equal(f.window.lastScrollBehavior, 'instant');
+  assert.match(viewerStyles, /html\s*\{[\s\S]*?scroll-behavior:\s*smooth/);
 });
 
 
