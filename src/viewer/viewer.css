@@ -1002,6 +1002,15 @@ input {
 }
 
 @media (max-width: 720px) {
+  .viewer {
+    padding-inline: 0;
+  }
+
+  .page {
+    width: 100%;
+    border-radius: 0;
+  }
+
   .toolbar {
     gap: 5px;
     padding-inline: 8px;
