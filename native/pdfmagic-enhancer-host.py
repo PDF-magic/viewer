@@ -423,7 +423,21 @@ def run_enhancer(command: list[str], progress: bool, report_progress=None) -> No
         raise RuntimeError("".join(logs).strip()[-2000:] or f"PDF enhancement failed (exit {code})")
 
 
-def enhance_pdf(source_url: str, reference_url: str, uploaded_path: Path | None = None, progress: bool = False) -> Path:
+def enhancement_options(mode: str) -> list[str]:
+    if mode == "light":
+        return ["--skip-text"]
+    if mode == "deep":
+        return ["--force-ocr", "--ai-review"]
+    raise ValueError(f"unsupported enhancement mode: {mode}")
+
+
+def enhance_pdf(
+    source_url: str,
+    reference_url: str,
+    uploaded_path: Path | None = None,
+    progress: bool = False,
+    enhancement_mode: str = "deep",
+) -> Path:
     config = load_config()
     enhancer_dir = Path(str(config["enhancer_dir"])).expanduser().resolve()
     enhancer = enhancer_dir / "ocr-scanned-pdf.sh"
@@ -444,10 +458,11 @@ def enhance_pdf(source_url: str, reference_url: str, uploaded_path: Path | None 
             else Path.home() / ".local/share/pdf-magic/enhanced"
         )
         output_directory = input_path.parent if is_local else web_output_directory
+        options = enhancement_options(enhancement_mode)
         def create(report):
             output_path = unique_output(output_directory, safe_stem(source_url))
             run_enhancer(
-                ["/bin/bash", str(enhancer), str(input_path), str(output_path), "--force-ocr", "--ai-review"],
+                ["/bin/bash", str(enhancer), str(input_path), str(output_path), *options],
                 progress, report_progress=report,
             )
             report({"type": "progress", "stage": "finalizing"})
@@ -462,6 +477,7 @@ def enhance_uploaded_pdf(message: dict[str, object]) -> Path:
     source_url = str(message.get("sourceUrl") or "")
     reference_url = str(message.get("referenceUrl") or "")
     byte_length = message.get("byteLength")
+    enhancement_mode = str(message.get("enhancementMode") or "deep")
     if not source_url or not reference_url:
         raise ValueError("sourceUrl and referenceUrl are required")
     if type(byte_length) is not int or byte_length <= 0:
@@ -490,7 +506,13 @@ def enhance_uploaded_pdf(message: dict[str, object]) -> Path:
         with path.open("rb") as uploaded:
             if b"%PDF-" not in uploaded.read(1024):
                 raise ValueError("uploaded document is not a PDF")
-        return enhance_pdf(source_url, reference_url, uploaded_path=path, **({"progress": True} if message.get("progress") else {}))
+        return enhance_pdf(
+            source_url,
+            reference_url,
+            uploaded_path=path,
+            enhancement_mode=enhancement_mode,
+            **({"progress": True} if message.get("progress") else {}),
+        )
 
 
 def stamp_mode() -> int:
@@ -545,7 +567,12 @@ def main() -> int:
 
         output_path = (
             enhance_uploaded_pdf(message) if message["action"] == "enhance-pdf-start"
-            else enhance_pdf(source_url, reference_url, **({"progress": True} if message.get("progress") else {}))
+            else enhance_pdf(
+                source_url,
+                reference_url,
+                enhancement_mode=str(message.get("enhancementMode") or "deep"),
+                **({"progress": True} if message.get("progress") else {}),
+            )
         )
         send_message(
             {
