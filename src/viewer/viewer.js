@@ -102,6 +102,8 @@ let sharpRenderTimer;
 const priorityRenderQueue = new Set();
 const backgroundRenderQueue = new Set();
 const renderedPages = new Set();
+// Keep the previous bitmap on screen until a render at the new size is ready.
+const staleRenderedPages = new Set();
 const pageTextCache = new Map();
 
 function imageAreaFraction(imageCoordinates, offset) {
@@ -141,8 +143,8 @@ function createImageOverlayCanvas(baseCanvas, viewport, imageCoordinates) {
   overlay.setAttribute("aria-hidden", "true");
   overlay.width = baseCanvas.width;
   overlay.height = baseCanvas.height;
-  overlay.style.width = `${viewport.width}px`;
-  overlay.style.height = `${viewport.height}px`;
+  overlay.style.width = "100%";
+  overlay.style.height = "100%";
   overlay.style.position = "absolute";
   overlay.style.inset = "0";
   overlay.style.zIndex = "1";
@@ -683,7 +685,7 @@ async function renderPageNow(pageNumber) {
   const page = await pdfDocument.getPage(pageNumber);
   const container = pageElements[pageNumber - 1];
   const baseViewport = page.getViewport({ scale: 1, rotation });
-  const cssWidth = Math.max(280, container.clientWidth);
+  const cssWidth = Math.max(1, container.clientWidth);
   const viewport = page.getViewport({ scale: cssWidth / baseViewport.width, rotation });
   const annotationViewport = viewport.clone({ dontFlip: true });
   container.style.setProperty("--total-scale-factor", String(viewport.scale));
@@ -701,8 +703,8 @@ async function renderPageNow(pageNumber) {
 
   canvas.width = Math.floor(viewport.width * outputScale);
   canvas.height = Math.floor(viewport.height * outputScale);
-  canvas.style.width = `${viewport.width}px`;
-  canvas.style.height = `${viewport.height}px`;
+  // CSS fits the bitmap to the page, including while an old render is kept
+  // during resizing. Fixed pixel styles would clip it in a compressed pane.
 
   const textContent = await page.getTextContent({ includeMarkedContent: true, disableNormalization: true });
   const textLayerTask = new TextLayer({
@@ -779,6 +781,7 @@ async function renderPageNow(pageNumber) {
   highlightTextLayer(textLayer, completedSearchQuery);
   renderFootnoteHighlight(container, pageNumber, rotation);
   renderedPages.add(pageNumber);
+  staleRenderedPages.delete(pageNumber);
   pagePreviews?.hide(pageNumber);
   markDocumentReady();
   page.cleanup();
@@ -837,6 +840,7 @@ function releaseRenderedPage(pageNumber) {
   container.replaceChildren();
   container.classList.remove("rendered");
   renderedPages.delete(pageNumber);
+  staleRenderedPages.delete(pageNumber);
   pagePreviews?.show(pageNumber);
   priorityRenderQueue.delete(pageNumber);
   backgroundRenderQueue.delete(pageNumber);
@@ -853,7 +857,7 @@ function keepRenderWindow(centerPage = currentPage, queueNearby = true) {
   const firstPage = Math.max(1, centerPage - RENDER_WINDOW_RADIUS);
   const lastPage = Math.min(pdfDocument.numPages, centerPage + RENDER_WINDOW_RADIUS);
 
-  for (const pageNumber of [...renderedPages]) {
+  for (const pageNumber of new Set([...renderedPages, ...staleRenderedPages])) {
     if (pageNumber < firstPage || pageNumber > lastPage) {
       releaseRenderedPage(pageNumber);
     }
@@ -872,9 +876,7 @@ function keepRenderWindow(centerPage = currentPage, queueNearby = true) {
   }
 
   for (let pageNumber = firstPage; queueNearby && pageNumber <= lastPage; pageNumber += 1) {
-    if (pageNumber !== centerPage) {
-      void queuePageRender(pageNumber);
-    }
+    void queuePageRender(pageNumber, pageNumber === centerPage);
   }
 }
 
@@ -1093,16 +1095,23 @@ async function refreshPageRendering() {
     return;
   }
 
+  // Zoom layout changes happen after the resize event's tracking frame.
+  // Use the pages' final positions, rather than the pre-resize page number.
+  pageAtViewportCenter();
   clearTimeout(sharpRenderTimer);
   renderGeneration += 1;
   priorityRenderQueue.clear();
   backgroundRenderQueue.clear();
   for (const pageNumber of [...renderedPages]) {
-    releaseRenderedPage(pageNumber);
+    staleRenderedPages.add(pageNumber);
   }
+  renderedPages.clear();
 
-  await queuePageRender(currentPage, true);
+  // Queue the whole window before waiting: scroll tracking can clear queued
+  // work while an older render is finishing, including the center page.
+  const rendering = queuePageRender(currentPage, true);
   keepRenderWindow(currentPage);
+  await rendering;
 }
 
 async function rotatePages(delta) {
@@ -1353,7 +1362,7 @@ async function initialize() {
   pagePreviews = new PagePreviews({
     pdfDocument,
     pages: pageElements,
-    isSharp: (pageNumber) => renderedPages.has(pageNumber),
+    isSharp: (pageNumber) => renderedPages.has(pageNumber) || staleRenderedPages.has(pageNumber),
     waitForForeground: () => renderQueuePromise?.catch(() => {}),
   });
   bindControls();
