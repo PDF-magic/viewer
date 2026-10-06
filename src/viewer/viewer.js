@@ -143,8 +143,8 @@ function createImageOverlayCanvas(baseCanvas, viewport, imageCoordinates) {
   overlay.setAttribute("aria-hidden", "true");
   overlay.width = baseCanvas.width;
   overlay.height = baseCanvas.height;
-  overlay.style.width = `${viewport.width}px`;
-  overlay.style.height = `${viewport.height}px`;
+  overlay.style.width = "100%";
+  overlay.style.height = "100%";
   overlay.style.position = "absolute";
   overlay.style.inset = "0";
   overlay.style.zIndex = "1";
@@ -685,7 +685,7 @@ async function renderPageNow(pageNumber) {
   const page = await pdfDocument.getPage(pageNumber);
   const container = pageElements[pageNumber - 1];
   const baseViewport = page.getViewport({ scale: 1, rotation });
-  const cssWidth = Math.max(280, container.clientWidth);
+  const cssWidth = Math.max(1, container.clientWidth);
   const viewport = page.getViewport({ scale: cssWidth / baseViewport.width, rotation });
   const annotationViewport = viewport.clone({ dontFlip: true });
   container.style.setProperty("--total-scale-factor", String(viewport.scale));
@@ -703,8 +703,8 @@ async function renderPageNow(pageNumber) {
 
   canvas.width = Math.floor(viewport.width * outputScale);
   canvas.height = Math.floor(viewport.height * outputScale);
-  canvas.style.width = `${viewport.width}px`;
-  canvas.style.height = `${viewport.height}px`;
+  // CSS fits the bitmap to the page, including while an old render is kept
+  // during resizing. Fixed pixel styles would clip it in a compressed pane.
 
   const textContent = await page.getTextContent({ includeMarkedContent: true, disableNormalization: true });
   const textLayerTask = new TextLayer({

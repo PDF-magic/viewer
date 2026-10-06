@@ -20,6 +20,40 @@ test("sharp rendering prioritizes the nearest queued page after a distant jump",
   assert.equal(context.takeNextQueuedPage(), 1800);
 });
 
+test("sharp rendering fits a compressed page below 280px without fixed display dimensions", async () => {
+  let children;
+  let renderedViewport;
+  const container = {
+    clientWidth: 160, style: { setProperty() {} },
+    classList: { add() {} }, replaceChildren(...nodes) { children = nodes; },
+  };
+  const context = vm.createContext({
+    renderedPages: new Set(), staleRenderedPages: new Set([1]),
+    renderGeneration: 0, renderingAllPages: false, rotation: 0,
+    pageElements: [container], completedSearchQuery: "",
+    window: { devicePixelRatio: 2 },
+    document: { createElement: () => ({ style: {}, getContext: () => ({}) }) },
+    TextLayer: class { textDivs = []; async render() {} },
+    pageIsInRenderWindow: () => true,
+    registerSearchText() {}, highlightTextLayer() {}, renderFootnoteHighlight() {}, markDocumentReady() {},
+    pagePreviews: { hide() {} },
+    pdfDocument: { async getPage() { return {
+      getViewport: ({ scale }) => ({ width: 600 * scale, height: 800 * scale, scale, clone() { return this; } }),
+      async getTextContent() { return { items: [] }; },
+      async getAnnotations() { return []; },
+      render({ viewport }) { renderedViewport = viewport; return { promise: Promise.resolve() }; },
+      cleanup() {},
+    }; } },
+  });
+  loadFunction("renderPageNow", context);
+  await context.renderPageNow(1);
+  assert.equal(renderedViewport.width, 160);
+  assert.equal(children[0].width, 320, "Retain device-pixel resolution at the actual page width");
+  assert.equal(children[0].style.width, undefined, "CSS must keep the full bitmap fitted during later resizes");
+  assert.equal(children[0].style.height, undefined);
+  assert.equal(context.staleRenderedPages.size, 0);
+});
+
 test("changing render windows releases distant canvases and removes stale priority requests", () => {
   const released = [];
   const queued = [];
