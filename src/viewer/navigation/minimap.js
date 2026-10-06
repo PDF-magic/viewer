@@ -655,7 +655,7 @@ function scrollFromViewportTop(viewportTop) {
   const { scrollMaximum } = documentMetrics();
   const viewportTravel = Math.max(mapHeight - viewportHeight, 0);
   const ratio = viewportTravel > 0 ? clamp(viewportTop / viewportTravel, 0, 1) : 0;
-  window.scrollTo({ top: ratio * scrollMaximum, behavior: "auto" });
+  window.scrollTo({ top: ratio * scrollMaximum, behavior: "instant" });
 }
 
 function dragViewportTo(viewportTop) {
