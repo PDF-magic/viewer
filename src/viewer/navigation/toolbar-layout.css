@@ -226,6 +226,11 @@
   .viewer {
     padding-top: 124px;
   }
+
+  .section-popover {
+    top: calc(100% + 65px);
+    max-height: calc(100vh - 124px);
+  }
 }
 
 .search-tools .search-control {
