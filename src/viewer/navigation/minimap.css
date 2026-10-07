@@ -245,20 +245,8 @@
 
 .minimap-collapsed .minimap-shell {
   top: auto;
-  right: 8px;
-  bottom: calc(8px + var(--document-scrubber-height, 0px));
-  width: 36px;
   height: 36px;
   min-height: 36px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  overflow: hidden;
-  box-shadow: 0 8px 22px rgb(0 0 0 / 24%);
-}
-
-.minimap-left.minimap-collapsed .minimap-shell {
-  right: auto;
-  left: 8px;
 }
 
 .minimap-collapsed .minimap {
@@ -267,7 +255,6 @@
 
 .minimap-collapsed .minimap-controls {
   flex: 1 1 auto;
-  border-top: 0;
 }
 
 .minimap-collapsed .minimap-control:not(.minimap-collapse) {
@@ -277,8 +264,6 @@
 .minimap-collapsed .minimap-collapse {
   display: grid;
   flex: 1 1 auto;
-  width: 34px;
-  height: 34px;
 }
 
 @media (max-width: 700px) {
