@@ -540,6 +540,9 @@ def stamp_mode() -> int:
             "https://pdfmagic.org/ns/1.0/", "pdfmagic"
         )
         with pdf.open_metadata(set_pikepdf_as_editor=False, update_docinfo=False) as metadata:
+            existing_url = str(metadata.get("pdfmagic:href") or pdf.docinfo.get("/PDFMagicSourceURL") or "")
+            if urlparse(source_url).scheme == "file" and urlparse(existing_url).scheme in {"http", "https"}:
+                source_url = existing_url
             metadata["pdfmagic:href"] = source_url
         if "/PDFMagicSourceURL" in pdf.docinfo:
             del pdf.docinfo["/PDFMagicSourceURL"]
