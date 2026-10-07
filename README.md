@@ -38,15 +38,23 @@ The root manifest points directly at the source files and local `node_modules`, 
 
 The viewer can hand the current PDF to the local PDF-magic/enhancer workflow: https://github.com/PDF-magic/enhancer. The enhancer button occupies the top-left section-control slot only when the PDF has no section navigator.
 
-Chrome and Brave extensions cannot start local processes directly, so register the included native-messaging host after loading the unpacked extension. Copy the extension ID from `chrome://extensions` or `brave://extensions`, then run:
+Chrome and Brave extensions cannot start local processes directly. When Enhance cannot find the native host, the viewer now asks before doing any setup work. If you approve, it copies a one-line setup command for you to paste into Terminal; the extension itself never silently executes shell commands.
+
+The copied command runs the repository installer remotely and includes the current extension ID. It may create or reuse your personal `PDF-magic/enhancer` fork when GitHub CLI is installed and signed in; otherwise it clones the upstream enhancer. The local installer can also be run directly:
 
 ```sh
-./native/install-host.sh CHROME_EXTENSION_ID /path/to/PDF-magic/enhancer
+./native/install-host.sh CHROME_EXTENSION_ID
 ```
 
-If the native host is unavailable, the enhancer control becomes a link to these setup instructions. After installation, reload the PDF tab to retry enhancement.
+To explicitly allow the installer to use an authenticated personal fork when it has to acquire the enhancer checkout:
 
-The installer registers the host for both Chrome and Brave. The host locates Homebrew tools even when the browser is launched from Finder and keeps OCR logs separate from native-messaging responses.
+```sh
+./native/install-host.sh CHROME_EXTENSION_ID --fork-if-available
+```
+
+The installer first reuses a sibling `../enhancer` checkout when one exists. Otherwise it creates a managed checkout under `~/Library/Application Support/PDF Magic/Enhancer` on macOS or `~/.local/share/pdf-magic/enhancer` on Linux. It installs a stable copy of the native bridge under `~/.config/pdf-magic/native` and registers it for both Chrome and Brave, so the registration does not depend on keeping the viewer repository at the same filesystem path.
+
+After setup completes, click Enhance again. The host locates Homebrew tools even when the browser is launched from Finder and keeps OCR logs separate from native-messaging responses.
 
 For web PDFs, the viewer sends the already-loaded document to the host in acknowledged chunks. Enhancement does not make another HTTP download, so it can use PDFs that the browser loaded from sites that reject standalone requests. Local PDFs are read directly from disk. Enhance preserves embedded text and runs OCR only on pages that need it using `--skip-text`. The tagger builds heading structure and section bookmarks directly from supported existing text or new OCR text. Browser enhancement does not run per-page AI review. For a deliberate full OCR replacement and local model review, run the enhancer CLI with `--force-ocr --ai-review`; this can take substantially longer.
 
