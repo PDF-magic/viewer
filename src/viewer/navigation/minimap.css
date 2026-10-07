@@ -209,7 +209,7 @@
   align-items: stretch;
   justify-content: space-between;
   border-top: 1px solid var(--border);
-  border-radius: 9px 9px 0 0;
+  border-radius: 9px 0 0 0;
   overflow: hidden;
   background: var(--toolbar-bg);
 }
@@ -256,6 +256,7 @@
 
 .minimap-collapsed .minimap-controls {
   flex: 1 1 auto;
+  border-radius: 9px 9px 0 0;
 }
 
 .minimap-collapsed .minimap-control:not(.minimap-collapse) {
