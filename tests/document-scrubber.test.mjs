@@ -44,6 +44,25 @@ test("baseline footnote labels are accepted when the body has matching superscri
   assert.match(notes[1].text, /Exchange Act Release No\. 55816/);
 });
 
+test("ruled SEC footnote blocks recover OCR-mangled sequential labels", () => {
+  const petitionItems = [
+    item("Body text with established prior notes", 12, 60, 200),
+    item("More body text", 12, 60, 360),
+    item(",", 8, 60, 660),
+    item("Exchange Act Release No. 60196 (June 30, 2009).", 8, 82, 660),
+    item("ll", 8, 60, 684),
+    item("In fact, immobilization of securities within DTC increased.", 8, 82, 684),
+  ];
+
+  const notes = footnotesForPage(petitionItems, viewport, 2,
+    [{ x: 60, y: 620, width: 260 }], undefined, 5);
+  assert.deepEqual(notes.map(({ number }) => number), [5, 6]);
+  assert.match(notes[0].text, /^Exchange Act Release No\. 60196/);
+  assert.match(notes[1].text, /^In fact, immobilization/);
+  assert.doesNotMatch(notes[0].text, /^,/);
+  assert.doesNotMatch(notes[1].text, /^ll/);
+});
+
 test("ordinary numbered paragraphs and page counters do not create notes", () => {
   assert.deepEqual(footnotesForPage([...body, item("1 A numbered paragraph", 12, 60, 700), item("2", 10, 300, 760)], viewport, 2), []);
 });
