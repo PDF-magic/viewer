@@ -33,6 +33,11 @@
   html:not(.minimap-disabled):not(.minimap-collapsed) .viewer:not([data-zoom-mode]) .page {
     width: min(1100px, calc(100vw - 128px));
   }
+
+  html.minimap-collapsed:not(.minimap-disabled) .viewer[data-zoom-mode="fit-width"] {
+    padding-right: 16px;
+    padding-left: 1px;
+  }
 }
 
 .minimap-shell {

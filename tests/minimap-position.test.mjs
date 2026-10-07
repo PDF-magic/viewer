@@ -5,6 +5,7 @@ import vm from 'node:vm';
 
 const minimap = readFileSync(new URL('../src/viewer/navigation/minimap.js', import.meta.url), 'utf8');
 const settings = readFileSync(new URL('../src/viewer/viewer-settings.js', import.meta.url), 'utf8');
+const minimapStyles = readFileSync(new URL('../src/viewer/navigation/minimap.css', import.meta.url), 'utf8');
 const viewer = readFileSync(new URL('../src/viewer/viewer.js', import.meta.url), 'utf8');
 const capture = minimap.match(/function updateMinimapLayout\(update\) \{[\s\S]*?\n\}/)[0];
 const listener = settings.match(/window.addEventListener\("pdf-viewer-minimap-layout-change", \(event\) => \{[\s\S]*?\n  \}\);/)[0];
@@ -36,6 +37,35 @@ test('minimap layout preserves the reading point synchronously through repeated 
     }
     assert.equal(renders, 4);
   }
+});
+
+test('collapsed minimap fit-width reaches the left viewport edge', () => {
+  const viewportWidth = settings.match(/function viewportPageWidth\(\) \{[\s\S]*?\n\}/)[0];
+  const classes = new Set(['minimap-collapsed']);
+  const context = vm.createContext({
+    PAGE_HORIZONTAL_GUTTER: 32,
+    window: { innerWidth: 1200 },
+    document: {
+      documentElement: {
+        classList: {
+          contains(value) { return classes.has(value); },
+        },
+      },
+      querySelector() {
+        return { getBoundingClientRect: () => ({ width: 96 }) };
+      },
+    },
+  });
+
+  vm.runInContext(viewportWidth, context);
+  assert.equal(vm.runInContext('viewportPageWidth()', context), 1183);
+
+  classes.add('minimap-disabled');
+  assert.equal(vm.runInContext('viewportPageWidth()', context), 1168);
+  assert.match(
+    minimapStyles,
+    /html\.minimap-collapsed:not\(\.minimap-disabled\) \.viewer\[data-zoom-mode="fit-width"\]\s*\{[\s\S]*?padding-right:\s*16px;[\s\S]*?padding-left:\s*1px;/,
+  );
 });
 
 test('zoom refresh renders without rotation or page recentering', () => {
