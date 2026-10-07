@@ -28,13 +28,25 @@ function updateSearchCountVisibility() {
   searchControl.classList.toggle("search-count-crowded", queryNeedsCountSpace);
 }
 
-searchInput.addEventListener("input", updateSearchCountVisibility);
-new MutationObserver(updateSearchCountVisibility).observe(searchCount, {
+// ResizeObserver callbacks run during layout. Defer DOM class changes until the
+// next animation frame so changing the search control cannot resize it again in
+// the same observer delivery cycle.
+let searchCountUpdateFrame = 0;
+function scheduleSearchCountVisibilityUpdate() {
+  if (searchCountUpdateFrame) return;
+  searchCountUpdateFrame = requestAnimationFrame(() => {
+    searchCountUpdateFrame = 0;
+    updateSearchCountVisibility();
+  });
+}
+
+searchInput.addEventListener("input", scheduleSearchCountVisibilityUpdate);
+new MutationObserver(scheduleSearchCountVisibilityUpdate).observe(searchCount, {
   childList: true,
   characterData: true,
   subtree: true,
 });
-new ResizeObserver(updateSearchCountVisibility).observe(searchControl);
+new ResizeObserver(scheduleSearchCountVisibilityUpdate).observe(searchControl);
 
 function updateToolbarRows() {
   document.documentElement.classList.toggle("toolbar-two-rows", twoRowToolbar.matches);
