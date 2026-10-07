@@ -17,6 +17,46 @@ const defaultTitle = enhanceButton.title;
 let titleResetTimer;
 let toastTimer;
 
+const SETUP_INSTALLER_URL = "https://raw.githubusercontent.com/PDF-magic/viewer/main/native/install-host.sh";
+
+function isMissingNativeHost(message) {
+  return /native.*(?:host|messag)|host.*(?:not found|not configured)/i.test(message);
+}
+
+function enhancerSetupCommand() {
+  const extensionId = chrome.runtime.id;
+  if (!/^[a-p]{32}$/.test(extensionId || "")) {
+    throw new Error("Could not determine this extension ID");
+  }
+  return `curl -fsSL ${SETUP_INSTALLER_URL} | PDF_MAGIC_SETUP_APPROVED=1 bash -s -- ${extensionId} --fork-if-available`;
+}
+
+async function offerEnhancerSetup() {
+  const approved = window.confirm(
+    "PDF Enhancer is not registered yet.\n\n" +
+      "Setup will install the native-messaging bridge and acquire PDF-magic/enhancer if needed. " +
+      "If GitHub CLI is signed in, it may create or reuse your personal enhancer fork; otherwise it uses the upstream repository.\n\n" +
+      "Chrome and Brave cannot run the setup command themselves. Choose OK to copy the reviewed setup command to your clipboard so you can paste it into Terminal.",
+  );
+
+  if (!approved) {
+    enhanceButton.hidden = true;
+    installLink.hidden = false;
+    return;
+  }
+
+  try {
+    const command = enhancerSetupCommand();
+    await navigator.clipboard.writeText(command);
+    showToast("Setup command copied — paste it into Terminal, then click Enhance again");
+    showTemporaryTitle("Run copied setup command in Terminal");
+  } catch {
+    enhanceButton.hidden = true;
+    installLink.hidden = false;
+    showToast("Open the enhancer setup instructions");
+  }
+}
+
 
 function updateEnhancementProgress(stage, completed, total) {
   progressContainer.hidden = false;
@@ -181,9 +221,8 @@ async function enhanceCurrentPdf() {
   } catch (error) {
     const message = error?.message || "Could not enhance PDF";
     showToast(message);
-    if (/native.*(?:host|messag)|host.*(?:not found|not configured)/i.test(message)) {
-      enhanceButton.hidden = true;
-      installLink.hidden = false;
+    if (isMissingNativeHost(message)) {
+      await offerEnhancerSetup();
     } else {
       showTemporaryTitle("Could not enhance PDF");
     }
