@@ -23,6 +23,7 @@ function updateEnhancementProgress(stage, completed, total) {
   document.documentElement.classList.add("enhancement-active");
   const labels = {
     preparing: "Preparing enhancement…",
+    queued: "Waiting for another PDF enhancement…",
     upload: "Sending PDF for enhancement…",
     ocr: "Checking text and structure…",
     review: "Enhancing…",

@@ -64,6 +64,25 @@ def completed_output(state: dict[str, object]) -> Path | None:
     return None
 
 
+def serialized_enhancement(create, report, directory: Path) -> Path:
+    """Allow only one memory-intensive enhancement pipeline to run at a time."""
+    queued = False
+    with (directory / "enhancement-slot.lock").open("a") as slot:
+        while True:
+            try:
+                fcntl.flock(slot, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if not queued:
+                    report({"type": "progress", "stage": "queued"})
+                    queued = True
+                time.sleep(0.25)
+        try:
+            return create(report)
+        finally:
+            fcntl.flock(slot, fcntl.LOCK_UN)
+
+
 def shared_enhancement(input_path: Path, create, progress: bool, directory: Path) -> Path:
     """Serialize owners by input bytes and let duplicate hosts follow their job."""
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -108,7 +127,7 @@ def shared_enhancement(input_path: Path, create, progress: bool, directory: Path
                 notify(event)
 
             try:
-                output = create(report).resolve()
+                output = serialized_enhancement(create, report, directory).resolve()
                 output_hash = document_hash(output)
                 state = {"status": "complete", "pipelineVersion": PIPELINE_VERSION, "output": str(output), "outputHash": output_hash}
                 write_job(state_path, state)

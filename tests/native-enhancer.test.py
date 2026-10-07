@@ -74,6 +74,38 @@ host.send_message({{'ok': True, 'outputUrl': result.as_uri()}})
                         process.kill()
                         process.communicate()
 
+    def test_distinct_documents_queue_instead_of_running_in_parallel(self):
+        with tempfile.TemporaryDirectory() as folder:
+            directory = Path(folder)
+            first = directory / "first.pdf"
+            second = directory / "second.pdf"
+            first.write_bytes(b"%PDF-1.7\\nfirst document")
+            second.write_bytes(b"%PDF-1.7\\nsecond document")
+            bootstrap = f"""\nimport importlib.util, sys, time\nfrom pathlib import Path\nspec = importlib.util.spec_from_file_location('host', {str(HOST)!r})\nhost = importlib.util.module_from_spec(spec)\nspec.loader.exec_module(host)\ndirectory = Path({folder!r})\nsource = Path(sys.argv[1])\ndef create(report):\n    name = source.stem\n    with (directory / 'timeline').open('a') as log:\n        log.write(f'start {{name}}\\n')\n    time.sleep(0.5)\n    output = directory / f'{{name}}-enhanced.pdf'\n    output.write_bytes(source.read_bytes() + b' enhanced')\n    with (directory / 'timeline').open('a') as log:\n        log.write(f'end {{name}}\\n')\n    return output\nresult = host.shared_enhancement(source, create, True, directory / 'jobs')\nhost.send_message({{'ok': True, 'outputUrl': result.as_uri()}})\n"""
+            processes = [
+                subprocess.Popen([sys.executable, "-c", bootstrap, str(source)], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                for source in (first, second)
+            ]
+            streams = [process.communicate(timeout=5) for process in processes]
+            for process, stream in zip(processes, streams):
+                self.assertEqual(process.returncode, 0, stream[1])
+            timeline = (directory / "timeline").read_text().splitlines()
+            self.assertEqual(len(timeline), 4)
+            self.assertTrue(timeline[0].startswith("start "))
+            self.assertTrue(timeline[1].startswith("end "))
+            self.assertTrue(timeline[2].startswith("start "))
+            self.assertTrue(timeline[3].startswith("end "))
+            self.assertEqual(timeline[0][6:], timeline[1][4:])
+            self.assertEqual(timeline[2][6:], timeline[3][4:])
+            frames = []
+            for stdout, _stderr in streams:
+                offset = 0
+                while offset < len(stdout):
+                    length = struct.unpack("<I", stdout[offset:offset + 4])[0]
+                    frames.append(json.loads(stdout[offset + 4:offset + 4 + length]))
+                    offset += 4 + length
+            self.assertIn({"type": "progress", "stage": "queued"}, frames)
+
     def test_completed_output_is_reused_and_hash_is_verified(self):
         with tempfile.TemporaryDirectory() as folder:
             directory = Path(folder)
