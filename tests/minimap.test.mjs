@@ -20,7 +20,9 @@ function fixture(count, height = 900) {
   const pages = tiles.map((_, index) => ({ querySelector() { return null; },
     getBoundingClientRect() { return { width: 1000, height: 1400, top: index * 1420 - window.scrollY }; } }));
   const listeners = {};
-  const track = { clientHeight: height - 52, addEventListener(type, callback) { listeners[type] = callback; }, setAttribute() {} };
+  const track = { clientHeight: height - 52,
+    style: { setProperty(name, value) { this[name] = value; } },
+    addEventListener(type, callback) { listeners[type] = callback; }, setAttribute() {} };
   const viewport = { style: {} };
   const toggle = { checked: true, addEventListener(type, callback) { listeners[`toggle-${type}`] = callback; } };
   const minimapPageContainer = {
@@ -101,6 +103,19 @@ test('short overview documents temporarily use local navigator sizing until the 
   f.sync();
   assert.ok(f.classes.has('minimap-local-active'));
   assert.equal(parseFloat(f.tiles[0].style.height), 112);
+});
+
+test('short minimaps fade into a translucent tail instead of ending over the document', () => {
+  const f = fixture(2);
+  assert.equal(f.track.style['--minimap-content-height'], '224px');
+  assert.match(styles, /\.minimap::after\s*\{[\s\S]*?top:\s*min\(var\(--minimap-content-height, 100%\), 100%\)/);
+  assert.match(styles, /\.minimap::after\s*\{[\s\S]*?color-mix\(in srgb, var\(--toolbar-bg\) 46%, transparent\)/);
+  assert.match(styles, /\.minimap-pages\s*\{[\s\S]*?z-index:\s*1/);
+
+  f.window.innerHeight = 200;
+  f.track.clientHeight = 148;
+  f.sync();
+  assert.equal(f.track.style['--minimap-content-height'], '148px');
 });
 
 test('minimap packs page thumbnails without viewer gaps', () => {
