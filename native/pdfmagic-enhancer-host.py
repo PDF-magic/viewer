@@ -21,6 +21,8 @@ import time
 from urllib.parse import unquote, urlparse
 from urllib.request import Request, urlopen
 
+PIPELINE_VERSION = 2
+
 HOST_CONFIG = Path.home() / ".config" / "pdf-magic" / "enhancer-host.json"
 
 
@@ -51,7 +53,7 @@ def write_job(path: Path, state: dict[str, object]) -> None:
 
 
 def completed_output(state: dict[str, object]) -> Path | None:
-    if state.get("status") != "complete" or not isinstance(state.get("output"), str):
+    if state.get("pipelineVersion") != PIPELINE_VERSION or state.get("status") != "complete" or not isinstance(state.get("output"), str):
         return None
     output = Path(state["output"])
     try:
@@ -108,7 +110,7 @@ def shared_enhancement(input_path: Path, create, progress: bool, directory: Path
             try:
                 output = create(report).resolve()
                 output_hash = document_hash(output)
-                state = {"status": "complete", "output": str(output), "outputHash": output_hash}
+                state = {"status": "complete", "pipelineVersion": PIPELINE_VERSION, "output": str(output), "outputHash": output_hash}
                 write_job(state_path, state)
                 # An enhanced PDF is also an alias for the completed result.
                 # Never overwrite another job that is already running for it.
@@ -424,10 +426,10 @@ def run_enhancer(command: list[str], progress: bool, report_progress=None) -> No
 
 
 def enhancement_options(mode: str) -> list[str]:
-    if mode == "light":
+    if mode in {"light", "deep"}:
+        # Tag embedded text directly; OCR only pages that need it. Expensive
+        # model review remains an explicit enhancer CLI option.
         return ["--skip-text"]
-    if mode == "deep":
-        return ["--force-ocr", "--ai-review"]
     raise ValueError(f"unsupported enhancement mode: {mode}")
 
 

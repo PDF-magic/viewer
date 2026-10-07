@@ -17,39 +17,6 @@ const defaultTitle = enhanceButton.title;
 let titleResetTimer;
 let toastTimer;
 
-const BORN_DIGITAL_SOURCE = /(?:microsoft(?:®)? word|libreoffice|google docs|apple pages|\bpages\b|latex|\btex\b|prince|weasyprint|wkhtmltopdf|chrom(?:e|ium)|pdfkit|reportlab)/i;
-
-async function enhancementModeFor(pdfDocument) {
-  try {
-    const metadata = await pdfDocument?.getMetadata?.();
-    const info = metadata?.info || {};
-    const source = [info.Creator, info.Producer]
-      .filter((value) => typeof value === "string")
-      .join(" ");
-    if (!BORN_DIGITAL_SOURCE.test(source) || typeof pdfDocument?.getPage !== "function") {
-      return "deep";
-    }
-
-    const pageCount = Number(pdfDocument.numPages);
-    if (!Number.isInteger(pageCount) || pageCount < 1) return "deep";
-    const samplePages = [...new Set([1, Math.ceil(pageCount / 2), pageCount])];
-    let characters = 0;
-    for (const pageNumber of samplePages) {
-      const page = await pdfDocument.getPage(pageNumber);
-      const textContent = await page.getTextContent();
-      for (const item of textContent?.items || []) {
-        if (typeof item?.str === "string") {
-          characters += item.str.replace(/\s/g, "").length;
-        }
-      }
-    }
-
-    const minimumCharacters = samplePages.length === 1 ? 40 : 80;
-    return characters >= minimumCharacters ? "light" : "deep";
-  } catch {
-    return "deep";
-  }
-}
 
 function updateEnhancementProgress(stage, completed, total) {
   progressContainer.hidden = false;
@@ -118,7 +85,7 @@ async function enhanceLoadedPdf(sourceUrl, referenceUrl) {
   try {
     const session = await pdfDocumentSessionReady;
     const pdfDocument = session?.document;
-    const enhancementMode = await enhancementModeFor(pdfDocument);
+    const enhancementMode = "light";
     if (new URL(sourceUrl).protocol === "file:") {
       return await request({ action: "enhance-pdf", sourceUrl, referenceUrl, enhancementMode, progress: true });
     }
