@@ -883,6 +883,7 @@ input {
   display: block;
   width: 100%;
   height: auto;
+  border-radius: inherit;
   filter: var(--page-filter);
   background: #fff;
 }
