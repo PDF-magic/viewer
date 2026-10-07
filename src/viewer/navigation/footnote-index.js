@@ -260,9 +260,14 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
     const notes = [];
     for (const entry of entries) {
       const match = entry.text.match(/^(?:\[\s*(\d+)\s*\]|\(\s*(\d+)\s*\)|(\d+)(?:[.)](?!\d)|\s|$))/);
-      if (!match || entry.x > column.left + (column.right - column.left) * 0.45) continue;
+      if (!match) continue;
       const number = Number(match[1] || match[2] || match[3]);
       if (!Number.isSafeInteger(number) || number <= 0) continue;
+      const sameLineFooterText = entries.some((other) => other !== entry && other.text.length >= 3 &&
+        Math.abs(other.y - entry.y) <= Math.max(2, entry.height * 0.4));
+      const edgePageNumber = /^\d+$/.test(entry.text) && number === pageNumber &&
+        entry.yRatio >= 0.94 && (entry.xRatio <= 0.08 || entry.xRatio >= 0.92) && sameLineFooterText;
+      if (edgePageNumber || entry.x > column.left + (column.right - column.left) * 0.45) continue;
       const inlineText = entry.text.slice(match[0].length).trim();
       const adjacent = entries.filter((other) => other !== entry && other.x > entry.x &&
         other.y >= entry.y - 2 && other.y - entry.y <= Math.max(3, other.height * 0.65) && other.text.length >= 3 && /[A-Za-z\u00c0-\u02af]/u.test(other.text))

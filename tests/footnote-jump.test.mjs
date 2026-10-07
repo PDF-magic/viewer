@@ -103,6 +103,37 @@ test("footnote lookup rejects a centered footer page number by itself", () => {
   assert.equal(candidateForPage(items, viewport, 12, 4, 4), undefined);
 });
 
+test("footnote indexing ignores an edge page number in a running footer", () => {
+  const { footnotesForPage } = loadFootnoteHelpers();
+  const viewport = {
+    width: 600,
+    height: 800,
+    convertToViewportPoint(x, y) {
+      return [x, y];
+    },
+  };
+  const items = [];
+  for (let line = 0; line < 8; line += 1) {
+    items.push({
+      str: "Body copy for the document",
+      width: 220,
+      height: 12,
+      transform: [1, 0, 0, 12, 60, 220 + line * 24],
+    });
+  }
+  items.push(
+    { str: "5", width: 6, height: 7, transform: [1, 0, 0, 7, 30, 760] },
+    {
+      str: "DTCC + CLEARSTREAM + EUROCLEAR + BOSTON CONSULTING GROUP",
+      width: 360,
+      height: 7,
+      transform: [1, 0, 0, 7, 48, 760],
+    },
+  );
+
+  assert.deepEqual(footnotesForPage(items, viewport, 5), []);
+});
+
 
 test("footnote navigation scrolls once to the note without an intermediate page jump", () => {
   const viewerSource = readFileSync(new URL("../src/viewer/viewer.js", import.meta.url), "utf8");
