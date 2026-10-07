@@ -219,6 +219,25 @@ test('wheel navigation uses compact map travel and current scroll position in ev
   }
 });
 
+test('collapsed minimap uses a themed rounded scrollbar while the expanded minimap hides it', () => {
+  assert.match(
+    styles,
+    /html\.minimap-collapsed:not\(\.minimap-disabled\)\s*\{[\s\S]*?scrollbar-color:\s*var\(--accent, #43af49\) transparent;[\s\S]*?scrollbar-width:\s*thin;/,
+  );
+  assert.match(
+    styles,
+    /html\.minimap-collapsed:not\(\.minimap-disabled\)::\-webkit-scrollbar[\s\S]*?width:\s*10px;/,
+  );
+  assert.match(
+    styles,
+    /html\.minimap-collapsed:not\(\.minimap-disabled\)::\-webkit-scrollbar-thumb[\s\S]*?border-radius:\s*999px;[\s\S]*?background:\s*var\(--accent, #43af49\);[\s\S]*?background-clip:\s*content-box;/,
+  );
+  assert.match(
+    styles,
+    /html:not\(\.minimap-disabled\):not\(\.minimap-collapsed\)::\-webkit-scrollbar[\s\S]*?display:\s*none;/,
+  );
+});
+
 test('minimap toggle persists visibility and updates accessibility state', () => {
   const f = fixture(3);
   f.toggle.checked = false;
