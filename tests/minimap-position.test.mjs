@@ -39,7 +39,7 @@ test('minimap layout preserves the reading point synchronously through repeated 
   }
 });
 
-test('collapsed minimap fit-width reaches the left viewport edge', () => {
+test('collapsed minimap fit-width accounts for the browser scrollbar and outline gutters', () => {
   const viewportWidth = settings.match(/function viewportPageWidth\(\) \{[\s\S]*?\n\}/)[0];
   const classes = new Set(['minimap-collapsed']);
   const context = vm.createContext({
@@ -47,6 +47,7 @@ test('collapsed minimap fit-width reaches the left viewport edge', () => {
     window: { innerWidth: 1200 },
     document: {
       documentElement: {
+        clientWidth: 1185,
         classList: {
           contains(value) { return classes.has(value); },
         },
@@ -59,12 +60,18 @@ test('collapsed minimap fit-width reaches the left viewport edge', () => {
 
   vm.runInContext(viewportWidth, context);
   assert.equal(vm.runInContext('viewportPageWidth()', context), 1183);
+  assert.equal(vm.runInContext('viewportPageWidth()', context) + 2, context.document.documentElement.clientWidth);
+
+  classes.add('minimap-left');
+  assert.equal(vm.runInContext('viewportPageWidth()', context), 1183);
+  context.document.documentElement.clientWidth = 1200;
+  assert.equal(vm.runInContext('viewportPageWidth()', context), 1198);
 
   classes.add('minimap-disabled');
   assert.equal(vm.runInContext('viewportPageWidth()', context), 1168);
   assert.match(
     minimapStyles,
-    /html\.minimap-collapsed:not\(\.minimap-disabled\) \.viewer\[data-zoom-mode="fit-width"\]\s*\{[\s\S]*?padding-right:\s*16px;[\s\S]*?padding-left:\s*1px;/,
+    /html\.minimap-collapsed:not\(\.minimap-disabled\) \.viewer\[data-zoom-mode\]\s*\{[\s\S]*?padding-right:\s*1px;[\s\S]*?padding-left:\s*1px;/,
   );
 });
 

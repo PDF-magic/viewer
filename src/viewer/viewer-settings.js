@@ -344,9 +344,10 @@ function viewportPageWidth() {
 
   const horizontalGutter =
     window.innerWidth > 700 && !root.classList.contains("minimap-disabled")
-      ? PAGE_HORIZONTAL_GUTTER / 2 + 1
+      ? root.classList.contains("minimap-collapsed") ? 2 : PAGE_HORIZONTAL_GUTTER / 2 + 1
       : PAGE_HORIZONTAL_GUTTER;
-  return Math.max(160, window.innerWidth - minimapWidth - horizontalGutter);
+  const availableWidth = root.clientWidth || window.innerWidth;
+  return Math.max(160, availableWidth - minimapWidth - horizontalGutter);
 }
 
 function viewportPageHeight() {
