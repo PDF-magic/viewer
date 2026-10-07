@@ -247,6 +247,59 @@ function pageLayout(items, viewport, rules) {
   }));
 }
 
+function scannedHangingNotes(column, viewport, expectedNumber) {
+  const separator = [...column.rules].sort((a, b) => a.y - b.y)[0];
+  if (!separator || separator.y < viewport.height * 0.5) return [];
+  const below = column.entries.filter(entry => entry.y > separator.y + 2 && entry.yRatio < 0.92);
+  const markers = below.filter(entry => entry.text.length <= 3 &&
+    Math.abs(entry.x - separator.x) < 8 && entry.item.width < 18);
+  const text = below.filter(entry => entry.x > separator.x + 24 && /[A-Za-z]/.test(entry.text));
+  const lines = [];
+  const textHeight = median(text.map(entry => entry.height));
+  for (const entry of text.filter(entry => entry.height >= textHeight * 0.85).sort(readingOrder)) {
+    const line = lines.find(line => Math.abs(line.y - entry.y) < 2);
+    if (line) line.entries.push(entry);
+    else lines.push({ y: entry.y, entries: [entry] });
+  }
+  if (!lines.length || (!markers.length && !Number.isSafeInteger(expectedNumber))) return [];
+  const margin = Math.min(...text.map(entry => entry.x));
+  const height = median(text.map(entry => entry.height));
+  // OCR can omit labels entirely, or give a tiny printed digit the text and
+  // height of a comma/quote. Require a consistent hanging block and label gutter.
+  if (margin - separator.x > 48 || lines.some(line =>
+    Math.abs(Math.min(...line.entries.map(entry => entry.x)) - margin) > 3) ||
+    lines[0].y - separator.y > height * 2.5) return [];
+  if (!markers.some(marker => !/^\d+$/.test(marker.text) || marker.height > height) &&
+    !Number.isSafeInteger(expectedNumber) && !markers.some(marker => marker.text === "2")) return [];
+  const starts = [];
+  let quotedBlock = false;
+  for (const [index, line] of lines.entries()) {
+    const marker = markers.find(marker => Math.abs(marker.y - line.y) <= height * 0.8 &&
+      lines.reduce((closest, candidate) => Math.abs(candidate.y - marker.y) < Math.abs(closest.y - marker.y)
+        ? candidate : closest, lines[0]) === line);
+    const previous = lines[index - 1];
+    const gap = previous && line.y - previous.y >= height * 1.45;
+    if (!index || marker || (gap && !quotedBlock)) {
+      starts.push({ line, marker });
+      quotedBlock = false;
+    }
+    if (/:$/.test(joinNoteEntries(line.entries))) quotedBlock = true;
+  }
+  const anchor = starts.findIndex(start => /^\d+$/.test(start.marker?.text || ""));
+  let number = expectedNumber ?? (anchor >= 0 ? Number(starts[anchor].marker.text) - anchor : undefined);
+  if (!Number.isSafeInteger(number) || number < 1) return [];
+  // A readable label must agree with the recovered sequence.
+  if (starts.some((start, index) => /^\d+$/.test(start.marker?.text || "") &&
+    Number(start.marker.text) !== number + index)) return [];
+  return starts.map(({ line, marker }) => {
+    const entry = marker || line.entries[0];
+    return { number: number++, xRatio: entry.xRatio, yRatio: line.y / viewport.height,
+      label: marker?.text || "", baseline: line.y, textHeight: height,
+      columnIndex: column.index, columnLeft: column.left, columnRight: column.right,
+      inferredMarker: marker?.text || "", hangingMargin: margin };
+  });
+}
+
 // Detect and collect each column independently, then traverse columns left to right.
 export function footnotesForPage(items, viewport, pageNumber, rules = [], referenceContext, expectedNumber) {
   const result = [];
@@ -353,14 +406,18 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
       }
     }
 
+    const scannedNotes = layout.length === 1 ? scannedHangingNotes(column, viewport, expectedNumber) : [];
+    if (scannedNotes.length) notes.splice(0, notes.length, ...scannedNotes.map(note => ({ ...note, pageNumber })));
     notes.sort((a, b) => a.yRatio - b.yRatio);
     for (const [index, note] of notes.entries()) {
       const next = notes[index + 1];
       // Table notes can occupy the full page width above resumed body columns.
       // A larger-type body line ends that note block even if more small text follows.
       const resumedBody = entries.filter((entry) => entry.y > note.baseline + 2 &&
+        (note.hangingMargin === undefined || entry.x >= note.hangingMargin - 3) &&
         entry.height > note.textHeight * 1.2).sort(readingOrder)[0];
       const textEntries = entries.filter((entry) => entry.y >= note.baseline - 2 &&
+        (note.hangingMargin === undefined || entry.x >= note.hangingMargin - 3) &&
         (!resumedBody || entry.y < resumedBody.y - 2) &&
         (!next || entry.y < next.yRatio * viewport.height - 2) && isPreviewText(entry, note.textHeight) &&
         !(/^\d+$/.test(entry.text) && entry.yRatio > 0.92)).sort(readingOrder);
@@ -368,11 +425,14 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
       const text = (note.inferredMarker && joinedText.startsWith(note.inferredMarker)
         ? joinedText.slice(note.inferredMarker.length)
         : joinedText.replace(markerPattern(note.number), "")).trim();
-      const marker = entries.find((entry) => entry.xRatio === note.xRatio && entry.yRatio === note.yRatio);
+      const marker = entries.find((entry) => entry.xRatio === note.xRatio &&
+        (note.hangingMargin === undefined ? entry.yRatio === note.yRatio :
+          entry.text === note.inferredMarker && Math.abs(entry.y - note.baseline) <= note.textHeight * 0.8));
       const highlightedEntries = marker && !textEntries.includes(marker) ? [marker, ...textEntries] : textEntries;
       if (text.length >= 3) result.push({ ...note, text, endPageNumber: pageNumber, endColumnIndex: column.index,
         highlightRegions: highlightRegions(highlightedEntries, viewport, pageNumber),
-        continues: !next && textEntries.at(-1)?.yRatio >= 0.88 });
+        continues: !next && textEntries.at(-1)?.yRatio >= 0.88 &&
+          (note.hangingMargin === undefined || !/[.!?]["')\]]?$/.test(text)) });
     }
   }
   return result;

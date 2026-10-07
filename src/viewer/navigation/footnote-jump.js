@@ -1,4 +1,4 @@
-import { candidateForPage } from "./footnote-index.js";
+import { appendFootnotesForPage, candidateForPage } from "./footnote-index.js";
 import { pdfDocumentSessionReady } from "../pdf-document-session.js";
 
 const form = document.querySelector("#footnote-jump");
@@ -32,32 +32,38 @@ async function pageData(pdfDocument, pageNumber) {
   }
 
   const page = await pdfDocument.getPage(pageNumber);
-  const [textContent, viewport] = await Promise.all([
+  const [textContent, viewport, operatorList] = await Promise.all([
     page.getTextContent(),
     Promise.resolve(page.getViewport({ scale: 1 })),
+    page.getOperatorList(),
   ]);
-  const data = { items: textContent.items, viewport };
+  const data = { items: textContent.items, viewport, operatorList };
   pageCache.set(pageNumber, data);
   page.cleanup();
   return data;
 }
 
-async function findFootnoteTarget(pdfDocument, number, originPage, requestId) {
+async function findFootnoteTarget(pdfDocument, number, originPage, requestId, operators) {
   let best;
+  const notes = [];
+  let previous;
 
   for (let pageNumber = 1; pageNumber <= pdfDocument.numPages; pageNumber += 1) {
     if (requestId !== lookupRequestId) {
       return null;
     }
 
-    const { items, viewport } = await pageData(pdfDocument, pageNumber);
+    const { items, viewport, operatorList } = await pageData(pdfDocument, pageNumber);
+    appendFootnotesForPage(notes, items, viewport, pageNumber, operatorList, operators, previous);
+    previous = { items, viewport };
     const candidate = candidateForPage(items, viewport, number, pageNumber, originPage);
     if (candidate && (!best || candidate.score > best.score)) {
       best = candidate;
     }
   }
 
-  return best || null;
+  return notes.filter(note => note.number === number).sort((a, b) =>
+    Math.abs(a.pageNumber - originPage) - Math.abs(b.pageNumber - originPage))[0] || best || null;
 }
 
 function scrollToTarget(target, searchResult = false) {
@@ -93,6 +99,7 @@ async function jumpToFootnote(rawNumber) {
     number,
     currentPageNumber(),
     requestId,
+    session.operators,
   );
   if (requestId !== lookupRequestId) {
     return;
