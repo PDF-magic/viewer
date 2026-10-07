@@ -12,6 +12,13 @@ test("narrow PDF pages reach the horizontal viewport edges", () => {
   );
 });
 
+test("rendered page surfaces inherit the rounded page corners", () => {
+  assert.match(
+    viewerStyles,
+    /\.page canvas,[\s\S]*?\.page-preview\s*\{[\s\S]*?border-radius:\s*inherit;/,
+  );
+});
+
 test("sections popover clears the second toolbar row", () => {
   assert.match(
     toolbarStyles,
