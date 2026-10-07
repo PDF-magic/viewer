@@ -105,12 +105,11 @@ test('short overview documents temporarily use local navigator sizing until the 
   assert.equal(parseFloat(f.tiles[0].style.height), 112);
 });
 
-test('short minimaps fade into an opaque themed tail that covers the document', () => {
+test('short minimaps end in an opaque document-colored tail', () => {
   const f = fixture(2);
   assert.equal(f.track.style['--minimap-content-height'], '224px');
   assert.match(styles, /\.minimap::after\s*\{[\s\S]*?top:\s*min\(var\(--minimap-content-height, 100%\), 100%\)/);
-  assert.match(styles, /\.minimap::after\s*\{[\s\S]*?background-color:\s*var\(--body-bg\)/);
-  assert.match(styles, /\.minimap::after\s*\{[\s\S]*?color-mix\(in srgb, var\(--toolbar-bg\) 65%, var\(--body-bg\)\)/);
+  assert.match(styles, /\.minimap::after\s*\{[\s\S]*?background:\s*var\(--page-bg\)/);
   assert.match(styles, /\.minimap-pages\s*\{[\s\S]*?z-index:\s*1/);
 
   f.window.innerHeight = 200;
