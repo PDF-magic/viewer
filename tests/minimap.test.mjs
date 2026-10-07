@@ -105,11 +105,13 @@ test('short overview documents temporarily use local navigator sizing until the 
   assert.equal(parseFloat(f.tiles[0].style.height), 112);
 });
 
-test('short minimaps fade into a translucent tail instead of ending over the document', () => {
+test('short minimaps gradually fade their document-colored tail to half opacity', () => {
   const f = fixture(2);
   assert.equal(f.track.style['--minimap-content-height'], '224px');
+  assert.equal(f.track.style['--minimap-tail-fade-height'], '112px');
   assert.match(styles, /\.minimap::after\s*\{[\s\S]*?top:\s*min\(var\(--minimap-content-height, 100%\), 100%\)/);
-  assert.match(styles, /\.minimap::after\s*\{[\s\S]*?color-mix\(in srgb, var\(--toolbar-bg\) 46%, transparent\)/);
+  assert.match(styles, /\.minimap::after\s*\{[\s\S]*?right:\s*8px;[\s\S]*?left:\s*8px;/);
+  assert.match(styles, /\.minimap::after\s*\{[\s\S]*?background:\s*linear-gradient\(\s*to bottom,\s*var\(--page-bg\) 0,\s*color-mix\(in srgb, var\(--page-bg\) 50%, transparent\)\s*max\(100%, var\(--minimap-tail-fade-height, 0px\)\)\s*\)/);
   assert.match(styles, /\.minimap-pages\s*\{[\s\S]*?z-index:\s*1/);
 
   f.window.innerHeight = 200;
@@ -362,8 +364,8 @@ test('minimap exposes persistent local, side-swap, and collapse controls', () =>
 });
 
 test('local minimap keeps natural thumbnail scale and moves the page background', () => {
-  assert.match(source, /minimapMode\(\) === "overview"[\s\S]*?trackHeight \/ widthScaledHeight[\s\S]*?: 1/);
-  assert.match(source, /mapOffset =[\s\S]*?minimapMode\(\) === "local"[\s\S]*?viewportTop \+ viewportHeight \/ 2 - trackHeight \/ 2/);
+  assert.match(source, /displayMode === "overview"[\s\S]*?trackHeight \/ widthScaledHeight[\s\S]*?: 1/);
+  assert.match(source, /mapOffset =[\s\S]*?displayMode === "local"[\s\S]*?viewportTop \+ viewportHeight \/ 2 - trackHeight \/ 2/);
   assert.match(source, /minimapPages\.style\.transform = `translateY\(\$\{\-mapOffset\}px\)`/);
   assert.match(source, /function pointerMapPosition\(event\)[\s\S]*?\+ mapOffset/);
 });

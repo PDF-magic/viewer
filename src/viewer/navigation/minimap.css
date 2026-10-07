@@ -73,15 +73,15 @@
   content: "";
   position: absolute;
   top: min(var(--minimap-content-height, 100%), 100%);
-  right: 0;
+  right: 8px;
   bottom: 0;
-  left: 0;
+  left: 8px;
   z-index: 0;
   background: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--toolbar-bg) 46%, transparent),
-    color-mix(in srgb, var(--toolbar-bg) 24%, transparent) 48px,
-    color-mix(in srgb, var(--toolbar-bg) 16%, transparent)
+    var(--page-bg) 0,
+    color-mix(in srgb, var(--page-bg) 50%, transparent)
+      max(100%, var(--minimap-tail-fade-height, 0px))
   );
   pointer-events: none;
 }
@@ -209,6 +209,8 @@
   align-items: stretch;
   justify-content: space-between;
   border-top: 1px solid var(--border);
+  border-radius: 9px 9px 0 0;
+  overflow: hidden;
   background: var(--toolbar-bg);
 }
 
