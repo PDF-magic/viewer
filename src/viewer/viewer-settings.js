@@ -342,9 +342,10 @@ function viewportPageWidth() {
       ? minimapShell?.getBoundingClientRect().width || 0
       : 0;
 
-  const horizontalGutter = window.innerWidth > 700 && minimapWidth > 0
-    ? PAGE_HORIZONTAL_GUTTER / 2 + 1
-    : PAGE_HORIZONTAL_GUTTER;
+  const horizontalGutter =
+    window.innerWidth > 700 && !root.classList.contains("minimap-disabled")
+      ? PAGE_HORIZONTAL_GUTTER / 2 + 1
+      : PAGE_HORIZONTAL_GUTTER;
   return Math.max(160, window.innerWidth - minimapWidth - horizontalGutter);
 }
 
