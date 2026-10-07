@@ -10,6 +10,29 @@
     height: 0;
   }
 
+  html.minimap-collapsed:not(.minimap-disabled) {
+    scrollbar-color: var(--accent, #43af49) transparent;
+    scrollbar-width: thin;
+  }
+
+  html.minimap-collapsed:not(.minimap-disabled)::-webkit-scrollbar,
+  html.minimap-collapsed:not(.minimap-disabled) body::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  html.minimap-collapsed:not(.minimap-disabled)::-webkit-scrollbar-track,
+  html.minimap-collapsed:not(.minimap-disabled) body::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  html.minimap-collapsed:not(.minimap-disabled)::-webkit-scrollbar-thumb,
+  html.minimap-collapsed:not(.minimap-disabled) body::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: var(--accent, #43af49);
+    background-clip: content-box;
+  }
+
   html:not(.minimap-disabled):not(.minimap-collapsed) .viewer {
     padding-right: 112px;
   }
