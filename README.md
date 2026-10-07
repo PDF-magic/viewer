@@ -58,6 +58,8 @@ The host runs `ocr-scanned-pdf.sh`, uses the OCR tagging report to name the new 
 
 Recognized H1–H6 headings are also written as nested PDF bookmarks with page destinations. The enhanced copy shows the § section navigator in place of Enhance when it contains these sections.
 
+Enhanced copies use a detected signature or large letterhead name for Creator and Author. When no name is recognized, the enhancer uses existing author metadata, then the local account's full name or username. Producer is `PDF Magic Enhancer`. The metadata panel's Href link points to the preserved original document URL. Name detection uses searchable text and remains heuristic.
+
 Enable **Allow access to file URLs** for the unpacked extension in Chrome or Brave so the enhanced local PDF reopens in this viewer.
 
 ## Build a standalone extension folder
