@@ -7,7 +7,7 @@ const source = readFileSync(new URL("../src/viewer/enhance-pdf.js", import.meta.
   .replace(/^import .*;\n/gm, "");
 const markup = readFileSync(new URL("../src/viewer.html", import.meta.url), "utf8");
 
-async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new Uint8Array([37, 80, 68, 70, 45]), sourceUrl = "https://example.com/source.pdf", documentOverrides = {}) {
+async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new Uint8Array([37, 80, 68, 70, 45]), sourceUrl = "https://example.com/source.pdf", documentOverrides = {}, setupOptions = {}) {
   const elements = new Map();
   for (const id of ["enhance-nav", "enhance-pdf", "install-enhancer", "section-nav", "page-number", "toast", "enhance-progress", "enhance-progress-bar", "enhance-progress-label", "enhance-progress-percentage"]) {
     elements.set(`#${id}`, {
@@ -25,9 +25,12 @@ async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new U
   const destinations = [];
   const messages = [];
   const progressSnapshots = [];
+  const setupPrompts = [];
+  const clipboardWrites = [];
   let messageListener;
   let disconnectListener;
   const runtime = {
+    id: "abcdefghijklmnopabcdefghijklmnop",
     sendNativeMessage,
     connectNative: () => ({
       onMessage: { addListener(listener) { messageListener = listener; } },
@@ -61,7 +64,21 @@ async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new U
     setTimeout() {}, clearTimeout() {}, URL,
     btoa: (binary) => Buffer.from(binary, "binary").toString("base64"),
     pdfDocumentSessionReady: Promise.resolve({ document: { getData: async () => data, ...documentOverrides } }),
-    window: { location: { href: "chrome-extension://viewer/src/viewer.html?url=https%3A%2F%2Fexample.com%2Fsource.pdf#page=9" } },
+    window: {
+      location: { href: "chrome-extension://viewer/src/viewer.html?url=https%3A%2F%2Fexample.com%2Fsource.pdf#page=9" },
+      confirm: (message) => {
+        setupPrompts.push(message);
+        return setupOptions.approveSetup ?? true;
+      },
+    },
+    navigator: {
+      clipboard: {
+        writeText: async (value) => {
+          if (setupOptions.clipboardError) throw setupOptions.clipboardError;
+          clipboardWrites.push(value);
+        },
+      },
+    },
     resolvePdfSource: async () => ({ originalUrl: new URL(sourceUrl) }),
     resolveDocumentReferenceUrl: async () => "https://example.com/source.pdf",
     chrome: {
@@ -71,13 +88,32 @@ async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new U
   });
   vm.runInContext(source, context);
   await vm.runInContext("enhanceCurrentPdf()", context);
-  return { elements, destinations, messages, progressSnapshots };
+  return { elements, destinations, messages, progressSnapshots, setupPrompts, clipboardWrites };
 }
 
-test("missing native host reveals an actual installation link", async () => {
-  const { elements } = await enhancerFixture(async () => {
+test("missing native host asks for consent and copies a self-contained setup command", async () => {
+  const { elements, setupPrompts, clipboardWrites } = await enhancerFixture(async () => {
     throw new Error("Specified native messaging host not found.");
   });
+  assert.equal(setupPrompts.length, 1);
+  assert.match(setupPrompts[0], /may create or reuse your personal enhancer fork/i);
+  assert.deepEqual(clipboardWrites, [
+    "curl -fsSL https://raw.githubusercontent.com/PDF-magic/viewer/main/native/install-host.sh | PDF_MAGIC_SETUP_APPROVED=1 bash -s -- abcdefghijklmnopabcdefghijklmnop --fork-if-available",
+  ]);
+  assert.equal(elements.get("#enhance-pdf").hidden, false);
+  assert.equal(elements.get("#install-enhancer").hidden, true);
+});
+
+test("declining missing-host setup leaves the documented installer link available", async () => {
+  const { elements, clipboardWrites } = await enhancerFixture(
+    async () => { throw new Error("Specified native messaging host not found."); },
+    "1",
+    undefined,
+    "https://example.com/source.pdf",
+    {},
+    { approveSetup: false },
+  );
+  assert.deepEqual(clipboardWrites, []);
   assert.equal(elements.get("#enhance-pdf").hidden, true);
   assert.equal(elements.get("#install-enhancer").hidden, false);
   assert.match(markup, /<a\s+id="install-enhancer"[\s\S]*?href="https:\/\/github.com\/PDF-magic\/viewer#pdf-enhancer-integration"/);
