@@ -211,8 +211,8 @@ raise SystemExit(host.main())
                 })
             enhance.assert_not_called()
 
-    def test_enhancement_options_scale_review_depth(self):
-        self.assertEqual(host.enhancement_options("deep"), ["--force-ocr", "--ai-review"])
+    def test_enhancement_options_preserve_text_without_automatic_ai(self):
+        self.assertEqual(host.enhancement_options("deep"), ["--skip-text"])
         self.assertEqual(host.enhancement_options("light"), ["--skip-text"])
         with self.assertRaisesRegex(ValueError, "unsupported enhancement mode"):
             host.enhancement_options("unknown")
@@ -223,7 +223,7 @@ raise SystemExit(host.main())
             source = directory / "scan.pdf"
             source.write_bytes(b"test PDF")
             (directory / "ocr-scanned-pdf.sh").write_text(
-                '[ "$3" = "--force-ocr" ] && [ "$4" = "--ai-review" ] || exit 2\n'
+                '[ "$3" = "--skip-text" ] && [ "$4" = "--source-url" ] || exit 2\n'
                 'printf "OCR progress on stdout\\n"\ncp "$1" "$2"\n'
             )
             bootstrap = f"""
@@ -292,6 +292,37 @@ raise SystemExit(host.main())
             self.assertEqual(run.call_count, 2)
             for call in run.call_args_list:
                 self.assertIs(call.kwargs["stdout"], sys.stderr)
+
+    def test_old_pipeline_result_is_not_reused(self):
+        with tempfile.TemporaryDirectory() as folder:
+            output = Path(folder) / "enhanced.pdf"
+            output.write_bytes(b"old enhanced PDF")
+            state = {"status": "complete", "output": str(output),
+                     "outputHash": host.document_hash(output),
+                     "pipelineVersion": host.PIPELINE_VERSION - 1}
+            self.assertIsNone(host.completed_output(state))
+
+    def test_stamp_preserves_web_href_for_reenhanced_local_copy(self):
+        try:
+            import pikepdf
+        except ImportError:
+            self.skipTest("pikepdf unavailable in this Python environment")
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "enhanced.pdf"
+            href = "https://example.com/original.pdf?x=1&y=2"
+            pikepdf.models.PdfMetadata.register_xml_namespace("https://pdfmagic.org/ns/1.0/", "pdfmagic")
+            with pikepdf.Pdf.new() as pdf:
+                pdf.add_blank_page()
+                pdf.docinfo.Producer = "PDF Magic Enhancer"
+                with pdf.open_metadata(set_pikepdf_as_editor=False, update_docinfo=False) as metadata:
+                    metadata["pdfmagic:href"] = href
+                pdf.save(path)
+            with patch.object(host.sys, "argv", [str(HOST), "--stamp", str(path), path.as_uri()]):
+                self.assertEqual(host.stamp_mode(), 0)
+            with pikepdf.open(path) as pdf:
+                self.assertEqual(str(pdf.docinfo.Producer), "PDF Magic Enhancer")
+                with pdf.open_metadata(set_pikepdf_as_editor=False, update_docinfo=False) as metadata:
+                    self.assertEqual(metadata["pdfmagic:href"], href)
 
 
 if __name__ == "__main__":

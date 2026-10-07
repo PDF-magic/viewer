@@ -1,7 +1,7 @@
 import { AnnotationLayer, createValidAbsoluteUrl, getDocument, GlobalWorkerOptions, OPS, TextLayer, VerbosityLevel } from "../../node_modules/pdfjs-dist/build/pdf.mjs";
 import { EventBus, PDFLinkService } from "../../node_modules/pdfjs-dist/web/pdf_viewer.mjs";
 import { abandonPdfDocumentSession, publishPdfDocument } from "./pdf-document-session.js";
-import { resolveDocumentReferenceUrl } from "./document-reference-url.js";
+import { referenceUrlFromPdfMetadata, resolveDocumentReferenceUrl } from "./document-reference-url.js";
 import { resolvePdfSource } from "./pdf-source.js";
 import { findSearchMatches } from "./search/search-matches.js";
 import { highlightTextLayer, registerSearchText } from "./search/search-highlight.js";
@@ -547,7 +547,16 @@ function renderPdfMetadata(entries) {
     const description = document.createElement("dd");
     row.className = "section-metadata-row";
     term.textContent = label;
-    description.textContent = value;
+    if (label === "Href" && /^(?:https?:|file:)/i.test(value)) {
+      const link = document.createElement("a");
+      link.href = value;
+      link.textContent = value;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      description.append(link);
+    } else {
+      description.textContent = value;
+    }
     row.append(term, description);
     fragment.append(row);
   }
@@ -565,6 +574,8 @@ async function getPdfMetadataDetails() {
       value: metadataValue(info, metadata, infoKey, xmpKey),
     })).filter(({ value }) => Boolean(value));
 
+    const href = referenceUrlFromPdfMetadata(info, metadata);
+    if (href) entries.push({ label: "Href", value: href });
     return { title, entries };
   } catch {
     return { title: "", entries: [] };

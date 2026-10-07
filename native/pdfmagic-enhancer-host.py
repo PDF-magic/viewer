@@ -21,7 +21,7 @@ import time
 from urllib.parse import unquote, urlparse
 from urllib.request import Request, urlopen
 
-PIPELINE_VERSION = 2
+PIPELINE_VERSION = 3
 
 HOST_CONFIG = Path.home() / ".config" / "pdf-magic" / "enhancer-host.json"
 
@@ -464,7 +464,7 @@ def enhance_pdf(
         def create(report):
             output_path = unique_output(output_directory, safe_stem(source_url))
             run_enhancer(
-                ["/bin/bash", str(enhancer), str(input_path), str(output_path), *options],
+                ["/bin/bash", str(enhancer), str(input_path), str(output_path), *options, "--source-url", reference_url],
                 progress, report_progress=report,
             )
             report({"type": "progress", "stage": "finalizing"})
@@ -540,6 +540,9 @@ def stamp_mode() -> int:
             "https://pdfmagic.org/ns/1.0/", "pdfmagic"
         )
         with pdf.open_metadata(set_pikepdf_as_editor=False, update_docinfo=False) as metadata:
+            existing_url = str(metadata.get("pdfmagic:href") or pdf.docinfo.get("/PDFMagicSourceURL") or "")
+            if urlparse(source_url).scheme == "file" and urlparse(existing_url).scheme in {"http", "https"}:
+                source_url = existing_url
             metadata["pdfmagic:href"] = source_url
         if "/PDFMagicSourceURL" in pdf.docinfo:
             del pdf.docinfo["/PDFMagicSourceURL"]

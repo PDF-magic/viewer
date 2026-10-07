@@ -132,7 +132,7 @@ test("modern word-processor PDFs use the light enhancement path", async () => {
   assert.equal(messages[0].enhancementMode, "light");
 });
 
-test("OCR text layers without born-digital metadata keep deep review", async () => {
+test("OCR text layers use the text-preserving enhancement path", async () => {
   const { messages } = await enhancerFixture(
     async () => ({ ok: true, outputUrl: "file:///tmp/enhanced.pdf" }),
     "1",
@@ -144,7 +144,7 @@ test("OCR text layers without born-digital metadata keep deep review", async () 
       getPage: async () => ({ getTextContent: async () => ({ items: [{ str: "OCR text ".repeat(100) }] }) }),
     },
   );
-  assert.equal(messages[0].enhancementMode, "deep");
+  assert.equal(messages[0].enhancementMode, "light");
 });
 
 test("progress events update the bar without consuming the final response", async () => {
@@ -159,6 +159,6 @@ test("local PDFs use a persistent native connection for progress", async () => {
   assert.equal(messages.length, 1);
   assert.equal(messages[0].action, "enhance-pdf");
   assert.equal(messages[0].progress, true);
-  assert.equal(messages[0].enhancementMode, "deep");
+  assert.equal(messages[0].enhancementMode, "light");
   assert.equal(progressSnapshots[0].value, 50);
 });
