@@ -64,6 +64,23 @@
   touch-action: none;
 }
 
+.minimap::after {
+  content: "";
+  position: absolute;
+  top: min(var(--minimap-content-height, 100%), 100%);
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 0;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--toolbar-bg) 46%, transparent),
+    color-mix(in srgb, var(--toolbar-bg) 24%, transparent) 48px,
+    color-mix(in srgb, var(--toolbar-bg) 16%, transparent)
+  );
+  pointer-events: none;
+}
+
 .minimap-preparing .minimap-shell {
   visibility: hidden;
   opacity: 0;
@@ -91,6 +108,7 @@
 .minimap-pages {
   position: absolute;
   inset: 0 0 auto;
+  z-index: 1;
   overflow: hidden;
   pointer-events: none;
   transform: translateY(0);
