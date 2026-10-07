@@ -376,6 +376,55 @@ function applyZoomLayout() {
   viewer.style.setProperty("--zoom-page-width", `${Math.max(160, pageWidth)}px`);
 }
 
+function captureZoomAnchor() {
+  const viewportY = TOOLBAR_HEIGHT + Math.max(0, window.innerHeight - TOOLBAR_HEIGHT) / 2;
+  const pageNumber = Number.parseInt(document.querySelector("#page-number")?.value, 10);
+  const centeredPage = document.elementFromPoint(window.innerWidth / 2, viewportY)?.closest(".page");
+  const page = centeredPage
+    || (Number.isFinite(pageNumber) ? document.querySelector(`.page[data-page="${pageNumber}"]`) : null);
+
+  if (!page) {
+    return null;
+  }
+
+  const rect = page.getBoundingClientRect();
+  if (!(rect.height > 0)) {
+    return null;
+  }
+
+  return {
+    page,
+    ratio: (viewportY - rect.top) / rect.height,
+    viewportY,
+  };
+}
+
+function restoreZoomAnchor(anchor) {
+  if (!anchor) {
+    return;
+  }
+
+  const rect = anchor.page.getBoundingClientRect();
+  if (!(rect.height > 0)) {
+    return;
+  }
+
+  window.scrollTo({
+    left: window.scrollX,
+    top: Math.max(
+      0,
+      window.scrollY + rect.top + rect.height * anchor.ratio - anchor.viewportY,
+    ),
+    behavior: "instant",
+  });
+}
+
+function applyZoomLayoutPreservingPosition() {
+  const anchor = captureZoomAnchor();
+  applyZoomLayout();
+  restoreZoomAnchor(anchor);
+}
+
 function currentRelativeScale() {
   const currentPage = document.querySelector(".page[aria-label='Page " + document.querySelector("#page-number")?.value + "']")
     || document.querySelector(".page");
@@ -420,7 +469,7 @@ function scheduleViewerRerender() {
 function setCustomZoom(scale) {
   zoomMode = "custom";
   zoomScale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, scale));
-  applyZoomLayout();
+  applyZoomLayoutPreservingPosition();
   syncZoomControls();
   scheduleViewerRerender();
 }
@@ -434,14 +483,14 @@ function zoomBy(delta) {
 function fitWidth() {
   zoomMode = "fit-width";
   zoomScale = 1;
-  applyZoomLayout();
+  applyZoomLayoutPreservingPosition();
   syncZoomControls();
   scheduleViewerRerender();
 }
 
 function fitHeight() {
   zoomMode = "fit-height";
-  applyZoomLayout();
+  applyZoomLayoutPreservingPosition();
   syncZoomControls();
   scheduleViewerRerender();
 }
@@ -501,7 +550,7 @@ if (zoomControls) {
   window.addEventListener("resize", () => {
     clearTimeout(zoomResizeTimer);
     zoomResizeTimer = setTimeout(() => {
-      applyZoomLayout();
+      applyZoomLayoutPreservingPosition();
       syncZoomControls();
       scheduleViewerRerender();
     }, 120);
