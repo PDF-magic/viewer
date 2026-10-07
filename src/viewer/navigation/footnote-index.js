@@ -248,12 +248,14 @@ function pageLayout(items, viewport, rules) {
 }
 
 // Detect and collect each column independently, then traverse columns left to right.
-export function footnotesForPage(items, viewport, pageNumber, rules = [], referenceContext) {
+export function footnotesForPage(items, viewport, pageNumber, rules = [], referenceContext, expectedNumber) {
   const result = [];
+  const layout = pageLayout(items, viewport, rules);
+  let nextExpectedNumber = expectedNumber;
   const allEntries = positionedItems(items, viewport);
   if (referenceContext) allEntries.push(...positionedItems(referenceContext.items, referenceContext.viewport)
     .map((entry) => ({ ...entry, priorPage: true })));
-  for (const column of pageLayout(items, viewport, rules)) {
+  for (const column of layout) {
     const entries = column.entries;
     const bodyEntries = entries.filter((entry) => entry.yRatio < 0.5);
     const typicalHeight = median((bodyEntries.length ? bodyEntries : entries).map((entry) => entry.height));
@@ -311,6 +313,46 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
         baseline, textHeight: inlineText ? entry.height : adjacent.height, columnIndex: column.index,
         columnLeft: column.left, columnRight: column.right });
     }
+    // Some scanned SEC filings render a numeric footnote label correctly while
+    // exposing punctuation or letter-like OCR text to PDF.js. Once the document
+    // has established a numeric sequence, recover those labels only inside a
+    // single-column footnote block with a real separator rule.
+    if (layout.length === 1 && Number.isSafeInteger(nextExpectedNumber) && column.rules.length) {
+      const separator = [...column.rules].sort((a, b) => a.y - b.y)[0];
+      const knownBaselines = new Set(notes.map((note) => Math.round(note.baseline)));
+      const anonymous = entries.filter((entry) => {
+        if (entry.y <= separator.y + 2 || entry.yRatio >= 0.94 || entry.text.length > 3 ||
+          /^\d/.test(entry.text) || knownBaselines.has(Math.round(entry.y))) return false;
+        if (Math.abs(entry.x - separator.x) > Math.max(8, typicalHeight)) return false;
+        const adjacent = entries.filter((other) => other !== entry && other.x > entry.x &&
+          other.y >= entry.y - 2 && other.y - entry.y <= Math.max(3, other.height * 0.65) &&
+          other.text.length >= 3 && /[A-Za-z\u00c0-\u02af]/u.test(other.text))
+          .sort((a, b) => a.x - b.x)[0];
+        return Boolean(adjacent) && entry.height <= typicalHeight * 0.9 &&
+          adjacent.height <= typicalHeight * 0.9;
+      }).sort((a, b) => a.y - b.y);
+
+      const starts = [
+        ...notes.map((note) => ({ y: note.yRatio * viewport.height, note })),
+        ...anonymous.map((entry) => ({ y: entry.y, entry })),
+      ].sort((a, b) => a.y - b.y);
+      for (const start of starts) {
+        if (start.note) {
+          if (start.note.number >= nextExpectedNumber) nextExpectedNumber = start.note.number + 1;
+          continue;
+        }
+        const entry = start.entry;
+        const adjacent = entries.filter((other) => other !== entry && other.x > entry.x &&
+          other.y >= entry.y - 2 && other.y - entry.y <= Math.max(3, other.height * 0.65) &&
+          other.text.length >= 3 && /[A-Za-z\u00c0-\u02af]/u.test(other.text))
+          .sort((a, b) => a.x - b.x)[0];
+        notes.push({ pageNumber, number: nextExpectedNumber, xRatio: entry.xRatio, yRatio: entry.yRatio,
+          label: entry.text, baseline: adjacent.y, textHeight: adjacent.height, columnIndex: column.index,
+          columnLeft: column.left, columnRight: column.right, inferredMarker: entry.text });
+        nextExpectedNumber += 1;
+      }
+    }
+
     notes.sort((a, b) => a.yRatio - b.yRatio);
     for (const [index, note] of notes.entries()) {
       const next = notes[index + 1];
@@ -322,7 +364,10 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
         (!resumedBody || entry.y < resumedBody.y - 2) &&
         (!next || entry.y < next.yRatio * viewport.height - 2) && isPreviewText(entry, note.textHeight) &&
         !(/^\d+$/.test(entry.text) && entry.yRatio > 0.92)).sort(readingOrder);
-      const text = joinNoteEntries(textEntries).replace(markerPattern(note.number), "").trim();
+      const joinedText = joinNoteEntries(textEntries);
+      const text = (note.inferredMarker && joinedText.startsWith(note.inferredMarker)
+        ? joinedText.slice(note.inferredMarker.length)
+        : joinedText.replace(markerPattern(note.number), "")).trim();
       const marker = entries.find((entry) => entry.xRatio === note.xRatio && entry.yRatio === note.yRatio);
       const highlightedEntries = marker && !textEntries.includes(marker) ? [marker, ...textEntries] : textEntries;
       if (text.length >= 3) result.push({ ...note, text, endPageNumber: pageNumber, endColumnIndex: column.index,
@@ -352,7 +397,9 @@ export function footnoteContinuationForPage(items, viewport, operatorList, previ
 
 export function appendFootnotesForPage(index, items, viewport, pageNumber, operatorList, operatorIds, referenceContext) {
   const rules = footnoteRulesForPage(operatorList, viewport, operatorIds);
-  const pageNotes = footnotesForPage(items, viewport, pageNumber, rules, referenceContext);
+  const previousNumber = [...index].reverse().find((note) => Number.isSafeInteger(note.number))?.number;
+  const expectedNumber = Number.isSafeInteger(previousNumber) ? previousNumber + 1 : undefined;
+  const pageNotes = footnotesForPage(items, viewport, pageNumber, rules, referenceContext, expectedNumber);
   for (const column of pageLayout(items, viewport, rules)) {
     const previous = index.at(-1);
     const adjacent = previous && (previous.endPageNumber === pageNumber - 1 && column.index === 0 ||
