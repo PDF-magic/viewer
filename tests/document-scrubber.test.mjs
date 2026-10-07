@@ -22,6 +22,28 @@ test("index extracts note numbers and text, excluding footer page numbers", () =
   assert.equal(notes[1].highlightRegions.length, 1);
 });
 
+test("baseline footnote labels are accepted when the body has matching superscript references", () => {
+  const petitionItems = [
+    item("Background text", 12, 60, 180),
+    item("Exchange Act,", 12, 60, 220),
+    item("1", 6, 150, 216),
+    item("a proposed rule change", 12, 156, 220),
+    item("Commission published notice", 12, 60, 300),
+    item("2", 6, 210, 296),
+    item("of the filing", 12, 216, 300),
+    item("More body text", 12, 60, 400),
+    item("1", 10, 60, 660),
+    item("15 U.S.C. § 78s(b)(1).", 10, 82, 660),
+    item("2", 10, 60, 684),
+    item("Exchange Act Release No. 55816 (May 25, 2007).", 10, 82, 684),
+  ];
+
+  const notes = footnotesForPage(petitionItems, viewport, 1);
+  assert.deepEqual(notes.map(({ number }) => number), [1, 2]);
+  assert.equal(notes[0].text, "15 U.S.C. § 78s(b)(1).");
+  assert.match(notes[1].text, /Exchange Act Release No\. 55816/);
+});
+
 test("ordinary numbered paragraphs and page counters do not create notes", () => {
   assert.deepEqual(footnotesForPage([...body, item("1 A numbered paragraph", 12, 60, 700), item("2", 10, 300, 760)], viewport, 2), []);
 });

@@ -273,7 +273,11 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
         Math.abs(other.y - baseline) < Math.max(2, other.height * 0.2))) continue;
       const superscript = /^\d+$/.test(entry.text) && adjacent && entry.height <= adjacent.height * 0.8 &&
         adjacent.y - entry.y >= adjacent.height * 0.15 && adjacent.x - entry.x <= entry.height * (entry.text.length + 2);
-      const reference = superscript && allEntries.some((other) => other !== entry && other.text === entry.text &&
+      // A definition label can sit on the note-text baseline even when its
+      // matching body reference is superscripted. Treat that confirmed body
+      // reference as sufficient evidence without requiring the label itself
+      // to be raised.
+      const reference = Boolean(adjacent) && allEntries.some((other) => other !== entry && other.text === entry.text &&
         (other.priorPage || other.y < entry.y - entry.height) && other.height <= adjacent.height * 0.8 && allEntries.some((body) =>
           body !== other && Boolean(body.priorPage) === Boolean(other.priorPage) &&
           ((body.x < other.x && Math.abs(body.x + Math.abs(body.item.width || 0) - other.x) < adjacent.height) ||
