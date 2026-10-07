@@ -1,3 +1,5 @@
-node_modules/
-dist/
+*.py[cod]
 .DS_Store
+__pycache__/
+dist/
+node_modules/
