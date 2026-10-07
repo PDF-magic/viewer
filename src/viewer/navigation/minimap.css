@@ -73,15 +73,15 @@
   content: "";
   position: absolute;
   top: min(var(--minimap-content-height, 100%), 100%);
-  right: 0;
+  right: 8px;
   bottom: 0;
-  left: 0;
+  left: 8px;
   z-index: 0;
   background: linear-gradient(
     to bottom,
     var(--page-bg) 0,
     color-mix(in srgb, var(--page-bg) 50%, transparent)
-      max(100vh, var(--minimap-tail-fade-height, 100vh))
+      max(100%, var(--minimap-tail-fade-height, 0px))
   );
   pointer-events: none;
 }
@@ -209,6 +209,8 @@
   align-items: stretch;
   justify-content: space-between;
   border-top: 1px solid var(--border);
+  border-radius: 9px;
+  overflow: hidden;
   background: var(--toolbar-bg);
 }
 
