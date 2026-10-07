@@ -124,18 +124,21 @@ if [[ ! -f "$enhancer_dir/ocr-scanned-pdf.sh" ]]; then
   if "$fork_if_available" && command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
     github_login=$(gh api user --jq .login 2>/dev/null || true)
     if [[ -n "$github_login" ]]; then
-      if ! gh repo view "$github_login/enhancer" >/dev/null 2>&1; then
+      is_pdf_magic_fork() {
+        [[ "$(gh api "repos/$github_login/enhancer" --jq 'if .fork and .parent.full_name == "PDF-magic/enhancer" then "yes" else "no" end' 2>/dev/null || true)" == "yes" ]]
+      }
+      if ! is_pdf_magic_fork; then
         gh api --method POST repos/PDF-magic/enhancer/forks >/dev/null 2>&1 || true
         for _ in {1..20}; do
-          gh repo view "$github_login/enhancer" >/dev/null 2>&1 && break
+          is_pdf_magic_fork && break
           sleep 0.5
         done
       fi
-      if gh repo view "$github_login/enhancer" >/dev/null 2>&1; then
+      if is_pdf_magic_fork; then
         repository_url="https://github.com/$github_login/enhancer.git"
         printf 'Using GitHub fork: %s/enhancer\n' "$github_login"
       else
-        printf '%s\n' 'Could not prepare a personal fork; cloning PDF-magic/enhancer instead.' >&2
+        printf '%s\n' 'Could not prepare a matching personal fork; cloning PDF-magic/enhancer instead.' >&2
       fi
     fi
   fi
