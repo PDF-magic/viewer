@@ -256,7 +256,6 @@
 
 .minimap-collapsed .minimap-controls {
   flex: 1 1 auto;
-  border-radius: 9px 9px 0 0;
 }
 
 .minimap-collapsed .minimap-control:not(.minimap-collapse) {
