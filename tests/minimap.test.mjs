@@ -78,14 +78,28 @@ test('switching to local view keeps thumbnails unclipped at the middle and end',
   }
 });
 
-test('short documents keep fixed thumbnail heights at the top after resize', () => {
+test('short overview documents temporarily use local navigator sizing until the viewport needs compression', () => {
   const f = fixture(2);
+  assert.ok(!f.classes.has('minimap-local'));
+  assert.ok(f.classes.has('minimap-local-active'));
+  assert.equal(f.storedValues.get('pdf-viewer-minimap-mode'), undefined);
   assert.equal(parseFloat(f.tiles[0].style.top), 0);
   assert.equal(parseFloat(f.tiles[0].style.height), 112);
   assert.ok(parseFloat(f.tiles[1].style.top) + 112 < f.track.clientHeight);
+
+  f.window.innerHeight = 200;
+  f.track.clientHeight = 148;
+  f.sync();
+  assert.ok(!f.classes.has('minimap-local-active'));
+  assert.ok(parseFloat(f.tiles[0].style.height) < 112);
+  assert.ok(Math.abs(
+    parseFloat(f.tiles[1].style.top) + parseFloat(f.tiles[1].style.height) - f.track.clientHeight,
+  ) < 0.00001);
+
   f.window.innerHeight = 1600;
   f.track.clientHeight = 1548;
   f.sync();
+  assert.ok(f.classes.has('minimap-local-active'));
   assert.equal(parseFloat(f.tiles[0].style.height), 112);
 });
 
