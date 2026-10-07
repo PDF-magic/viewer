@@ -211,8 +211,8 @@ raise SystemExit(host.main())
                 })
             enhance.assert_not_called()
 
-    def test_enhancement_options_scale_review_depth(self):
-        self.assertEqual(host.enhancement_options("deep"), ["--force-ocr", "--ai-review"])
+    def test_enhancement_options_preserve_text_without_automatic_ai(self):
+        self.assertEqual(host.enhancement_options("deep"), ["--skip-text"])
         self.assertEqual(host.enhancement_options("light"), ["--skip-text"])
         with self.assertRaisesRegex(ValueError, "unsupported enhancement mode"):
             host.enhancement_options("unknown")
@@ -223,7 +223,7 @@ raise SystemExit(host.main())
             source = directory / "scan.pdf"
             source.write_bytes(b"test PDF")
             (directory / "ocr-scanned-pdf.sh").write_text(
-                '[ "$3" = "--force-ocr" ] && [ "$4" = "--ai-review" ] || exit 2\n'
+                '[ "$3" = "--skip-text" ] && [ "$4" = "--source-url" ] || exit 2\n'
                 'printf "OCR progress on stdout\\n"\ncp "$1" "$2"\n'
             )
             bootstrap = f"""

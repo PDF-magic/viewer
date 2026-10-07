@@ -21,7 +21,7 @@ import time
 from urllib.parse import unquote, urlparse
 from urllib.request import Request, urlopen
 
-PIPELINE_VERSION = 2
+PIPELINE_VERSION = 3
 
 HOST_CONFIG = Path.home() / ".config" / "pdf-magic" / "enhancer-host.json"
 
@@ -464,7 +464,7 @@ def enhance_pdf(
         def create(report):
             output_path = unique_output(output_directory, safe_stem(source_url))
             run_enhancer(
-                ["/bin/bash", str(enhancer), str(input_path), str(output_path), *options],
+                ["/bin/bash", str(enhancer), str(input_path), str(output_path), *options, "--source-url", reference_url],
                 progress, report_progress=report,
             )
             report({"type": "progress", "stage": "finalizing"})
