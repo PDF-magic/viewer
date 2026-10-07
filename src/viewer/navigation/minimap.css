@@ -77,11 +77,12 @@
   bottom: 0;
   left: 0;
   z-index: 0;
-  background: linear-gradient(
+  background-color: var(--body-bg);
+  background-image: linear-gradient(
     to bottom,
-    color-mix(in srgb, var(--toolbar-bg) 46%, transparent),
-    color-mix(in srgb, var(--toolbar-bg) 24%, transparent) 48px,
-    color-mix(in srgb, var(--toolbar-bg) 16%, transparent)
+    var(--toolbar-bg),
+    color-mix(in srgb, var(--toolbar-bg) 80%, var(--body-bg)) 48px,
+    color-mix(in srgb, var(--toolbar-bg) 65%, var(--body-bg))
   );
   pointer-events: none;
 }

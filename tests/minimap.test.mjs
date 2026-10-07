@@ -105,11 +105,12 @@ test('short overview documents temporarily use local navigator sizing until the 
   assert.equal(parseFloat(f.tiles[0].style.height), 112);
 });
 
-test('short minimaps fade into a translucent tail instead of ending over the document', () => {
+test('short minimaps fade into an opaque themed tail that covers the document', () => {
   const f = fixture(2);
   assert.equal(f.track.style['--minimap-content-height'], '224px');
   assert.match(styles, /\.minimap::after\s*\{[\s\S]*?top:\s*min\(var\(--minimap-content-height, 100%\), 100%\)/);
-  assert.match(styles, /\.minimap::after\s*\{[\s\S]*?color-mix\(in srgb, var\(--toolbar-bg\) 46%, transparent\)/);
+  assert.match(styles, /\.minimap::after\s*\{[\s\S]*?background-color:\s*var\(--body-bg\)/);
+  assert.match(styles, /\.minimap::after\s*\{[\s\S]*?color-mix\(in srgb, var\(--toolbar-bg\) 65%, var\(--body-bg\)\)/);
   assert.match(styles, /\.minimap-pages\s*\{[\s\S]*?z-index:\s*1/);
 
   f.window.innerHeight = 200;
@@ -362,8 +363,8 @@ test('minimap exposes persistent local, side-swap, and collapse controls', () =>
 });
 
 test('local minimap keeps natural thumbnail scale and moves the page background', () => {
-  assert.match(source, /minimapMode\(\) === "overview"[\s\S]*?trackHeight \/ widthScaledHeight[\s\S]*?: 1/);
-  assert.match(source, /mapOffset =[\s\S]*?minimapMode\(\) === "local"[\s\S]*?viewportTop \+ viewportHeight \/ 2 - trackHeight \/ 2/);
+  assert.match(source, /displayMode === "overview"[\s\S]*?trackHeight \/ widthScaledHeight[\s\S]*?: 1/);
+  assert.match(source, /mapOffset =[\s\S]*?displayMode === "local"[\s\S]*?viewportTop \+ viewportHeight \/ 2 - trackHeight \/ 2/);
   assert.match(source, /minimapPages\.style\.transform = `translateY\(\$\{\-mapOffset\}px\)`/);
   assert.match(source, /function pointerMapPosition\(event\)[\s\S]*?\+ mapOffset/);
 });
