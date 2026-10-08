@@ -1,4 +1,5 @@
 import { formatMetadataDate, formatRelativeMetadataDate } from "./metadata-date.js";
+import { updatePdfFaviconForLocalSource } from "./local-file-favicon.js";
 
 const RELATIVE_DATES_KEY = "pdf-viewer-relative-dates";
 const relativeDatesToggle = document.querySelector("#relative-metadata-dates");
@@ -106,7 +107,9 @@ if (metadataList) {
   formatVisibleMetadataDates();
 }
 
-const fileName = fileNameFromUrl(await resolveOriginalUrl());
+const originalUrl = await resolveOriginalUrl();
+updatePdfFaviconForLocalSource(originalUrl, document.querySelector('link[rel="icon"]'));
+const fileName = fileNameFromUrl(originalUrl);
 if (fileName) {
   document.title = fileName;
 }

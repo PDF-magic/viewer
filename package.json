@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
-    "check": "node scripts/check-extension.mjs"
+    "check": "node scripts/check-extension.mjs",
+    "test": "node --test tests/enhancer-setup.test.mjs"
   },
   "dependencies": {
     "pdfjs-dist": "6.3.289",

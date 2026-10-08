@@ -483,7 +483,7 @@ def enhance_pdf(
         def create(report):
             output_path = unique_output(output_directory, safe_stem(source_url))
             run_enhancer(
-                ["/bin/bash", str(enhancer), str(input_path), str(output_path), *options, "--source-url", reference_url],
+                ["/bin/bash", str(enhancer), str(input_path), str(output_path), *options],
                 progress, report_progress=report,
             )
             report({"type": "progress", "stage": "finalizing"})

@@ -65,6 +65,12 @@ function directPageJump() {
     return;
   }
 
+  // Keep typed jumps to the first page aligned with the toolbar, not centered.
+  if (targetPage === 1) {
+    window.scrollTo({ top: 0, behavior: "instant" });
+    return;
+  }
+
   const readableHeight = window.innerHeight - TOOLBAR_HEIGHT - PAGE_GAP * 2;
   const pageRect = pageElement.getBoundingClientRect();
 
