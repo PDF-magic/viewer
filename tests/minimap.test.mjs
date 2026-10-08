@@ -11,7 +11,7 @@ const viewerStyles = readFileSync(new URL('../src/viewer/viewer.css', import.met
 const viewerSource = readFileSync(new URL('../src/viewer/viewer.js', import.meta.url), 'utf8');
 const viewerMarkup = readFileSync(new URL('../src/viewer.html', import.meta.url), 'utf8');
 const toggleStyles = readFileSync(new URL('../src/viewer/theme/image-color-toggle.css', import.meta.url), 'utf8');
-function fixture(count, height = 900) {
+function fixture(count, height = 900, initialPreferences = {}) {
   const windowEvents = [];
   const windowListeners = {};
   const window = { innerHeight: height, scrollY: 0, location: { pathname: '/src/viewer.html', search: '' },
@@ -28,6 +28,12 @@ function fixture(count, height = 900) {
     contains(target) { return target === this; }, setAttribute() {} };
   const viewport = { style: {} };
   const toggle = { checked: true, addEventListener(type, callback) { listeners[`toggle-${type}`] = callback; } };
+  const optIn = { checked: false, addEventListener(type, callback) { listeners[`opt-in-${type}`] = callback; } };
+  const pageTabsButton = {
+    hidden: true,
+    setAttribute() {},
+    addEventListener(type, callback) { listeners[`page-tabs-${type}`] = callback; },
+  };
   const minimapPageContainer = {
     children: tiles,
     style: {},
@@ -36,7 +42,8 @@ function fixture(count, height = 900) {
     replaceChildren(...children) { this.children = children; },
   };
   const elements = { '#viewer': { querySelectorAll: () => pages }, '#minimap': track,
-    '#minimap-pages': minimapPageContainer, '#minimap-viewport': viewport, '#show-minimap': toggle };
+    '#minimap-pages': minimapPageContainer, '#minimap-viewport': viewport, '#show-minimap': toggle,
+    '#page-tabs-opt-in': optIn, '#minimap-page-tabs-toggle': pageTabsButton };
   const classes = new Set();
   const document = { querySelector: selector => elements[selector],
     documentElement: { scrollHeight: count * 1420, classList: {
@@ -44,7 +51,7 @@ function fixture(count, height = 900) {
       add(value) { classes.add(value); },
       toggle(value, force) { force ? classes.add(value) : classes.delete(value); },
     } } };
-  const storedValues = new Map();
+  const storedValues = new Map(Object.entries(initialPreferences));
   const localStorage = {
     getItem: key => storedValues.get(key) ?? null,
     setItem: (key, value) => storedValues.set(key, value),
@@ -60,7 +67,7 @@ function fixture(count, height = 900) {
   vm.runInContext(source, context);
   const sync = () => vm.runInContext('syncMinimap()', context);
   sync();
-  return { window, windowEvents, windowListeners, pages, tiles, track, viewport, toggle, classes, storedValues, context, sync, listeners, minimapPageContainer };
+  return { window, windowEvents, windowListeners, pages, tiles, track, viewport, toggle, optIn, pageTabsButton, classes, storedValues, context, sync, listeners, minimapPageContainer };
 }
 
 test('switching to local view keeps thumbnails unclipped at the middle and end', () => {
@@ -197,7 +204,7 @@ test('dragging the viewport follows the latest pointer position immediately', ()
   assert.ok(prevented);
   assert.equal(parseFloat(f.viewport.style.top), viewportTop);
   assert.ok(Math.abs(f.window.scrollY - viewportTop / viewportTravel * maximum) < 0.00001);
-  assert.match(source, /function scheduleSync\(\) \{[\s\S]*?syncFrame \|\| dragging/);
+  assert.match(source, /function scheduleSync\(layoutChanged = true\) \{[\s\S]*?syncFrame \|\| dragging/);
 });
 
 
@@ -436,7 +443,7 @@ test('persistent thumbnails and their work follow the global minimap preference'
   assert.match(source, /composeThumbnailStrip\(thumbnails\)/);
   assert.match(source, /minimapPages\.append\(strip\)/);
   assert.match(source, /"image\/png"/);
-  assert.match(source, /if \(thumbnailPreparationStarted \|\| !minimapEnabled\(\) \|\| window\.innerWidth <= 700\)/);
+  assert.match(source, /if \(thumbnailPreparationStarted \|\| !minimapEnabled\(\) \|\| pageTabsEnabled\(\) \|\| window\.innerWidth <= 700\)/);
   assert.match(source, /else \{\s*stopThumbnailPreparation\(\);/);
   assert.match(source, /thumbnailLoadGeneration \+= 1;[\s\S]*?thumbnailDocument = undefined/);
   assert.match(source, /scheduleThumbnailPreparation\(\);\s*$/);
@@ -473,7 +480,75 @@ test('minimap exposes persistent local, side-swap, and collapse controls', () =>
 
 test('local minimap keeps natural thumbnail scale and moves the page background', () => {
   assert.match(source, /displayMode === "overview"[\s\S]*?trackHeight \/ widthScaledHeight[\s\S]*?: 1/);
-  assert.match(source, /mapOffset =[\s\S]*?displayMode === "local"[\s\S]*?viewportTop \+ viewportHeight \/ 2 - trackHeight \/ 2/);
+  assert.match(source, /mapOffset =[\s\S]*?minimapDisplayMode === "local"[\s\S]*?viewportTop \+ viewportHeight \/ 2 - minimapTrackHeight \/ 2/);
   assert.match(source, /minimapPages\.style\.transform = `translateY\(\$\{\-mapOffset\}px\)`/);
   assert.match(source, /function pointerMapPosition\(event\)[\s\S]*?\+ mapOffset/);
+});
+
+test('numbered page tabs require opt-in and remain dismissible without losing the option', () => {
+  const f = fixture(5);
+  assert.equal(f.optIn.checked, false, 'default setting is off');
+  assert.equal(f.pageTabsButton.hidden, true, 'the № control is hidden until opted in');
+  assert.equal(f.classes.has('minimap-page-tabs'), false);
+  assert.equal(f.storedValues.has('pdf-viewer-page-tabs-opt-in'), false, 'load does not implicitly opt in');
+
+  f.optIn.checked = true;
+  f.listeners['opt-in-change']();
+  assert.equal(f.pageTabsButton.hidden, false);
+  assert.equal(f.classes.has('minimap-page-tabs'), true);
+  assert.equal(f.storedValues.get('pdf-viewer-page-tabs-opt-in'), 'true');
+  assert.equal(f.storedValues.get('pdf-viewer-page-tabs'), 'true');
+
+  f.listeners['page-tabs-click']();
+  assert.equal(f.classes.has('minimap-page-tabs'), false, '№ switches back to the minimap');
+  assert.equal(f.optIn.checked, true, 'the feature stays available when viewing thumbnails');
+  f.listeners['page-tabs-click']();
+  assert.equal(f.classes.has('minimap-page-tabs'), true);
+
+  f.optIn.checked = false;
+  f.listeners['opt-in-change']();
+  assert.equal(f.pageTabsButton.hidden, true);
+  assert.equal(f.classes.has('minimap-page-tabs'), false);
+  assert.equal(f.storedValues.get('pdf-viewer-page-tabs-opt-in'), 'false');
+  assert.equal(f.storedValues.get('pdf-viewer-page-tabs'), 'false');
+});
+
+test('numbered page tab availability and mode restore independently', () => {
+  const enabled = fixture(5, 900, {
+    'pdf-viewer-page-tabs-opt-in': 'true',
+    'pdf-viewer-page-tabs': 'true',
+  });
+  assert.equal(enabled.optIn.checked, true);
+  assert.equal(enabled.pageTabsButton.hidden, false);
+  assert.equal(enabled.classes.has('minimap-page-tabs'), true);
+
+  const thumbnails = fixture(5, 900, {
+    'pdf-viewer-page-tabs-opt-in': 'true',
+    'pdf-viewer-page-tabs': 'false',
+  });
+  assert.equal(thumbnails.optIn.checked, true);
+  assert.equal(thumbnails.pageTabsButton.hidden, false);
+  assert.equal(thumbnails.classes.has('minimap-page-tabs'), false);
+
+  const disabled = fixture(5, 900, {
+    'pdf-viewer-page-tabs-opt-in': 'false',
+    'pdf-viewer-page-tabs': 'true',
+  });
+  assert.equal(disabled.optIn.checked, false);
+  assert.equal(disabled.pageTabsButton.hidden, true);
+  assert.equal(disabled.classes.has('minimap-page-tabs'), false);
+
+  const legacy = fixture(5, 900, { 'pdf-viewer-page-tabs': 'true' });
+  assert.equal(legacy.optIn.checked, true, 'respect existing explicit use of the tab mode');
+  assert.equal(legacy.classes.has('minimap-page-tabs'), true);
+});
+
+test('opt-in reveals the side navigation when it was disabled', () => {
+  const f = fixture(5, 900, { 'pdf-viewer-show-minimap': 'false' });
+  assert.equal(f.classes.has('minimap-disabled'), true);
+  f.optIn.checked = true;
+  f.listeners['opt-in-change']();
+  assert.equal(f.classes.has('minimap-disabled'), false);
+  assert.equal(f.toggle.checked, true);
+  assert.equal(f.classes.has('minimap-page-tabs'), true);
 });
