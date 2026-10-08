@@ -72,7 +72,7 @@ function scrollToTarget(target, searchResult = false) {
   }));
 }
 
-async function jumpToFootnote(rawNumber) {
+async function jumpToFootnote(rawNumber, originPage = currentPageNumber()) {
   const number = Number.parseInt(String(rawNumber).trim(), 10);
   if (!Number.isSafeInteger(number) || number <= 0) {
     setStatus("Enter a footnote number", "error");
@@ -97,7 +97,7 @@ async function jumpToFootnote(rawNumber) {
   const target = await findFootnoteTarget(
     session.document,
     number,
-    currentPageNumber(),
+    originPage,
     requestId,
     session.operators,
   );
@@ -113,6 +113,13 @@ async function jumpToFootnote(rawNumber) {
   scrollToTarget(target, true);
   setStatus(`Footnote ${number} · page ${target.pageNumber}`, "success");
 }
+
+window.addEventListener("pdf-viewer-inline-footnote-jump", (event) => {
+  const { number, originPage } = event.detail || {};
+  if (Number.isSafeInteger(number) && number > 0) {
+    void jumpToFootnote(number, Number.isSafeInteger(originPage) ? originPage : currentPageNumber());
+  }
+});
 
 form?.addEventListener("submit", (event) => {
   event.preventDefault();

@@ -10,6 +10,8 @@ import { PagePreviews } from "./page-previews.js";
 import { preparePrintDocument } from "./print-renderer.js";
 import { highlightFootnote, renderFootnoteHighlight } from "./navigation/footnote-highlight.js";
 import { findPrintedContentsEntries, resolvePrintedContentsPage, contentsEntryHasEmbeddedLink } from "./navigation/printed-contents.js";
+import { createClickableReferenceLayer } from "./navigation/clickable-reference-links.js";
+import { outlinedSectionHeadings } from "./navigation/section-cross-references.js";
 
 const sourceMode = window.location.pathname.includes("/src/");
 
@@ -96,6 +98,22 @@ let activeSearchIndex = -1;
 let sectionEntries = [];
 let contentsPageLabels = null;
 let contentsOutlineItems = [];
+let clickableSectionTargetsPromise;
+
+function clickableSectionTargets() {
+  if (!clickableSectionTargetsPromise) {
+    clickableSectionTargetsPromise = pdfDocument.getOutline().then((outline) => {
+      const targets = new Map();
+      for (const heading of outlinedSectionHeadings(outline)) {
+        const key = heading.normalizedReference;
+        if (!targets.has(key)) targets.set(key, []);
+        targets.get(key).push(heading);
+      }
+      return targets;
+    }).catch(() => new Map());
+  }
+  return clickableSectionTargetsPromise;
+}
 let sectionHighlightRequestId = 0;
 let renderGeneration = 0;
 let renderingAllPages = false;
@@ -849,6 +867,43 @@ async function renderPageNow(pageNumber) {
     ...(annotations.length ? [annotationLayer] : []),
   );
   container.classList.add("rendered");
+  // Resolve outlined headings once, without delaying the first readable page.
+  // Only the recognized words receive clickable hit targets; native PDF links
+  // and the viewer's built-in toolbar navigation retain their own behavior.
+  void clickableSectionTargets().then((sectionTargets) => {
+    if (generation !== renderGeneration || !container.contains(textLayer)) return;
+    if (!renderingAllPages && !pageIsInRenderWindow(pageNumber)) return;
+    const layer = createClickableReferenceLayer({
+      pageElement: container,
+      items: textContent.items.filter((item) => "str" in item),
+      textDivs: textLayerTask.textDivs,
+      annotationsLayer: annotationLayer,
+      viewport,
+      pageCount: pdfDocument.numPages,
+      sectionTargets,
+      onNavigate(reference) {
+        if (reference.kind === "footnote") {
+          window.dispatchEvent(new CustomEvent("pdf-viewer-inline-footnote-jump", {
+            detail: { number: reference.number, originPage: pageNumber },
+          }));
+        } else if (reference.kind === "section") {
+          void navigateToOutlineItem(reference.item);
+        } else if (reference.kind === "page") {
+          const pages = Array.isArray(contentsPageLabels)
+            ? contentsPageLabels.flatMap((label, index) => label === String(reference.number) ? [index + 1] : [])
+            : [];
+          goToPage(pages.length === 1 ? pages[0] : reference.number);
+        }
+      },
+    });
+    if (layer.childElementCount) {
+      const nextLayer = contentsLayer?.parentElement === container ? contentsLayer
+        : annotationLayer.parentElement === container ? annotationLayer : null;
+      container.insertBefore(layer, nextLayer);
+    }
+  }).catch((error) => {
+    console.warn("Could not add clickable document references", error);
+  });
   highlightTextLayer(textLayer, completedSearchQuery);
   renderFootnoteHighlight(container, pageNumber, rotation);
   renderedPages.add(pageNumber);
