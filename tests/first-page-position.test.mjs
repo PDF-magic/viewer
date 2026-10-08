@@ -34,3 +34,34 @@ test("navigating to a short first page scrolls to the document top instead of ce
   assert.equal(calls[0].top, 0);
   assert.equal(calls[0].behavior, "instant");
 });
+
+
+test("jumping to any later page aligns its start beneath the visible toolbar", () => {
+  const definition = viewerSource.match(/function goToPage\(pageNumber, behavior = "smooth"\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(definition);
+  for (const pageHeight of [300, 1400]) {
+    const calls = [];
+    const page = {
+      getBoundingClientRect() { return { top: 700, height: pageHeight }; },
+      scrollIntoView() { assert.fail("Pages must not be centered"); },
+    };
+    const context = vm.createContext({
+      pdfDocument: { numPages: 3 },
+      setCurrentPage() {},
+      queuePageRender() {},
+      pageElements: [null, page],
+      document: {
+        querySelector(selector) {
+          if (selector === ".toolbar") return { getBoundingClientRect: () => ({ height: 100 }) };
+          if (selector === "#enhance-progress") return { getBoundingClientRect: () => ({ height: 42 }) };
+          return null;
+        },
+      },
+      window: { scrollY: 200, scrollTo(options) { calls.push(options); } },
+    });
+    vm.runInContext(`${definition}; goToPage(2, "auto");`, context);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].top, 758);
+    assert.equal(calls[0].behavior, "instant");
+  }
+});

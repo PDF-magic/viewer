@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 const source = readFileSync(new URL('../src/viewer/navigation/toolbar-layout.js', import.meta.url), 'utf8');
 
-function fixture({ value = '900', max = '2000', pageTop = 900000, pageHeight = 700 } = {}) {
+function fixture({ value = '900', max = '2000', pageTop = 900000, pageHeight = 700, toolbarHeight = 52, progressHeight = 0 } = {}) {
   const changeListeners = [];
   const events = [];
   const pageNumberInput = {
@@ -29,7 +29,11 @@ function fixture({ value = '900', max = '2000', pageTop = 900000, pageHeight = 7
   const document = {
     createElement() { return { getContext() { return { measureText() { return { width: 0 }; } }; } }; },
     querySelector(selector) {
-      return selector === '#page-number' ? pageNumberInput : selector === '#viewer' ? viewer : searchElement;
+      if (selector === '#page-number') return pageNumberInput;
+      if (selector === '#viewer') return viewer;
+      if (selector === '.toolbar') return { getBoundingClientRect: () => ({ height: toolbarHeight }) };
+      if (selector === '#enhance-progress') return { getBoundingClientRect: () => ({ height: progressHeight }) };
+      return searchElement;
     },
     documentElement: { classList: { toggle() {} } },
   };
@@ -49,9 +53,9 @@ test('typed page jumps instantly before the viewer change handler', () => {
   f.changeListeners.push(() => f.events.push(['viewer-handler']));
   for (const listener of f.changeListeners) listener();
   assert.deepEqual(f.events[0], ['selector', '.page[data-page="900"]']);
-  assert.equal(f.events[1][0], 'jump');
+  assert.equal(f.events[1][0], 'scroll');
   assert.equal(f.events[1][1].behavior, 'instant');
-  assert.equal(f.events[1][1].block, 'center');
+  assert.equal(f.events[1][1].top, 899948);
   assert.deepEqual(f.events[2], ['viewer-handler']);
 });
 
@@ -65,7 +69,7 @@ test('tall pages jump directly to the readable top edge', () => {
   const f = fixture({ value: '1200', pageTop: 500000, pageHeight: 1400 });
   f.changeListeners[0]();
   assert.equal(f.events.at(-1)[0], 'scroll');
-  assert.equal(f.events.at(-1)[1].top, 499924);
+  assert.equal(f.events.at(-1)[1].top, 499948);
   assert.equal(f.events.at(-1)[1].behavior, 'instant');
 });
 
@@ -75,5 +79,14 @@ test('typed jumps to page one align it with the top instead of centering it', ()
   assert.equal(f.events.at(-1)[0], 'scroll');
   assert.equal(f.events.at(-1)[1].top, 0);
   assert.equal(f.events.at(-1)[1].behavior, 'instant');
+  assert.ok(!f.events.some(([event]) => event === 'jump'));
+});
+
+
+test('typed jumps align short pages immediately below a two-row toolbar and enhancement bar', () => {
+  const f = fixture({ value: '8', pageTop: 12000, pageHeight: 300, toolbarHeight: 100, progressHeight: 42 });
+  f.changeListeners[0]();
+  assert.equal(f.events.at(-1)[0], 'scroll');
+  assert.equal(f.events.at(-1)[1].top, 11858);
   assert.ok(!f.events.some(([event]) => event === 'jump'));
 });

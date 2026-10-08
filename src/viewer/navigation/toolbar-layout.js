@@ -1,6 +1,5 @@
 const TOOLBAR_ROW_BREAKPOINT = 900;
 const TOOLBAR_HEIGHT = 52;
-const PAGE_GAP = 24;
 
 const twoRowToolbar = window.matchMedia(`(max-width: ${TOOLBAR_ROW_BREAKPOINT}px)`);
 const pageNumberInput = document.querySelector("#page-number");
@@ -71,17 +70,11 @@ function directPageJump() {
     return;
   }
 
-  const readableHeight = window.innerHeight - TOOLBAR_HEIGHT - PAGE_GAP * 2;
-  const pageRect = pageElement.getBoundingClientRect();
-
-  if (pageRect.height <= readableHeight) {
-    pageElement.scrollIntoView({ behavior: "instant", block: "center" });
-    return;
-  }
-
-  const pageTop = window.scrollY + pageRect.top;
+  const toolbarHeight = document.querySelector(".toolbar")?.getBoundingClientRect().height ?? TOOLBAR_HEIGHT;
+  const progressHeight = document.querySelector("#enhance-progress")?.getBoundingClientRect().height ?? 0;
+  const pageTop = window.scrollY + pageElement.getBoundingClientRect().top;
   window.scrollTo({
-    top: Math.max(0, pageTop - TOOLBAR_HEIGHT - PAGE_GAP),
+    top: Math.max(0, pageTop - toolbarHeight - progressHeight),
     behavior: "instant",
   });
 }
