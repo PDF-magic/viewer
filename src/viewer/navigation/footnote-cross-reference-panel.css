@@ -1,0 +1,130 @@
+.cross-reference-dialog {
+  box-sizing: border-box;
+  width: min(780px, calc(100vw - 28px));
+  max-height: min(85vh, 850px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--toolbar-bg);
+  color: var(--text);
+  box-shadow: 0 18px 65px rgb(0 0 0 / 35%);
+}
+
+.cross-reference-dialog::backdrop {
+  background: rgb(0 0 0 / 58%);
+}
+
+.cross-reference-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(85vh, 850px);
+}
+
+.cross-reference-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px 10px;
+}
+
+.cross-reference-panel-header h2 {
+  flex: 1;
+  margin: 0;
+  font-size: 18px;
+}
+
+.cross-reference-panel button {
+  font: inherit;
+  cursor: pointer;
+}
+
+.cross-reference-panel button:focus-visible {
+  outline: 2px solid var(--page-border);
+  outline-offset: 2px;
+}
+
+.cross-reference-close,
+.cross-reference-copy {
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--control-bg);
+  color: var(--text);
+}
+
+.cross-reference-copy:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cross-reference-status,
+.cross-reference-help {
+  margin: 0;
+  padding: 0 18px 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.cross-reference-help {
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.cross-reference-list {
+  margin: 0;
+  padding: 0 18px 18px;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.cross-reference-entry {
+  padding: 13px 0;
+  border-top: 1px solid var(--border);
+}
+
+.cross-reference-entry-header {
+  display: flex;
+  align-items: center;
+}
+
+.cross-reference-source {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--page-border);
+  font-weight: 650 !important;
+  text-align: left;
+}
+
+.cross-reference-text {
+  margin: 7px 0 9px;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cross-reference-targets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cross-reference-target,
+.cross-reference-unresolved {
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--control-bg);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.cross-reference-target:hover {
+  background: var(--control-hover);
+}
+
+.cross-reference-unresolved {
+  color: var(--muted);
+}

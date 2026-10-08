@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="viewer/theme/image-color-toggle.css" />
     <link rel="stylesheet" href="viewer/sharing/qr-file-url.css" />
     <link rel="stylesheet" href="viewer/annotation-layer.css" />
+    <link rel="stylesheet" href="viewer/navigation/footnote-cross-reference-panel.css" />
   </head>
   <body>
     <header class="toolbar" aria-label="PDF controls">
@@ -146,6 +147,7 @@
             </div>
             <span id="footnote-jump-status" class="tool-footnote-status" aria-live="polite"></span>
           </form>
+          <button id="cross-reference-notes" class="tool-button" type="button" role="menuitem">↗ <span>Footnote cross-references…</span></button>
           <div class="menu-separator" role="separator"></div>
           <label class="tool-toggle" title="Use the document minimap instead of the browser scrollbar">
             <span>Show minimap</span>
@@ -238,6 +240,19 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+    <dialog id="cross-reference-dialog" class="cross-reference-dialog" aria-labelledby="cross-reference-title">
+      <section class="cross-reference-panel">
+        <header class="cross-reference-panel-header">
+          <h2 id="cross-reference-title">Cross-referenced footnotes</h2>
+          <button id="cross-reference-copy" class="cross-reference-copy" type="button" disabled>Copy list</button>
+          <button id="cross-reference-close" class="cross-reference-close" type="button" aria-label="Close cross-references">×</button>
+        </header>
+        <p id="cross-reference-status" class="cross-reference-status" role="status" aria-live="polite"></p>
+        <ol id="cross-reference-list" class="cross-reference-list" aria-label="Footnotes citing other footnotes"></ol>
+        <p class="cross-reference-help">Finds explicit supra and infra citations in recognized footnotes. Scans without extractable text may be incomplete.</p>
+      </section>
+    </dialog>
+
     <dialog id="qr-file-url-dialog" class="qr-file-url-dialog" aria-labelledby="qr-file-url-title">
       <div class="qr-file-url-card">
         <button id="qr-file-url-close" class="qr-file-url-close" type="button" aria-label="Close QR code">×</button>
@@ -263,6 +278,7 @@
     <script type="module" src="viewer/navigation/page-number-input.js"></script>
     <script type="module" src="viewer/navigation/document-scrubber.js"></script>
     <script type="module" src="viewer/navigation/footnote-jump.js"></script>
+    <script type="module" src="viewer/navigation/footnote-cross-reference-panel.js"></script>
     <script type="module" src="viewer/sharing/copy-file-url.js"></script>
     <script type="module" src="viewer/sharing/summarize-with-chatgpt.js"></script>
     <script type="module" src="viewer/sharing/qr-file-url.js"></script>
