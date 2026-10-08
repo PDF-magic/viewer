@@ -20,8 +20,8 @@ export function normalizeRepositoryUrl(input) {
 }
 
 export function shellQuote(value) {
-  return "'" + String(value).replace(/'/g, "'\\''") + "'";
   return "'" + String(value).replace(/'/g, "'\"'\"'") + "'";
+}
 
 export function makeInstallerScript({ extensionId, repositoryUrl, checkoutPath = "" }) {
   if (!/^[a-p]{32}$/.test(extensionId || "")) {
