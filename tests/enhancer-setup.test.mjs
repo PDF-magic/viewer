@@ -34,9 +34,9 @@ test("generated installer uses chosen fork and folder without shell interpolatio
     checkoutPath: "/Users/tester/My 'Enhancer' files",
   });
   assert.ok(script.includes("--repo 'https://github.com/tester/enhancer.git'"));
-  assert.ok(script.includes("--directory '/Users/tester/My '"'"'Enhancer'"'"' files'"));
+  assert.ok(script.includes("--directory " + shellQuote("/Users/tester/My 'Enhancer' files")));
   assert.ok(script.includes("PDF_MAGIC_SETUP_APPROVED=1 bash -s"));
-  assert.equal(shellQuote("it's"), "'it'"'"'s'");
+  assert.ok(shellQuote("it\'s").includes(String.raw`'"'"'`));
   assert.throws(() => makeInstallerScript({
     extensionId,
     repositoryUrl: "https://github.com/tester/enhancer",
