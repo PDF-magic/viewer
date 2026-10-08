@@ -9,7 +9,7 @@ export function normalizeRepositoryUrl(input) {
   } catch {
     throw new Error("Enter a GitHub repository URL, such as https://github.com/your-name/enhancer");
   }
-  const parts = url.pathname.replace(/\\/+$|\\.git$/g, "").split("/").filter(Boolean);
+  const parts = url.pathname.replace(/\/+$|\.git$/g, "").split("/").filter(Boolean);
   if (url.protocol !== "https:" || url.hostname !== "github.com" ||
       url.username || url.password || url.port || url.search || url.hash ||
       parts.length !== 2 || !parts.every((part) => /^[a-zA-Z0-9_.-]+$/.test(part)) ||
@@ -21,7 +21,7 @@ export function normalizeRepositoryUrl(input) {
 
 export function shellQuote(value) {
   return "'" + String(value).replace(/'/g, "'\\''") + "'";
-}
+  return "'" + String(value).replace(/'/g, "'\"'\"'") + "'";
 
 export function makeInstallerScript({ extensionId, repositoryUrl, checkoutPath = "" }) {
   if (!/^[a-p]{32}$/.test(extensionId || "")) {
@@ -29,7 +29,7 @@ export function makeInstallerScript({ extensionId, repositoryUrl, checkoutPath =
   }
   const repo = normalizeRepositoryUrl(repositoryUrl);
   const location = String(checkoutPath).trim();
-  if (/[\\r\\n\\0]/.test(location)) {
+  if (/[\r\n\0]/.test(location)) {
     throw new Error("The checkout folder must be a single filesystem path");
   }
   const args = [shellQuote(extensionId), "--repo", shellQuote(repo)];
