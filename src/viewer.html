@@ -127,6 +127,7 @@
             <span>Print</span>
           </button>
           <button id="qr-file-url" class="tool-button" type="button" role="menuitem">▦ <span>QR file URL</span></button>
+          <button id="open-enhancer-setup" class="tool-button" type="button" role="menuitem">✦ <span>Set up PDF Enhancer</span></button>
           <div class="menu-separator" role="separator"></div>
           <button id="choose-loading-image" class="tool-button" type="button" role="menuitem">▧ <span>Custom loading image…</span></button>
           <button id="reset-loading-image" class="tool-button" type="button" role="menuitem" hidden>↺ <span>Use default loading image</span></button>
@@ -251,6 +252,24 @@
         <ol id="cross-reference-list" class="cross-reference-list" aria-label="Footnotes citing other footnotes"></ol>
         <p class="cross-reference-help">Finds explicit supra and infra citations in recognized footnotes. Scans without extractable text may be incomplete.</p>
       </section>
+    </dialog>
+
+    <dialog id="enhancer-setup-dialog" class="enhancer-setup-dialog" aria-labelledby="enhancer-setup-title">
+      <div class="enhancer-setup-card">
+        <button id="enhancer-setup-close" class="enhancer-setup-close" type="button" aria-label="Close PDF Enhancer setup">×</button>
+        <h2 id="enhancer-setup-title">Set up PDF Enhancer</h2>
+        <p>Choose the GitHub repository you already forked, or use the upstream enhancer. Then select where its local checkout should live.</p>
+        <form id="enhancer-setup-form">
+          <label for="enhancer-repository-url">GitHub repository (existing fork or upstream)</label>
+          <input id="enhancer-repository-url" type="url" required autocomplete="url" spellcheck="false" value="https://github.com/PDF-magic/enhancer" placeholder="https://github.com/your-name/enhancer" />
+          <label for="enhancer-checkout-path">Local checkout folder (optional)</label>
+          <input id="enhancer-checkout-path" type="text" spellcheck="false" placeholder="Leave blank for the managed default folder" />
+          <p class="enhancer-setup-help">If that folder already contains your selected checkout, setup will reuse it. Otherwise setup will clone the repository into it.</p>
+          <button id="enhancer-clone" type="submit">Clone · Download installer</button>
+          <p id="enhancer-setup-status" role="status" aria-live="polite"></p>
+        </form>
+        <p class="enhancer-setup-help">Your browser cannot run Git or register a native helper. After downloading, extract the ZIP and open <strong>Install PDF Magic.command</strong> on macOS. The script will clone and connect Enhance. No command needs to be pasted into Terminal.</p>
+      </div>
     </dialog>
 
     <dialog id="qr-file-url-dialog" class="qr-file-url-dialog" aria-labelledby="qr-file-url-title">
