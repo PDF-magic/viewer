@@ -9,7 +9,7 @@ export function normalizeRepositoryUrl(input) {
   } catch {
     throw new Error("Enter a GitHub repository URL, such as https://github.com/your-name/enhancer");
   }
-  const parts = url.pathname.replace(/\/+$|\.git$/g, "").split("/").filter(Boolean);
+  const parts = url.pathname.replace(/\/+$/, "").replace(/\.git$/, "").split("/").filter(Boolean);
   if (url.protocol !== "https:" || url.hostname !== "github.com" ||
       url.username || url.password || url.port || url.search || url.hash ||
       parts.length !== 2 || !parts.every((part) => /^[a-zA-Z0-9_.-]+$/.test(part)) ||
