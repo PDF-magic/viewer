@@ -142,7 +142,12 @@ if [[ -n "$repository_arg" && -f "$enhancer_dir/ocr-scanned-pdf.sh" ]]; then
     exit 1
   fi
   existing_remote=$(git -C "$enhancer_dir" remote get-url origin 2>/dev/null || true)
-  if [[ -z "$existing_remote" || "\${existing_remote%.git}" != "\${repository_arg%.git}" ]]; then
+  # A checkout cloned through SSH is the same fork as its HTTPS URL.
+  existing_name=\${existing_remote#https://github.com/}
+  existing_name=\${existing_name#git@github.com:}
+  existing_name=\${existing_name#ssh://git@github.com/}
+  chosen_name=\${repository_arg#https://github.com/}
+  if [[ -z "$existing_remote" || "\${existing_name%.git}" != "\${chosen_name%.git}" ]]; then
     printf 'Existing checkout at %s does not match selected repository %s.\n' "$enhancer_dir" "$repository_arg" >&2
     printf 'Choose a different local checkout folder, or select the existing repository URL.\n' >&2
     exit 1
