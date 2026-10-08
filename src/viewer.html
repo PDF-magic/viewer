@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="viewer/search/search-highlight-cues.css" />
     <link rel="stylesheet" href="viewer/navigation/toolbar-layout.css" />
     <link rel="stylesheet" href="viewer/navigation/minimap.css" />
+    <link rel="stylesheet" href="viewer/navigation/page-tabs.css" />
     <link rel="stylesheet" href="viewer/theme/image-color-toggle.css" />
     <link rel="stylesheet" href="viewer/sharing/qr-file-url.css" />
     <link rel="stylesheet" href="viewer/annotation-layer.css" />
@@ -197,7 +198,8 @@
         <div id="minimap-pages" class="minimap-pages" aria-hidden="true"></div>
         <div id="minimap-viewport" class="minimap-viewport" aria-hidden="true"></div>
       </div>
-      <div id="minimap-controls" class="minimap-controls" role="group" aria-label="Minimap controls">
+      <nav id="page-tabs" class="page-tabs" aria-label="Document pages" aria-hidden="true"></nav>
+      <div id="minimap-controls" class="minimap-controls" role="group" aria-label="Page navigation controls">
         <button
           id="minimap-swap-side"
           class="minimap-control minimap-swap-side"
@@ -213,6 +215,14 @@
           aria-pressed="false"
           title="Use local page navigator"
         ><span id="minimap-mode-icon" aria-hidden="true">▥</span></button>
+        <button
+          id="minimap-page-tabs-toggle"
+          class="minimap-control minimap-page-tabs-toggle"
+          type="button"
+          aria-label="Use numbered page tabs"
+          aria-pressed="false"
+          title="Use numbered page tabs"
+        >№</button>
         <button
           id="minimap-collapse"
           class="minimap-control minimap-collapse"
@@ -309,6 +319,7 @@
     <script type="module" src="viewer/selection/text-selection.js"></script>
     <script type="module" src="viewer/search/search-highlight-cues.js"></script>
     <script type="module" src="viewer/navigation/minimap.js"></script>
+    <script type="module" src="viewer/navigation/page-tabs.js"></script>
     <script type="module" src="viewer/navigation/page-number-input.js"></script>
     <script type="module" src="viewer/navigation/document-scrubber.js"></script>
     <script type="module" src="viewer/navigation/footnote-jump.js"></script>
