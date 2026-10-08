@@ -17,11 +17,13 @@ const minimapModeButton = document.querySelector("#minimap-mode");
 const minimapModeIcon = document.querySelector("#minimap-mode-icon");
 const minimapSwapSideButton = document.querySelector("#minimap-swap-side");
 const minimapCollapseButton = document.querySelector("#minimap-collapse");
+const minimapPageTabsButton = document.querySelector("#minimap-page-tabs-toggle");
 
 const MINIMAP_STORAGE_KEY = "pdf-viewer-show-minimap";
 const MINIMAP_MODE_STORAGE_KEY = "pdf-viewer-minimap-mode";
 const MINIMAP_SIDE_STORAGE_KEY = "pdf-viewer-minimap-side";
 const MINIMAP_COLLAPSED_STORAGE_KEY = "pdf-viewer-minimap-collapsed";
+const PAGE_TABS_STORAGE_KEY = "pdf-viewer-page-tabs";
 const MINIMAP_RENDER_CONCURRENCY = 4;
 const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
 const MINIMAP_WHEEL_EASE = 0.32;
@@ -68,6 +70,16 @@ function minimapCollapsed() {
   return document.documentElement.classList.contains("minimap-collapsed");
 }
 
+function pageTabsEnabled() {
+  return document.documentElement.classList.contains("minimap-page-tabs");
+}
+
+function notifyPageTabsVisibility() {
+  window.dispatchEvent(new CustomEvent("pdf-viewer-page-tabs-mode-change", {
+    detail: { enabled: pageTabsEnabled() },
+  }));
+}
+
 function minimapMode() {
   return document.documentElement.classList.contains("minimap-local") ? "local" : "overview";
 }
@@ -82,7 +94,7 @@ function localMinimapActive() {
 }
 
 function setMinimapAccessibility() {
-  const interactive = minimapEnabled() && !minimapCollapsed();
+  const interactive = minimapEnabled() && !minimapCollapsed() && !pageTabsEnabled();
   minimap.setAttribute("aria-hidden", String(!interactive));
   minimap.tabIndex = interactive ? 0 : -1;
   minimapShell?.setAttribute("data-collapsed", String(minimapCollapsed()));
@@ -111,6 +123,7 @@ function setMinimapEnabled(enabled, persist = true) {
   });
   minimapToggle.checked = enabled;
   setMinimapAccessibility();
+  if (pageTabsEnabled()) notifyPageTabsVisibility();
 
   if (persist) {
     localStorage.setItem(MINIMAP_STORAGE_KEY, String(enabled));
@@ -144,13 +157,35 @@ function setMinimapMode(mode, persist = true) {
   scheduleSync();
 }
 
+function setPageTabsEnabled(enabled, persist = true) {
+  const previouslyEnabled = pageTabsEnabled();
+  if (previouslyEnabled !== enabled) {
+    updateMinimapLayout(() => {
+      document.documentElement.classList.toggle("minimap-page-tabs", enabled);
+    });
+  }
+  const label = enabled ? "Use thumbnail minimap" : "Use numbered page tabs";
+  minimapPageTabsButton?.setAttribute("aria-pressed", String(enabled));
+  minimapPageTabsButton?.setAttribute("aria-label", label);
+  if (minimapPageTabsButton) minimapPageTabsButton.title = label;
+  setMinimapAccessibility();
+
+  if (persist) localStorage.setItem(PAGE_TABS_STORAGE_KEY, String(enabled));
+  if (enabled) cancelScheduledThumbnailPreparation();
+  else {
+    scheduleThumbnailPreparation();
+    scheduleSync();
+  }
+  if (previouslyEnabled !== enabled) notifyPageTabsVisibility();
+}
+
 function setMinimapSide(side, persist = true) {
   const left = side === "left";
   updateMinimapLayout(() => {
     document.documentElement.classList.toggle("minimap-left", left);
   });
   if (minimapSwapSideButton) {
-    const label = left ? "Move minimap to the right" : "Move minimap to the left";
+    const label = left ? "Move page navigation to the right" : "Move page navigation to the left";
     minimapSwapSideButton.setAttribute("aria-label", label);
     minimapSwapSideButton.title = label;
   }
@@ -168,12 +203,13 @@ function setMinimapCollapsed(collapsed, persist = true) {
     document.documentElement.classList.toggle("minimap-collapsed", collapsed);
   });
   if (minimapCollapseButton) {
-    const label = collapsed ? "Expand minimap" : "Collapse minimap";
+    const label = collapsed ? "Expand page navigation" : "Collapse page navigation";
     minimapCollapseButton.setAttribute("aria-label", label);
     minimapCollapseButton.setAttribute("aria-expanded", String(!collapsed));
     minimapCollapseButton.title = label;
   }
   setMinimapAccessibility();
+  if (pageTabsEnabled()) notifyPageTabsVisibility();
 
   if (persist) {
     localStorage.setItem(MINIMAP_COLLAPSED_STORAGE_KEY, String(collapsed));
@@ -642,6 +678,7 @@ function scheduleThumbnailPreparation() {
     thumbnailPreparationStarted ||
     thumbnailPreparationCancel ||
     !minimapEnabled() ||
+    pageTabsEnabled() ||
     window.innerWidth <= 700
   ) {
     return;
@@ -666,7 +703,7 @@ function scheduleThumbnailPreparation() {
 }
 
 function startThumbnailPreparation() {
-  if (thumbnailPreparationStarted || !minimapEnabled() || window.innerWidth <= 700) {
+  if (thumbnailPreparationStarted || !minimapEnabled() || pageTabsEnabled() || window.innerWidth <= 700) {
     return;
   }
 
@@ -877,6 +914,7 @@ minimapSwapSideButton?.addEventListener("click", () => {
 minimapCollapseButton?.addEventListener("click", () => {
   setMinimapCollapsed(!minimapCollapsed());
 });
+minimapPageTabsButton?.addEventListener("click", () => setPageTabsEnabled(!pageTabsEnabled()));
 minimapToggle.addEventListener("change", () => {
   setMinimapEnabled(minimapToggle.checked);
   if (minimapToggle.checked) {
@@ -890,10 +928,12 @@ const storedMinimapPreference = localStorage.getItem(MINIMAP_STORAGE_KEY);
 const storedMinimapMode = localStorage.getItem(MINIMAP_MODE_STORAGE_KEY);
 const storedMinimapSide = localStorage.getItem(MINIMAP_SIDE_STORAGE_KEY);
 const storedMinimapCollapsed = localStorage.getItem(MINIMAP_COLLAPSED_STORAGE_KEY);
+const storedPageTabs = localStorage.getItem(PAGE_TABS_STORAGE_KEY);
 setMinimapMode(storedMinimapMode === "local" ? "local" : "overview", false);
 setMinimapSide(storedMinimapSide === "left" ? "left" : "right", false);
 setMinimapCollapsed(storedMinimapCollapsed === "true", false);
 setMinimapEnabled(storedMinimapPreference !== "false", false);
+setPageTabsEnabled(storedPageTabs === "true", false);
 
 if (!minimapEnabled() || window.innerWidth <= 700) {
   finishMinimapPreparation();

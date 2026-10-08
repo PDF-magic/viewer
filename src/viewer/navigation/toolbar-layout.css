@@ -224,7 +224,7 @@
   }
 
   .viewer {
-    padding-top: 100px;
+    padding-top: calc(100px + var(--page-top-gap));
   }
 
   .section-popover {

@@ -7,11 +7,13 @@ const viewerStyles = readFileSync(new URL("../src/viewer/viewer.css", import.met
 const toolbarStyles = readFileSync(new URL("../src/viewer/navigation/toolbar-layout.css", import.meta.url), "utf8");
 const viewerSource = readFileSync(new URL("../src/viewer/viewer.js", import.meta.url), "utf8");
 
-test("the first page begins directly beneath each toolbar configuration", () => {
-  assert.match(viewerStyles, /\.viewer\s*\{[^}]*padding:\s*52px 16px calc\(/);
-  assert.match(toolbarStyles, /:where\(:root\.toolbar-two-rows\)[\s\S]*?\.viewer\s*\{\s*padding-top:\s*100px;/);
-  assert.match(viewerStyles, /\.enhancement-active \.viewer\s*\{\s*padding-top:\s*94px;/);
-  assert.match(viewerStyles, /\.toolbar-two-rows\.enhancement-active \.viewer\s*\{\s*padding-top:\s*142px;/);
+test("the first page preserves a small themed outline gap beneath every toolbar configuration", () => {
+  assert.match(viewerStyles, /--page-top-gap:\s*8px;/);
+  assert.match(viewerStyles, /\.page\s*\{[^}]*box-shadow:\s*0 0 0 1px var\(--page-border\);/);
+  assert.match(viewerStyles, /\.viewer\s*\{[^}]*padding:\s*calc\(52px \+ var\(--page-top-gap\)\) 16px calc\(/);
+  assert.match(toolbarStyles, /:where\(:root\.toolbar-two-rows\)[\s\S]*?\.viewer\s*\{\s*padding-top:\s*calc\(100px \+ var\(--page-top-gap\)\);/);
+  assert.match(viewerStyles, /\.enhancement-active \.viewer\s*\{\s*padding-top:\s*calc\(94px \+ var\(--page-top-gap\)\);/);
+  assert.match(viewerStyles, /\.toolbar-two-rows\.enhancement-active \.viewer\s*\{\s*padding-top:\s*calc\(142px \+ var\(--page-top-gap\)\);/);
 });
 
 test("navigating to a short first page scrolls to the document top instead of centering", () => {
@@ -33,4 +35,35 @@ test("navigating to a short first page scrolls to the document top instead of ce
   assert.equal(calls.length, 1);
   assert.equal(calls[0].top, 0);
   assert.equal(calls[0].behavior, "instant");
+});
+
+
+test("jumping to any later page aligns its start beneath the visible toolbar", () => {
+  const definition = viewerSource.match(/function goToPage\(pageNumber, behavior = "smooth"\) \{[\s\S]*?\n\}/)?.[0];
+  assert.ok(definition);
+  for (const pageHeight of [300, 1400]) {
+    const calls = [];
+    const page = {
+      getBoundingClientRect() { return { top: 700, height: pageHeight }; },
+      scrollIntoView() { assert.fail("Pages must not be centered"); },
+    };
+    const context = vm.createContext({
+      pdfDocument: { numPages: 3 },
+      setCurrentPage() {},
+      queuePageRender() {},
+      pageElements: [null, page],
+      document: {
+        querySelector(selector) {
+          if (selector === ".toolbar") return { getBoundingClientRect: () => ({ height: 100 }) };
+          if (selector === "#enhance-progress") return { getBoundingClientRect: () => ({ height: 42 }) };
+          return null;
+        },
+      },
+      window: { scrollY: 200, scrollTo(options) { calls.push(options); } },
+    });
+    vm.runInContext(`${definition}; goToPage(2, "auto");`, context);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].top, 758);
+    assert.equal(calls[0].behavior, "instant");
+  }
 });
