@@ -59,8 +59,8 @@ test("right-side rail integrates with the viewer and persists its own preference
 });
 
 test("numbered page tabs expose an opt-in under More PDF tools", () => {
-  assert.match(viewerMarkup, /id="tools-menu"[\\s\\S]*id="page-tabs-opt-in" class="checkbox-input" type="checkbox"/);
-  assert.match(viewerMarkup, /id="minimap-page-tabs-toggle"[\\s\\S]*?hidden/);
+  assert.match(viewerMarkup, /id="tools-menu"[\s\S]*id="page-tabs-opt-in" class="checkbox-input" type="checkbox"/);
+  assert.match(viewerMarkup, /id="minimap-page-tabs-toggle"[\s\S]*?hidden/);
   assert.match(minimapSource, /PAGE_TABS_OPT_IN_STORAGE_KEY = "pdf-viewer-page-tabs-opt-in"/);
   assert.match(minimapSource, /pageTabsOptedIn && storedPageTabs === "true"/);
 });
