@@ -38,15 +38,19 @@ The root manifest points directly at the source files and local `node_modules`, 
 
 The viewer can hand the current PDF to the local PDF-magic/enhancer workflow: https://github.com/PDF-magic/enhancer. The enhancer button occupies the top-left section-control slot only when the PDF has no section navigator.
 
-Chrome and Brave extensions cannot start local processes directly. When Enhance cannot find the native host, the viewer now asks before doing any setup work. If you approve, it copies a one-line setup command for you to paste into Terminal; the extension itself never silently executes shell commands.
+Chrome and Brave cannot run Git or install native-messaging hosts by themselves. If Enhance cannot find the native host, the viewer opens a setup dialog instead of copying a terminal command.
 
-The copied command runs the repository installer remotely and includes the current extension ID. It may create or reuse your personal `PDF-magic/enhancer` fork when GitHub CLI is installed and signed in; otherwise it clones the upstream enhancer. The local installer can also be run directly:
+Enter the GitHub URL of an **existing enhancer fork**, or keep `https://github.com/PDF-magic/enhancer` for upstream. Optionally enter a **local checkout folder**. Click **Clone · Download installer** to download a ZIP with a user-runnable setup script. On macOS, extract it and open `Install PDF Magic.command` (review the script before running). On Linux, extract it and run `bash "Install PDF Magic.sh"` locally. The user must explicitly run the installer; the extension never executes local shell commands silently or claims a download is an installation.
+
+The installer clones the selected GitHub repository (or reuses a matching checkout in the selected folder), then registers the native messaging helper for the current Chrome/Brave extension ID. If you already have a local checkout, provide its folder in the dialog. Changing an existing managed checkout to a different remote requires choosing a new checkout folder: setup will not silently bind to an unrelated Git remote.
+
+You can also run the installer manually:
 
 ```sh
-./native/install-host.sh CHROME_EXTENSION_ID
+./native/install-host.sh CHROME_EXTENSION_ID --repo https://github.com/YOUR-ACCOUNT/enhancer.git --directory "/absolute/path/to/enhancer"
 ```
 
-To explicitly allow the installer to use an authenticated personal fork when it has to acquire the enhancer checkout:
+To automatically create or reuse a personal fork using an authenticated GitHub CLI session, run:
 
 ```sh
 ./native/install-host.sh CHROME_EXTENSION_ID --fork-if-available
