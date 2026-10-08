@@ -68,3 +68,12 @@ test('tall pages jump directly to the readable top edge', () => {
   assert.equal(f.events.at(-1)[1].top, 499924);
   assert.equal(f.events.at(-1)[1].behavior, 'instant');
 });
+
+test('typed jumps to page one align it with the top instead of centering it', () => {
+  const f = fixture({ value: '1', pageTop: 52, pageHeight: 300 });
+  f.changeListeners[0]();
+  assert.equal(f.events.at(-1)[0], 'scroll');
+  assert.equal(f.events.at(-1)[1].top, 0);
+  assert.equal(f.events.at(-1)[1].behavior, 'instant');
+  assert.ok(!f.events.some(([event]) => event === 'jump'));
+});
