@@ -707,6 +707,19 @@ function takeNextQueuedPage() {
   return pageNumber;
 }
 
+function pageCanvasOutputScale(viewport, devicePixelRatio) {
+  // Supersample text before the browser resizes/filters the canvas, especially
+  // at fractional zoom. Bound both pixel count and dimensions for large pages.
+  const pixelRatio = Number.isFinite(devicePixelRatio) && devicePixelRatio > 0
+    ? devicePixelRatio : 1;
+  const preferredScale = Math.min(3, Math.max(2, pixelRatio * 1.25));
+  return Math.min(
+    preferredScale,
+    Math.sqrt(16_777_216 / Math.max(1, viewport.width * viewport.height)),
+    16_384 / Math.max(1, viewport.width, viewport.height),
+  );
+}
+
 async function renderPageNow(pageNumber) {
   if (renderedPages.has(pageNumber)) {
     return;
@@ -716,13 +729,14 @@ async function renderPageNow(pageNumber) {
   const page = await pdfDocument.getPage(pageNumber);
   const container = pageElements[pageNumber - 1];
   const baseViewport = page.getViewport({ scale: 1, rotation });
-  const cssWidth = Math.max(1, container.clientWidth);
+  // clientWidth rounds fractional zoom widths, forcing a resampled bitmap.
+  const cssWidth = Math.max(1, container.getBoundingClientRect?.().width || container.clientWidth);
   const viewport = page.getViewport({ scale: cssWidth / baseViewport.width, rotation });
   const annotationViewport = viewport.clone({ dontFlip: true });
   container.style.setProperty("--total-scale-factor", String(viewport.scale));
   container.style.setProperty("--scale-round-x", "1px");
   container.style.setProperty("--scale-round-y", "1px");
-  const outputScale = Math.min(window.devicePixelRatio || 1, 2);
+  const outputScale = pageCanvasOutputScale(viewport, window.devicePixelRatio);
   const renderTransform =
     outputScale === 1 ? null : [outputScale, 0, 0, outputScale, 0, 0];
   const canvas = document.createElement("canvas");
