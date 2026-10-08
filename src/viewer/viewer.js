@@ -264,6 +264,13 @@ function goToPage(pageNumber, behavior = "smooth") {
     return;
   }
 
+  // Page one belongs at the top of the document, even when it fits on screen.
+  // Centering a short first page leaves a large empty area above it.
+  if (nextPage === 1) {
+    window.scrollTo({ top: 0, behavior: scrollBehavior });
+    return;
+  }
+
   const toolbarHeight = 52;
   const pageGap = 24;
   const readableHeight = window.innerHeight - toolbarHeight - pageGap * 2;
