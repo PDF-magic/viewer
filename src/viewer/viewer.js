@@ -1208,6 +1208,10 @@ async function downloadPdf() {
 
 function bindControls() {
   window.addEventListener("pdf-viewer-footnote-jump", (event) => goToFootnote(event.detail));
+  window.addEventListener("pdf-viewer-section-cross-reference-target", (event) => {
+    highlightFootnote({ highlightRegions: [] }, pageElements, rotation);
+    void navigateToOutlineItem(event.detail);
+  });
   previousButton.addEventListener("click", () => goToPage(currentPage - 1));
   nextButton.addEventListener("click", () => goToPage(currentPage + 1));
   shareButton.addEventListener("click", () => void shareCurrentPage());
