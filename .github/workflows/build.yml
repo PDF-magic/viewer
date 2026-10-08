@@ -14,6 +14,8 @@ jobs:
         with:
           node-version: 22
       - run: npm install
+      - run: bash -n native/install-host.sh
+      - run: python3 -m unittest discover -s tests -p 'test_*.py'
       - run: npm test
       - run: npm run build
       - run: npm run check
