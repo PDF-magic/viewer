@@ -15,6 +15,7 @@
 html.minimap-page-tabs:not(.minimap-collapsed) .page-tabs { display: flex; }
 html.minimap-page-tabs .minimap,
 html.minimap-page-tabs .minimap-mode { display: none; }
+.minimap-page-tabs-toggle[hidden] { display: none !important; }
 html.minimap-page-tabs .minimap-page-tabs-toggle[aria-pressed="true"] {
   color: var(--minimap-accent);
 }

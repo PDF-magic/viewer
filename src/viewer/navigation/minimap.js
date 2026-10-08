@@ -18,12 +18,14 @@ const minimapModeIcon = document.querySelector("#minimap-mode-icon");
 const minimapSwapSideButton = document.querySelector("#minimap-swap-side");
 const minimapCollapseButton = document.querySelector("#minimap-collapse");
 const minimapPageTabsButton = document.querySelector("#minimap-page-tabs-toggle");
+const pageTabsOptIn = document.querySelector("#page-tabs-opt-in");
 
 const MINIMAP_STORAGE_KEY = "pdf-viewer-show-minimap";
 const MINIMAP_MODE_STORAGE_KEY = "pdf-viewer-minimap-mode";
 const MINIMAP_SIDE_STORAGE_KEY = "pdf-viewer-minimap-side";
 const MINIMAP_COLLAPSED_STORAGE_KEY = "pdf-viewer-minimap-collapsed";
 const PAGE_TABS_STORAGE_KEY = "pdf-viewer-page-tabs";
+const PAGE_TABS_OPT_IN_STORAGE_KEY = "pdf-viewer-page-tabs-opt-in";
 const MINIMAP_RENDER_CONCURRENCY = 4;
 const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
 const MINIMAP_WHEEL_EASE = 0.32;
@@ -177,6 +179,17 @@ function setPageTabsEnabled(enabled, persist = true) {
     scheduleSync();
   }
   if (previouslyEnabled !== enabled) notifyPageTabsVisibility();
+}
+
+function setPageTabsOptIn(enabled, persist = true) {
+  pageTabsOptIn.checked = enabled;
+  if (minimapPageTabsButton) minimapPageTabsButton.hidden = !enabled;
+
+  if (persist) {
+    localStorage.setItem(PAGE_TABS_OPT_IN_STORAGE_KEY, String(enabled));
+    if (enabled && !minimapEnabled()) setMinimapEnabled(true);
+    setPageTabsEnabled(enabled);
+  }
 }
 
 function setMinimapSide(side, persist = true) {
@@ -915,6 +928,7 @@ minimapCollapseButton?.addEventListener("click", () => {
   setMinimapCollapsed(!minimapCollapsed());
 });
 minimapPageTabsButton?.addEventListener("click", () => setPageTabsEnabled(!pageTabsEnabled()));
+pageTabsOptIn?.addEventListener("change", () => setPageTabsOptIn(pageTabsOptIn.checked));
 minimapToggle.addEventListener("change", () => {
   setMinimapEnabled(minimapToggle.checked);
   if (minimapToggle.checked) {
@@ -929,11 +943,16 @@ const storedMinimapMode = localStorage.getItem(MINIMAP_MODE_STORAGE_KEY);
 const storedMinimapSide = localStorage.getItem(MINIMAP_SIDE_STORAGE_KEY);
 const storedMinimapCollapsed = localStorage.getItem(MINIMAP_COLLAPSED_STORAGE_KEY);
 const storedPageTabs = localStorage.getItem(PAGE_TABS_STORAGE_KEY);
+const storedPageTabsOptIn = localStorage.getItem(PAGE_TABS_OPT_IN_STORAGE_KEY);
+// Existing users who explicitly selected page tabs retain that preference.
+const pageTabsOptedIn = storedPageTabsOptIn === "true" ||
+  (storedPageTabsOptIn === null && storedPageTabs === "true");
 setMinimapMode(storedMinimapMode === "local" ? "local" : "overview", false);
 setMinimapSide(storedMinimapSide === "left" ? "left" : "right", false);
 setMinimapCollapsed(storedMinimapCollapsed === "true", false);
 setMinimapEnabled(storedMinimapPreference !== "false", false);
-setPageTabsEnabled(storedPageTabs === "true", false);
+setPageTabsOptIn(pageTabsOptedIn, false);
+setPageTabsEnabled(pageTabsOptedIn && storedPageTabs === "true", false);
 
 if (!minimapEnabled() || window.innerWidth <= 700) {
   finishMinimapPreparation();
