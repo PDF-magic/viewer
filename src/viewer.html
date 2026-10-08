@@ -161,6 +161,10 @@
             <span>Show minimap</span>
             <input id="show-minimap" class="checkbox-input" type="checkbox" checked />
           </label>
+          <label class="tool-toggle" title="Opt in to numbered page tabs in the side navigation (off by default)">
+            <span>Enable numbered page tabs</span>
+            <input id="page-tabs-opt-in" class="checkbox-input" type="checkbox" />
+          </label>
           <label class="tool-toggle" title="Show created and modified dates as elapsed time; hover over a date for its UTC timestamp">
             <span>Relative dates</span>
             <input id="relative-metadata-dates" class="checkbox-input" type="checkbox" />
@@ -223,6 +227,7 @@
           id="minimap-page-tabs-toggle"
           class="minimap-control minimap-page-tabs-toggle"
           type="button"
+          hidden
           aria-label="Use numbered page tabs"
           aria-pressed="false"
           title="Use numbered page tabs"
