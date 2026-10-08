@@ -95,7 +95,11 @@ export async function resolvePrintedContentsPage(entry, { numPages, pageLabels, 
 export function contentsEntryHasEmbeddedLink(entry, annotations, viewport) {
   return annotations.some(annotation => {
     if (annotation.subtype !== "Link" || !Array.isArray(annotation.rect)) return false;
-    const rect = viewport.convertToViewportRectangle(annotation.rect);
+    // PDF.js 6 exposes point conversion rather than rectangle conversion.
+    const rect = [
+      ...viewport.convertToViewportPoint(annotation.rect[0], annotation.rect[1]),
+      ...viewport.convertToViewportPoint(annotation.rect[2], annotation.rect[3]),
+    ];
     const left = Math.min(rect[0], rect[2]);
     const right = Math.max(rect[0], rect[2]);
     const top = Math.min(rect[1], rect[3]);

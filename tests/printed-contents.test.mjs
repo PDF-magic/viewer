@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { findPrintedContentsEntries, resolvePrintedContentsPage, contentsEntryHasEmbeddedLink } from '../src/viewer/navigation/printed-contents.js';
 
 const viewport = {
   width: 600, height: 800, scale: 1,
   convertToViewportPoint(x, y) { return [x, 800 - y]; },
-  convertToViewportRectangle([x1,y1,x2,y2]) { return [x1,800-y1,x2,800-y2]; },
 };
 const fragment = (str, x, baseline) => ({ str, transform: [10,0,0,10,x,800-baseline], width: str.length * 5, height: 10 });
 const heading = fragment('Table of Contents', 60, 90);
@@ -52,6 +52,26 @@ test('existing PDF links keep their own annotation handling', () => {
   const entry = {left: 60,top: 115,width: 200,height: 18};
   assert.equal(contentsEntryHasEmbeddedLink(entry,[{subtype:'Link',rect:[60,663,260,685]}],viewport),true);
   assert.equal(contentsEntryHasEmbeddedLink(entry,[{subtype:'Text',rect:[60,663,260,685]}],viewport),false);
+});
+
+test('embedded link overlap uses the installed PDF.js viewport API at every rotation', async () => {
+  const loading = getDocument({
+    data: new Uint8Array(readFileSync(new URL('./fixtures/footnote-columns-and-pages.pdf', import.meta.url))),
+  });
+  try {
+    const pdf = await loading.promise;
+    const page = await pdf.getPage(1);
+    for (const rotation of [0, 90, 180, 270]) {
+      const actualViewport = page.getViewport({ scale: 1.5, rotation });
+      assert.equal(actualViewport.convertToViewportRectangle, undefined);
+      const [x, y] = actualViewport.convertToViewportPoint(160, 674);
+      const entry = { left: x - 5, top: y - 5, width: 10, height: 10 };
+      assert.equal(contentsEntryHasEmbeddedLink(entry, [{ subtype: 'Link', rect: [60, 663, 260, 685] }], actualViewport), true);
+      assert.equal(contentsEntryHasEmbeddedLink(entry, [{ subtype: 'Link', rect: [10, 10, 20, 20] }], actualViewport), false);
+    }
+  } finally {
+    await loading.destroy();
+  }
 });
 
 test('viewer wires printed contents buttons into ordinary page navigation', () => {
