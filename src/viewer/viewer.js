@@ -274,19 +274,13 @@ function goToPage(pageNumber, behavior = "smooth") {
     return;
   }
 
-  const toolbarHeight = 52;
-  const pageGap = 24;
-  const readableHeight = window.innerHeight - toolbarHeight - pageGap * 2;
-  const pageRect = pageElement.getBoundingClientRect();
-
-  if (pageRect.height <= readableHeight) {
-    pageElement.scrollIntoView({ behavior: scrollBehavior, block: "center" });
-    return;
-  }
-
-  const pageTop = window.scrollY + pageRect.top;
+  // Show the very start of the page beneath the actual fixed controls,
+  // including a two-row toolbar or the optional enhancement progress bar.
+  const toolbarHeight = document.querySelector(".toolbar")?.getBoundingClientRect().height ?? 52;
+  const progressHeight = document.querySelector("#enhance-progress")?.getBoundingClientRect().height ?? 0;
+  const pageTop = window.scrollY + pageElement.getBoundingClientRect().top;
   window.scrollTo({
-    top: Math.max(0, pageTop - toolbarHeight - pageGap),
+    top: Math.max(0, pageTop - toolbarHeight - progressHeight),
     behavior: scrollBehavior,
   });
 }

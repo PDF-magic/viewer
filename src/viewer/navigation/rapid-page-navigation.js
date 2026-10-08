@@ -31,19 +31,16 @@ function scrollToPageImmediately(pageNumber) {
     return;
   }
 
-  const toolbarHeight = 52;
-  const pageGap = 24;
-  const readableHeight = window.innerHeight - toolbarHeight - pageGap * 2;
-  const pageRect = pageElement.getBoundingClientRect();
-
-  if (pageRect.height <= readableHeight) {
-    pageElement.scrollIntoView({ behavior: "auto", block: "center" });
+  if (pageNumber === 1) {
+    window.scrollTo({ top: 0, behavior: "auto" });
     return;
   }
 
-  const pageTop = window.scrollY + pageRect.top;
+  const toolbarHeight = document.querySelector(".toolbar")?.getBoundingClientRect().height ?? 52;
+  const progressHeight = document.querySelector("#enhance-progress")?.getBoundingClientRect().height ?? 0;
+  const pageTop = window.scrollY + pageElement.getBoundingClientRect().top;
   window.scrollTo({
-    top: Math.max(0, pageTop - toolbarHeight - pageGap),
+    top: Math.max(0, pageTop - toolbarHeight - progressHeight),
     behavior: "auto",
   });
 }
