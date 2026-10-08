@@ -202,6 +202,7 @@ function setCurrentPage(pageNumber, deferSharpRender = false) {
   currentPage = nextPage;
   pagePreviews?.update(currentPage);
   pageNumberInput.value = String(currentPage);
+  window.dispatchEvent(new CustomEvent("pdf-viewer-page-changed", { detail: { pageNumber: currentPage } }));
   previousButton.disabled = currentPage <= 1;
   nextButton.disabled = currentPage >= pdfDocument.numPages;
   clearTimeout(sharpRenderTimer);
