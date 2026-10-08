@@ -20,11 +20,14 @@ test("sharp rendering prioritizes the nearest queued page after a distant jump",
   assert.equal(context.takeNextQueuedPage(), 1800);
 });
 
-test("sharp rendering fits a compressed page below 280px without fixed display dimensions", async () => {
+test("sharp rendering uses fractional CSS widths and oversamples without fixed display dimensions", async () => {
   let children;
   let renderedViewport;
+  let renderedTransform;
   const container = {
-    clientWidth: 160, style: { setProperty() {} },
+    clientWidth: 160,
+    getBoundingClientRect: () => ({ width: 160.5 }),
+    style: { setProperty() {} },
     classList: { add() {} }, replaceChildren(...nodes) { children = nodes; },
   };
   const context = vm.createContext({
@@ -41,17 +44,39 @@ test("sharp rendering fits a compressed page below 280px without fixed display d
       getViewport: ({ scale }) => ({ width: 600 * scale, height: 800 * scale, scale, clone() { return this; } }),
       async getTextContent() { return { items: [] }; },
       async getAnnotations() { return []; },
-      render({ viewport }) { renderedViewport = viewport; return { promise: Promise.resolve() }; },
+      render({ viewport, transform }) {
+        renderedViewport = viewport;
+        renderedTransform = transform;
+        return { promise: Promise.resolve() };
+      },
       cleanup() {},
     }; } },
   });
+  loadFunction("pageCanvasOutputScale", context);
   loadFunction("renderPageNow", context);
   await context.renderPageNow(1);
-  assert.equal(renderedViewport.width, 160);
-  assert.equal(children[0].width, 320, "Retain device-pixel resolution at the actual page width");
+  assert.equal(renderedViewport.width, 160.5);
+  assert.equal(children[0].width, 401, "Oversample the precise displayed width at device pixel ratio 2");
+  assert.equal(children[0].height, 535);
+  assert.deepEqual([...renderedTransform], [2.5, 0, 0, 2.5, 0, 0]);
   assert.equal(children[0].style.width, undefined, "CSS must keep the full bitmap fitted during later resizes");
   assert.equal(children[0].style.height, undefined);
   assert.equal(context.staleRenderedPages.size, 0);
+});
+
+test("page canvas output scale respects device pixel ratio and large-page memory limits", () => {
+  const context = vm.createContext({});
+  loadFunction("pageCanvasOutputScale", context);
+  const viewport = { width: 640, height: 900 };
+  assert.equal(context.pageCanvasOutputScale(viewport, 1), 2);
+  assert.equal(context.pageCanvasOutputScale(viewport, 2), 2.5);
+  assert.equal(context.pageCanvasOutputScale(viewport, 3), 3);
+  assert.equal(context.pageCanvasOutputScale(viewport, 0), 2);
+
+  const largeViewport = { width: 5000, height: 6000 };
+  const limitedScale = context.pageCanvasOutputScale(largeViewport, 3);
+  assert.ok(largeViewport.width * largeViewport.height * limitedScale ** 2 <= 16_777_216 + 1);
+  assert.ok(largeViewport.height * limitedScale <= 16_384);
 });
 
 test("changing render windows releases distant canvases and removes stale priority requests", () => {
