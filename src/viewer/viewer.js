@@ -9,6 +9,7 @@ import { normalizeSearchText } from "./search/search-text.js";
 import { PagePreviews } from "./page-previews.js";
 import { preparePrintDocument } from "./print-renderer.js";
 import { highlightFootnote, renderFootnoteHighlight } from "./navigation/footnote-highlight.js";
+import { findPrintedContentsEntries, resolvePrintedContentsPage, contentsEntryHasEmbeddedLink } from "./navigation/printed-contents.js";
 
 const sourceMode = window.location.pathname.includes("/src/");
 
@@ -93,6 +94,8 @@ let completedSearchQuery = "";
 let searchMatches = [];
 let activeSearchIndex = -1;
 let sectionEntries = [];
+let contentsPageLabels = null;
+let contentsOutlineItems = [];
 let sectionHighlightRequestId = 0;
 let renderGeneration = 0;
 let renderingAllPages = false;
@@ -598,6 +601,16 @@ async function initializeSectionNavigation() {
     return;
   }
 
+  // Reuse bookmark destinations for printed contents entries when page labels
+  // differ from their physical PDF page indices.
+  contentsOutlineItems = [];
+  const stack = [...(outline || [])];
+  while (stack.length) {
+    const item = stack.pop();
+    if (item.dest && item.title) contentsOutlineItems.push(item);
+    if (item.items?.length) stack.push(...item.items);
+  }
+
   if (!outline?.length || !outlineHasDestination(outline)) {
     return;
   }
@@ -774,6 +787,36 @@ async function renderPageNow(pageNumber) {
     });
   }
 
+  // Make printed, unlinked tables of contents clickable without replacing
+  // or intercepting the PDF's own link annotations.
+  const contentsEntries = findPrintedContentsEntries(textContent.items, viewport);
+  let contentsLayer;
+  if (contentsEntries.length) {
+    contentsLayer = document.createElement("div");
+    contentsLayer.className = "printed-contents-layer";
+    await Promise.all(contentsEntries.map(async (entry) => {
+      if (contentsEntryHasEmbeddedLink(entry, annotations, viewport)) return;
+      const targetPage = await resolvePrintedContentsPage(entry, {
+        numPages: pdfDocument.numPages,
+        pageLabels: contentsPageLabels,
+        outline: contentsOutlineItems,
+        resolveOutlinePage: resolveOutlinePageNumber,
+      });
+      if (!targetPage) return;
+      const link = document.createElement("button");
+      link.type = "button";
+      link.className = "printed-contents-link";
+      link.style.left = (100 * entry.left / viewport.width) + "%";
+      link.style.top = (100 * entry.top / viewport.height) + "%";
+      link.style.width = (100 * entry.width / viewport.width) + "%";
+      link.style.height = (100 * entry.height / viewport.height) + "%";
+      link.title = "Go to " + entry.title + " (page " + entry.label + ")";
+      link.setAttribute("aria-label", link.title);
+      link.addEventListener("click", () => goToPage(targetPage));
+      contentsLayer.append(link);
+    }));
+  }
+
   if (generation !== renderGeneration || (!renderingAllPages && !pageIsInRenderWindow(pageNumber))) {
     canvas.width = 0;
     canvas.height = 0;
@@ -793,6 +836,7 @@ async function renderPageNow(pageNumber) {
     canvas,
     ...(imageOverlay ? [imageOverlay] : []),
     textLayer,
+    ...(contentsLayer?.childElementCount ? [contentsLayer] : []),
     ...(annotations.length ? [annotationLayer] : []),
   );
   container.classList.add("rendered");
@@ -1388,6 +1432,7 @@ async function initialize() {
     waitForForeground: () => renderQueuePromise?.catch(() => {}),
   });
   bindControls();
+  contentsPageLabels = await pdfDocument.getPageLabels().catch(() => null);
   await initializeSectionNavigation();
   goToPage(currentPage, "auto");
   keepRenderWindow(currentPage);
