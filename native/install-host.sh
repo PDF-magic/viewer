@@ -3,17 +3,19 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Usage: ./native/install-host.sh CHROME_EXTENSION_ID [PDF_MAGIC_ENHANCER_DIR] [--fork-if-available]
+Usage: ./native/install-host.sh CHROME_EXTENSION_ID [PDF_MAGIC_ENHANCER_DIR] [--fork-if-available] [--repo URL] [--directory PATH]
 
 Register the PDF Magic enhancer native-messaging host for Chrome and Brave.
 If PDF_MAGIC_ENHANCER_DIR is omitted, a sibling ../enhancer checkout is reused
 when available; otherwise the installer creates a managed enhancer checkout.
 With --fork-if-available, an authenticated GitHub CLI session creates or reuses
 your personal fork before cloning. If GitHub CLI is unavailable, upstream is used.
+Use --repo URL to select an existing GitHub fork explicitly. --directory PATH
+clones into that folder or reuses an existing matching local checkout.
 EOF
 }
 
-if [[ $# -lt 1 || $# -gt 3 ]]; then
+if [[ $# -lt 1 ]]; then
   usage >&2
   exit 2
 fi
@@ -26,18 +28,32 @@ if [[ ! "$extension_id" =~ ^[a-p]{32}$ ]]; then
 fi
 
 enhancer_arg=""
+repository_arg=""
 fork_if_available=false
-for argument in "$@"; do
-  case "$argument" in
+while (( $# > 0 )); do
+  case "$1" in
     --fork-if-available)
       fork_if_available=true
+      shift
+      ;;
+    --repo|--directory)
+      if [[ $# -lt 2 || -z "$2" ]]; then
+        printf 'Missing value after %s\n' "$1" >&2
+        exit 2
+      fi
+      if [[ "$1" == "--repo" ]]; then
+        repository_arg=$2
+      else
+        enhancer_arg=$2
+      fi
+      shift 2
       ;;
     --help|-h)
       usage
       exit 0
       ;;
     --*)
-      printf 'Unknown option: %s\n' "$argument" >&2
+      printf 'Unknown option: %s\n' "$1" >&2
       usage >&2
       exit 2
       ;;
@@ -46,10 +62,20 @@ for argument in "$@"; do
         printf 'Pass at most one PDF_MAGIC_ENHANCER_DIR.\n' >&2
         exit 2
       fi
-      enhancer_arg=$argument
+      enhancer_arg=$1
+      shift
       ;;
   esac
 done
+
+if [[ -n "$repository_arg" && ! "$repository_arg" =~ ^https://github[.]com/[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+([.]git)?/?$ ]]; then
+  printf 'Repository must be an HTTPS github.com/owner/repository URL.\n' >&2
+  exit 2
+fi
+if [[ -n "$repository_arg" && "$fork_if_available" == "true" ]]; then
+  printf 'Choose --repo or --fork-if-available, not both.\n' >&2
+  exit 2
+fi
 
 if [[ "${PDF_MAGIC_SETUP_APPROVED:-0}" != "1" ]]; then
   cat <<EOF
@@ -103,11 +129,24 @@ case "$(uname -s)" in
 esac
 
 enhancer_dir=$enhancer_arg
-if [[ -z "$enhancer_dir" && -n "$viewer_dir" && -f "$viewer_dir/../enhancer/ocr-scanned-pdf.sh" ]]; then
+if [[ -z "$enhancer_dir" && -z "$repository_arg" && -n "$viewer_dir" && -f "$viewer_dir/../enhancer/ocr-scanned-pdf.sh" ]]; then
   enhancer_dir=$(CDPATH= cd -- "$viewer_dir/../enhancer" && pwd)
 fi
 if [[ -z "$enhancer_dir" ]]; then
   enhancer_dir=$managed_enhancer_dir
+fi
+
+if [[ -n "$repository_arg" && -f "$enhancer_dir/ocr-scanned-pdf.sh" ]]; then
+  if ! command -v git >/dev/null 2>&1; then
+    printf 'git is required to verify the selected enhancer checkout.\n' >&2
+    exit 1
+  fi
+  existing_remote=$(git -C "$enhancer_dir" remote get-url origin 2>/dev/null || true)
+  if [[ -z "$existing_remote" || "\${existing_remote%.git}" != "\${repository_arg%.git}" ]]; then
+    printf 'Existing checkout at %s does not match selected repository %s.\n' "$enhancer_dir" "$repository_arg" >&2
+    printf 'Choose a different local checkout folder, or select the existing repository URL.\n' >&2
+    exit 1
+  fi
 fi
 
 if [[ ! -f "$enhancer_dir/ocr-scanned-pdf.sh" ]]; then
@@ -120,8 +159,8 @@ if [[ ! -f "$enhancer_dir/ocr-scanned-pdf.sh" ]]; then
     exit 1
   fi
 
-  repository_url="https://github.com/PDF-magic/enhancer.git"
-  if "$fork_if_available" && command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  repository_url="${repository_arg:-https://github.com/PDF-magic/enhancer.git}"
+  if [[ -z "$repository_arg" ]] && "$fork_if_available" && command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
     github_login=$(gh api user --jq .login 2>/dev/null || true)
     if [[ -n "$github_login" ]]; then
       is_pdf_magic_fork() {
@@ -212,3 +251,8 @@ PY
 
 printf 'Configured enhancer: %s\n' "$enhancer_dir"
 printf 'Installed native bridge: %s\n' "$host_path"
+for required_tool in ocrmypdf qpdf; do
+  if ! command -v "$required_tool" >/dev/null 2>&1; then
+    printf 'Enhance needs %s. On macOS install the OCR dependencies with: brew install ocrmypdf\n' "$required_tool" >&2
+  fi
+done
