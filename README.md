@@ -6,6 +6,7 @@ A Chrome Manifest V3 extension that replaces the normal PDF tab with a local PDF
 
 - On Chrome 151+, registers as the PDF MIME handler so the original `https://…pdf` URL stays in the address bar while the extension renders the document.
 - Uses Chrome's already-received PDF stream instead of re-requesting the document URL.
+- Uses the ✨ sparkle favicon for local `file://` PDFs, while leaving the Luna favicon on web PDFs.
 - Falls back to the older extension-page redirect flow on Chrome versions that do not expose the MIME handler API.
 - Renders PDFs locally with bundled PDF.js assets; no remotely hosted executable code is used.
 - Supports dark and light viewing modes, remembers the selected theme, and shows Celestia in dark mode and Luna in light mode.
