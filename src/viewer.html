@@ -13,6 +13,7 @@
     <link rel="stylesheet" href="viewer/theme/image-color-toggle.css" />
     <link rel="stylesheet" href="viewer/sharing/qr-file-url.css" />
     <link rel="stylesheet" href="viewer/annotation-layer.css" />
+    <link rel="stylesheet" href="viewer/navigation/section-cross-reference-panel.css" />
   </head>
   <body>
     <header class="toolbar" aria-label="PDF controls">
@@ -147,6 +148,7 @@
             <span id="footnote-jump-status" class="tool-footnote-status" aria-live="polite"></span>
           </form>
           <div class="menu-separator" role="separator"></div>
+          <button id="section-cross-reference-notes" class="tool-button" type="button" role="menuitem">§ <span>Section cross-references…</span></button>
           <label class="tool-toggle" title="Use the document minimap instead of the browser scrollbar">
             <span>Show minimap</span>
             <input id="show-minimap" class="checkbox-input" type="checkbox" checked />
@@ -238,6 +240,19 @@
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+    <dialog id="section-cross-reference-dialog" class="section-cross-reference-dialog" aria-labelledby="section-cross-reference-title">
+      <section class="section-cross-reference-panel">
+        <header class="section-cross-reference-panel-header">
+          <h2 id="section-cross-reference-title">Referenced section headings</h2>
+          <button id="section-cross-reference-copy" class="section-cross-reference-copy" type="button" disabled>Copy list</button>
+          <button id="section-cross-reference-close" class="section-cross-reference-close" type="button" aria-label="Close section references">×</button>
+        </header>
+        <p id="section-cross-reference-status" class="section-cross-reference-status" role="status" aria-live="polite"></p>
+        <ol id="section-cross-reference-list" class="section-cross-reference-list" aria-label="References to sections"></ol>
+        <p class="section-cross-reference-help">Finds explicit section references in selectable PDF text and matches them to numbered PDF outline headings. Scans, unnumbered headings, and PDFs without bookmarks may be incomplete.</p>
+      </section>
+    </dialog>
+
     <dialog id="qr-file-url-dialog" class="qr-file-url-dialog" aria-labelledby="qr-file-url-title">
       <div class="qr-file-url-card">
         <button id="qr-file-url-close" class="qr-file-url-close" type="button" aria-label="Close QR code">×</button>
@@ -263,6 +278,7 @@
     <script type="module" src="viewer/navigation/page-number-input.js"></script>
     <script type="module" src="viewer/navigation/document-scrubber.js"></script>
     <script type="module" src="viewer/navigation/footnote-jump.js"></script>
+    <script type="module" src="viewer/navigation/section-cross-reference-panel.js"></script>
     <script type="module" src="viewer/sharing/copy-file-url.js"></script>
     <script type="module" src="viewer/sharing/summarize-with-chatgpt.js"></script>
     <script type="module" src="viewer/sharing/qr-file-url.js"></script>
