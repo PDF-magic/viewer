@@ -7,8 +7,8 @@ const viewerStyles = readFileSync(new URL("../src/viewer/viewer.css", import.met
 const toolbarStyles = readFileSync(new URL("../src/viewer/navigation/toolbar-layout.css", import.meta.url), "utf8");
 const viewerSource = readFileSync(new URL("../src/viewer/viewer.js", import.meta.url), "utf8");
 
-test("the first page preserves a small themed outline gap beneath every toolbar configuration", () => {
-  assert.match(viewerStyles, /--page-top-gap:\s*8px;/);
+test("the first page preserves a small themed outline clearance beneath every toolbar configuration", () => {
+  assert.match(viewerStyles, /--page-top-gap:\s*1px;/);
   assert.match(viewerStyles, /\.page\s*\{[^}]*box-shadow:\s*0 0 0 1px var\(--page-border\);/);
   assert.match(viewerStyles, /\.viewer\s*\{[^}]*padding:\s*calc\(52px \+ var\(--page-top-gap\)\) 16px calc\(/);
   assert.match(toolbarStyles, /:where\(:root\.toolbar-two-rows\)[\s\S]*?\.viewer\s*\{\s*padding-top:\s*calc\(100px \+ var\(--page-top-gap\)\);/);
@@ -63,7 +63,7 @@ test("jumping to any later page aligns its start beneath the visible toolbar", (
     });
     vm.runInContext(`${definition}; goToPage(2, "auto");`, context);
     assert.equal(calls.length, 1);
-    assert.equal(calls[0].top, 758);
+    assert.equal(calls[0].top, 757);
     assert.equal(calls[0].behavior, "instant");
   }
 });

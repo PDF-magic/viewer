@@ -40,7 +40,7 @@ function scrollToPageImmediately(pageNumber) {
   const progressHeight = document.querySelector("#enhance-progress")?.getBoundingClientRect().height ?? 0;
   const pageTop = window.scrollY + pageElement.getBoundingClientRect().top;
   window.scrollTo({
-    top: Math.max(0, pageTop - toolbarHeight - progressHeight),
+    top: Math.max(0, pageTop - toolbarHeight - progressHeight - 1),
     behavior: "auto",
   });
 }

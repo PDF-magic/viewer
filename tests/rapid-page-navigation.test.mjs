@@ -26,7 +26,7 @@ test("rapid page navigation anchors short and tall pages to the actual toolbar",
     };
     const window = { scrollY: 200, scrollTo(options) { calls.push(options); } };
     vm.runInContext(source + "\nscrollToPageImmediately(2); scrollToPageImmediately(1);", vm.createContext({ document, window }));
-    assert.equal(calls[0].top, 758);
+    assert.equal(calls[0].top, 757);
     assert.equal(calls[0].behavior, "auto");
     assert.equal(calls[1].top, 0);
   }
