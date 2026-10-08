@@ -13,7 +13,9 @@ const viewerMarkup = readFileSync(new URL('../src/viewer.html', import.meta.url)
 const toggleStyles = readFileSync(new URL('../src/viewer/theme/image-color-toggle.css', import.meta.url), 'utf8');
 function fixture(count, height = 900) {
   const windowEvents = [];
-  const window = { innerHeight: height, scrollY: 0, location: { pathname: '/src/viewer.html', search: '' }, addEventListener() {},
+  const windowListeners = {};
+  const window = { innerHeight: height, scrollY: 0, location: { pathname: '/src/viewer.html', search: '' },
+    addEventListener(type, callback) { windowListeners[type] = callback; },
     dispatchEvent(event) { windowEvents.push(event.type); },
     scrollTo({ top, behavior }) { this.scrollY = top; this.lastScrollBehavior = behavior; } };
   const tiles = Array.from({ length: count }, () => ({ clientWidth: 80, style: {} }));
@@ -22,7 +24,8 @@ function fixture(count, height = 900) {
   const listeners = {};
   const track = { clientHeight: height - 52,
     style: { setProperty(name, value) { this[name] = value; } },
-    addEventListener(type, callback) { listeners[type] = callback; }, setAttribute() {} };
+    addEventListener(type, callback) { listeners[type] = callback; },
+    contains(target) { return target === this; }, setAttribute() {} };
   const viewport = { style: {} };
   const toggle = { checked: true, addEventListener(type, callback) { listeners[`toggle-${type}`] = callback; } };
   const minimapPageContainer = {
@@ -57,7 +60,7 @@ function fixture(count, height = 900) {
   vm.runInContext(source, context);
   const sync = () => vm.runInContext('syncMinimap()', context);
   sync();
-  return { window, windowEvents, tiles, track, viewport, toggle, classes, storedValues, context, sync, listeners, minimapPageContainer };
+  return { window, windowEvents, windowListeners, pages, tiles, track, viewport, toggle, classes, storedValues, context, sync, listeners, minimapPageContainer };
 }
 
 test('switching to local view keeps thumbnails unclipped at the middle and end', () => {
@@ -198,10 +201,36 @@ test('dragging the viewport follows the latest pointer position immediately', ()
 });
 
 
-test('wheel navigation uses compact map travel and current scroll position in every delta mode', () => {
+function animationHarness(f) {
+  // The fixture's initial requestAnimationFrame stub never executes its callback.
+  vm.runInContext('syncFrame = undefined', f.context);
+  let nextId = 0;
+  const frames = new Map();
+  f.context.requestAnimationFrame = callback => {
+    const id = ++nextId;
+    frames.set(id, callback);
+    return id;
+  };
+  f.context.cancelAnimationFrame = id => frames.delete(id);
+  return {
+    step() {
+      const callbacks = Array.from(frames.values());
+      frames.clear();
+      callbacks.forEach(callback => callback());
+    },
+    settle() {
+      for (let step = 0; frames.size && step < 100; step++) this.step();
+      assert.equal(frames.size, 0, 'wheel animation should settle');
+    },
+    get pending() { return frames.size; },
+  };
+}
+
+test('wheel navigation eases full-document travel and accumulates rapid deltas', () => {
   for (const count of [2, 100]) {
     for (const deltaMode of [0, 1, 2]) {
       const f = fixture(count);
+      const animation = animationHarness(f);
       const maximum = count * 1420 - f.window.innerHeight;
       f.window.scrollY = maximum / 2;
       f.sync();
@@ -211,12 +240,72 @@ test('wheel navigation uses compact map travel and current scroll position in ev
       const travel = vm.runInContext('mapHeight - viewportHeight', f.context);
       const expected = Math.min(maximum, maximum / 2 + normalized * 0.55 / travel * maximum);
       f.listeners.wheel({ deltaY, deltaMode, preventDefault() { prevented = true; } });
-      assert.ok(Math.abs(f.window.scrollY - expected) < 0.00001);
+      f.listeners.wheel({ deltaY, deltaMode, preventDefault() {} });
+      assert.equal(f.window.scrollY, maximum / 2, 'wheel targets should be animated, not jump');
       assert.ok(prevented);
+      assert.equal(animation.pending, 1, 'rapid inputs should share one animation');
+      animation.step();
+      assert.ok(f.window.scrollY > maximum / 2);
+      assert.ok(f.window.scrollY < expected * 2 - maximum / 2);
+      animation.settle();
+      assert.ok(Math.abs(f.window.scrollY - (expected * 2 - maximum / 2)) < 0.00001);
       f.listeners.wheel({ deltaY: -1000000, deltaMode, preventDefault() {} });
+      animation.settle();
       assert.equal(f.window.scrollY, 0);
     }
   }
+});
+
+test('dragging interrupts minimap wheel easing without delayed snapback', () => {
+  const f = fixture(100);
+  const animation = animationHarness(f);
+  f.track.getBoundingClientRect = () => ({ top: 0, height: f.track.clientHeight });
+  f.track.setPointerCapture = () => {};
+  f.window.scrollY = 1000;
+  f.listeners.wheel({ deltaY: 100, deltaMode: 0, preventDefault() {} });
+  assert.equal(animation.pending, 1);
+  f.listeners.pointerdown({ button: 0, clientY: 60, pointerId: 1, preventDefault() {} });
+  assert.equal(animation.pending, 0);
+  assert.equal(vm.runInContext('wheelTarget', f.context), undefined);
+  animation.settle();
+  assert.equal(f.window.lastScrollBehavior, 'instant');
+});
+
+test('regular document scrolling cancels an unfinished minimap glide', () => {
+  const f = fixture(100);
+  const animation = animationHarness(f);
+  f.listeners.wheel({ deltaY: 100, deltaMode: 0, preventDefault() {} });
+  assert.equal(animation.pending, 1);
+  f.windowListeners.wheel({ target: {} });
+  assert.equal(animation.pending, 0);
+  assert.equal(vm.runInContext('wheelTarget', f.context), undefined);
+});
+
+test('reduced-motion preference keeps minimap wheel navigation immediate', () => {
+  const f = fixture(100);
+  const animation = animationHarness(f);
+  f.window.matchMedia = () => ({ matches: true });
+  f.listeners.wheel({ deltaY: 10, deltaMode: 0, preventDefault() {} });
+  assert.ok(f.window.scrollY > 0);
+  assert.equal(animation.pending, 0);
+});
+
+test('scroll-only minimap updates skip expensive per-page geometry reads', () => {
+  const f = fixture(100);
+  const animation = animationHarness(f);
+  let geometryReads = 0;
+  f.pages.forEach(page => {
+    const original = page.getBoundingClientRect;
+    page.getBoundingClientRect = () => { geometryReads++; return original(); };
+  });
+  f.window.scrollY = 50000;
+  f.windowListeners.scroll();
+  animation.step();
+  assert.equal(geometryReads, 0);
+  assert.ok(parseFloat(f.viewport.style.top) > 0);
+  vm.runInContext('scheduleSync()', f.context);
+  animation.step();
+  assert.ok(geometryReads > 0);
 });
 
 test('collapsed minimap uses a themed rounded scrollbar while the expanded minimap hides it', () => {

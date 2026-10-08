@@ -24,12 +24,21 @@ const MINIMAP_SIDE_STORAGE_KEY = "pdf-viewer-minimap-side";
 const MINIMAP_COLLAPSED_STORAGE_KEY = "pdf-viewer-minimap-collapsed";
 const MINIMAP_RENDER_CONCURRENCY = 4;
 const MINIMAP_WHEEL_TRACK_SCALE = 0.55;
+const MINIMAP_WHEEL_EASE = 0.32;
+const MINIMAP_WHEEL_SNAP_THRESHOLD = 0.5;
 const MINIMAP_THUMBNAIL_WIDTH = 80;
 const MINIMAP_THUMBNAIL_RENDER_WIDTH = 50;
 const MINIMAP_STRIP_MAX_HEIGHT = 32767;
 const MINIMAP_LOCAL_CACHE_LIMIT = 32;
 const WHEEL_LINE_HEIGHT = 16;
 let syncFrame;
+let syncLayoutPending = true;
+let geometryReady = false;
+let minimapTiles = [];
+let minimapTrackHeight = 0;
+let minimapDisplayMode = "overview";
+let wheelFrame;
+let wheelTarget;
 let dragging = false;
 let dragOffset = 0;
 let viewportHeight = 18;
@@ -107,12 +116,15 @@ function setMinimapEnabled(enabled, persist = true) {
     localStorage.setItem(MINIMAP_STORAGE_KEY, String(enabled));
   }
 
-  if (enabled && !minimapCollapsed()) {
+  if (!enabled) {
+    cancelWheelScroll();
+  } else if (!minimapCollapsed()) {
     scheduleSync();
   }
 }
 
 function setMinimapMode(mode, persist = true) {
+  cancelWheelScroll();
   const local = mode === "local";
   document.documentElement.classList.toggle("minimap-local", local);
   minimapModeButton?.setAttribute("aria-pressed", String(local));
@@ -151,6 +163,7 @@ function setMinimapSide(side, persist = true) {
 }
 
 function setMinimapCollapsed(collapsed, persist = true) {
+  if (collapsed) cancelWheelScroll();
   updateMinimapLayout(() => {
     document.documentElement.classList.toggle("minimap-collapsed", collapsed);
   });
@@ -171,7 +184,10 @@ function setMinimapCollapsed(collapsed, persist = true) {
   }
 }
 
-function scheduleSync() {
+function scheduleSync(layoutChanged = true) {
+  if (layoutChanged) {
+    syncLayoutPending = true;
+  }
   if (!minimapEnabled() || syncFrame || dragging) {
     return;
   }
@@ -181,7 +197,11 @@ function scheduleSync() {
     if (dragging) {
       return;
     }
-    syncMinimap();
+    if (syncLayoutPending || !geometryReady) {
+      syncMinimap();
+    } else {
+      syncMinimapPosition();
+    }
   });
 }
 
@@ -225,7 +245,6 @@ function syncMinimap() {
   const pages = Array.from(viewer.querySelectorAll(".page"));
   const tiles = ensureTiles(pages);
   const trackHeight = minimap.clientHeight;
-  const { scrollMaximum } = documentMetrics();
 
   const pageWidth = pages[0]?.getBoundingClientRect().width || 1;
   const thumbnailWidth = tiles[0]?.clientWidth || MINIMAP_THUMBNAIL_WIDTH;
@@ -255,7 +274,6 @@ function syncMinimap() {
     strip.style.height = `${mapHeight}px`;
   }
 
-  const scrollRatio = scrollMaximum > 0 ? clamp(window.scrollY / scrollMaximum, 0, 1) : 0;
   let packedTop = 0;
   pages.forEach((page, index) => {
     const tile = tiles[index];
@@ -270,12 +288,29 @@ function syncMinimap() {
     Math.max(mapHeight, 0),
     Math.max(18, window.innerHeight * scale),
   );
+  minimapTiles = tiles;
+  minimapTrackHeight = trackHeight;
+  minimapDisplayMode = displayMode;
+  syncLayoutPending = false;
+  geometryReady = true;
+  syncMinimapPosition();
+}
+
+// Scrolling moves only the viewport: page geometry and tiles change on resize,
+// zoom, rotation or DOM updates, not on every wheel-animation frame.
+function syncMinimapPosition() {
+  if (!geometryReady || !minimapEnabled() || minimapCollapsed()) {
+    return;
+  }
+
+  const { scrollMaximum } = documentMetrics();
+  const scrollRatio = scrollMaximum > 0 ? clamp(window.scrollY / scrollMaximum, 0, 1) : 0;
   const viewportTravel = Math.max(mapHeight - viewportHeight, 0);
-  const viewportTop = clamp(scrollRatio, 0, 1) * viewportTravel;
-  const mapTravel = Math.max(mapHeight - trackHeight, 0);
+  const viewportTop = scrollRatio * viewportTravel;
+  const mapTravel = Math.max(mapHeight - minimapTrackHeight, 0);
   mapOffset =
-    displayMode === "local"
-      ? clamp(viewportTop + viewportHeight / 2 - trackHeight / 2, 0, mapTravel)
+    minimapDisplayMode === "local"
+      ? clamp(viewportTop + viewportHeight / 2 - minimapTrackHeight / 2, 0, mapTravel)
       : 0;
 
   minimapPages.style.transform = `translateY(${-mapOffset}px)`;
@@ -283,7 +318,7 @@ function syncMinimap() {
   minimapViewport.style.height = `${viewportHeight}px`;
   minimap.setAttribute("aria-valuemax", String(Math.round(scrollMaximum)));
   minimap.setAttribute("aria-valuenow", String(Math.round(window.scrollY)));
-  updateLocalThumbnails(tiles, trackHeight);
+  updateLocalThumbnails(minimapTiles, minimapTrackHeight);
 }
 
 function clearLocalThumbnails() {
@@ -674,6 +709,52 @@ function scrollFromViewportTop(viewportTop) {
   window.scrollTo({ top: ratio * scrollMaximum, behavior: "instant" });
 }
 
+function cancelWheelScroll() {
+  if (wheelFrame !== undefined) {
+    cancelAnimationFrame(wheelFrame);
+  }
+  wheelFrame = undefined;
+  wheelTarget = undefined;
+}
+
+function animateWheelScroll() {
+  wheelFrame = undefined;
+  if (wheelTarget === undefined || dragging || !minimapEnabled() || minimapCollapsed()) {
+    cancelWheelScroll();
+    return;
+  }
+  const maximum = documentMetrics().scrollMaximum;
+  wheelTarget = clamp(wheelTarget, 0, maximum);
+  const remaining = wheelTarget - window.scrollY;
+  if (Math.abs(remaining) <= MINIMAP_WHEEL_SNAP_THRESHOLD) {
+    window.scrollTo({ top: wheelTarget, behavior: "instant" });
+    wheelTarget = undefined;
+    return;
+  }
+  window.scrollTo({ top: window.scrollY + remaining * MINIMAP_WHEEL_EASE, behavior: "instant" });
+  wheelFrame = requestAnimationFrame(animateWheelScroll);
+}
+
+function scrollMinimapWheel(delta) {
+  const { scrollMaximum } = documentMetrics();
+  const viewportTravel = Math.max(mapHeight - viewportHeight, 0);
+  if (!scrollMaximum || !viewportTravel) {
+    return;
+  }
+  const target = wheelTarget ?? window.scrollY;
+  wheelTarget = clamp(
+    target + delta * MINIMAP_WHEEL_TRACK_SCALE / viewportTravel * scrollMaximum,
+    0,
+    scrollMaximum,
+  );
+  if (window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) {
+    window.scrollTo({ top: wheelTarget, behavior: "instant" });
+    cancelWheelScroll();
+  } else if (wheelFrame === undefined) {
+    wheelFrame = requestAnimationFrame(animateWheelScroll);
+  }
+}
+
 function dragViewportTo(viewportTop) {
   const viewportTravel = Math.max(mapHeight - viewportHeight, 0);
   const clampedTop = clamp(viewportTop, 0, viewportTravel);
@@ -707,6 +788,7 @@ minimap.addEventListener("pointerdown", (event) => {
     return;
   }
 
+  cancelWheelScroll();
   const y = pointerMapPosition(event);
   const currentTop = viewportTopFromScrollPosition();
   const currentBottom = currentTop + viewportHeight;
@@ -753,8 +835,7 @@ minimap.addEventListener(
       return;
     }
 
-    const viewportTop = viewportTopFromScrollPosition();
-    scrollFromViewportTop(viewportTop + delta * MINIMAP_WHEEL_TRACK_SCALE);
+    scrollMinimapWheel(delta);
     event.preventDefault();
   },
   { passive: false },
@@ -780,6 +861,7 @@ minimap.addEventListener("keydown", (event) => {
     return;
   }
 
+  cancelWheelScroll();
   window.scrollTo({ top: target, behavior: "auto" });
   event.preventDefault();
 });
@@ -823,13 +905,25 @@ mutationObserver.observe(viewer, { childList: true, subtree: true });
 const resizeObserver = new ResizeObserver(scheduleSync);
 resizeObserver.observe(viewer);
 
-window.addEventListener("scroll", scheduleSync, { passive: true });
+window.addEventListener("scroll", () => scheduleSync(false), { passive: true });
+// A new gesture in the document takes precedence over an unfinished minimap glide.
+window.addEventListener("wheel", (event) => {
+  if (!minimap.contains(event.target)) {
+    cancelWheelScroll();
+  }
+}, { passive: true });
+window.addEventListener("pointerdown", (event) => {
+  if (!minimap.contains(event.target)) {
+    cancelWheelScroll();
+  }
+}, { passive: true });
 window.addEventListener("pdf-viewer-document-ready", scheduleThumbnailPreparation);
 window.addEventListener("resize", () => {
   scheduleSync();
   scheduleThumbnailPreparation();
 });
 window.addEventListener("pagehide", () => {
+  cancelWheelScroll();
   cancelScheduledThumbnailPreparation();
   thumbnailLoadGeneration += 1;
   thumbnailGeneration += 1;
