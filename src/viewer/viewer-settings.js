@@ -1,5 +1,7 @@
+import { referenceClicksEnabled } from "./navigation/clickable-reference-links.js";
 const THEME_STORAGE_KEY = "pdf-viewer-theme";
 const SEC_COMMENT_DARK_MODE_KEY = "pdf-viewer-sec-comment-dark-mode";
+const CLICKABLE_REFERENCES_STORAGE_KEY = "pdf-viewer-clickable-references";
 const STUDIO_GREEN = "#43af49";
 
 const toolsMenu = document.querySelector("#tools-menu");
@@ -86,6 +88,19 @@ themeObserver.observe(document.documentElement, {
   attributeFilter: ["data-theme"],
 });
 
+function installClickableReferencesSetting() {
+  const input = document.querySelector("#clickable-references");
+  if (!input) return;
+  const apply = (enabled, persist = true) => {
+    input.checked = enabled;
+    document.documentElement.classList.toggle("clickable-references-disabled", !enabled);
+    if (persist) localStorage.setItem(CLICKABLE_REFERENCES_STORAGE_KEY, String(enabled));
+  };
+  apply(referenceClicksEnabled(localStorage.getItem(CLICKABLE_REFERENCES_STORAGE_KEY)), false);
+  input.addEventListener("change", () => apply(input.checked));
+}
+
+installClickableReferencesSetting();
 syncThemePreference();
 void addSecCommentSetting();
 

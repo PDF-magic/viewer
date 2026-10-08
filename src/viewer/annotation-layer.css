@@ -55,3 +55,29 @@
   outline: 2px solid Highlight;
   outline-offset: 1px;
 }
+
+/* Inferred text references can be disabled without affecting native PDF links. */
+.clickable-reference-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.clickable-reference-link {
+  position: absolute;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.clickable-reference-link:hover {
+  background: rgb(100 150 240 / 14%);
+  outline: 1px solid rgb(100 150 240 / 32%);
+}
+.clickable-reference-link:focus-visible {
+  outline: 2px solid Highlight;
+}
+html.clickable-references-disabled .clickable-reference-layer { display: none !important; }
+@media print { .clickable-reference-layer { display: none !important; } }
