@@ -1,11 +1,18 @@
 import { resolveDocumentReferenceUrl } from "./document-reference-url.js";
 import { resolvePdfSource } from "./pdf-source.js";
 import { pdfDocumentSessionReady } from "./pdf-document-session.js";
+import { downloadSetupZip } from "./enhancer-setup-download.js";
 
 const NATIVE_HOST = "org.pdfmagic.enhancer";
 const enhanceNav = document.querySelector("#enhance-nav");
 const enhanceButton = document.querySelector("#enhance-pdf");
-const installLink = document.querySelector("#install-enhancer");
+const setupDialog = document.querySelector("#enhancer-setup-dialog");
+const setupForm = document.querySelector("#enhancer-setup-form");
+const setupRepository = document.querySelector("#enhancer-repository-url");
+const setupCheckout = document.querySelector("#enhancer-checkout-path");
+const setupStatus = document.querySelector("#enhancer-setup-status");
+const setupMenuButton = document.querySelector("#open-enhancer-setup");
+const SETUP_PREF_KEY = "pdfmagic-enhancer-setup";
 const sectionNav = document.querySelector("#section-nav");
 const pageNumberInput = document.querySelector("#page-number");
 const toast = document.querySelector("#toast");
@@ -17,45 +24,47 @@ const defaultTitle = enhanceButton.title;
 let titleResetTimer;
 let toastTimer;
 
-const SETUP_INSTALLER_URL = "https://raw.githubusercontent.com/PDF-magic/viewer/main/native/install-host.sh";
-
 function isMissingNativeHost(message) {
-  return /native.*(?:host|messag)|host.*(?:not found|not configured)/i.test(message);
-}
-
-function enhancerSetupCommand() {
-  const extensionId = chrome.runtime.id;
-  if (!/^[a-p]{32}$/.test(extensionId || "")) {
-    throw new Error("Could not determine this extension ID");
-  }
-  return `curl -fsSL ${SETUP_INSTALLER_URL} | PDF_MAGIC_SETUP_APPROVED=1 bash -s -- ${extensionId} --fork-if-available`;
+  return /native.*(?:host|messag)|host.*(?:not found|not configured)|enhancer script not found|enhancer-host[.]json|native.*exited/i.test(message);
 }
 
 async function offerEnhancerSetup() {
-  const approved = window.confirm(
-    "PDF Enhancer is not registered yet.\n\n" +
-      "Setup will install the native-messaging bridge and acquire PDF-magic/enhancer if needed. " +
-      "If GitHub CLI is signed in, it may create or reuse your personal enhancer fork; otherwise it uses the upstream repository.\n\n" +
-      "Chrome and Brave cannot run the setup command themselves. Choose OK to copy the reviewed setup command to your clipboard so you can paste it into Terminal.",
-  );
-
-  if (!approved) {
-    enhanceButton.hidden = true;
-    installLink.hidden = false;
-    return;
-  }
-
+  setupStatus.textContent = "";
   try {
-    const command = enhancerSetupCommand();
-    await navigator.clipboard.writeText(command);
-    showToast("Setup command copied — paste it into Terminal, then click Enhance again");
-    showTemporaryTitle("Run copied setup command in Terminal");
+    const preferences = (await chrome.storage.local.get(SETUP_PREF_KEY))[SETUP_PREF_KEY] || {};
+    setupRepository.value = preferences.repositoryUrl || "https://github.com/PDF-magic/enhancer";
+    setupCheckout.value = preferences.checkoutPath || "";
   } catch {
-    enhanceButton.hidden = true;
-    installLink.hidden = false;
-    showToast("Open the enhancer setup instructions");
+    setupRepository.value = "https://github.com/PDF-magic/enhancer";
+    setupCheckout.value = "";
   }
+  if (!setupDialog.open) setupDialog.showModal();
 }
+
+document.querySelector("#enhancer-setup-close").addEventListener("click", () => setupDialog.close());
+setupDialog.addEventListener("click", (event) => {
+  if (event.target === setupDialog) setupDialog.close();
+});
+setupMenuButton.addEventListener("click", () => {
+  document.querySelector("#tools-menu").hidden = true;
+  document.querySelector("#tools-button").setAttribute("aria-expanded", "false");
+  void offerEnhancerSetup();
+});
+setupForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const repositoryUrl = setupRepository.value.trim();
+  const checkoutPath = setupCheckout.value.trim();
+  setupStatus.textContent = "";
+  try {
+    downloadSetupZip({ extensionId: chrome.runtime.id, repositoryUrl, checkoutPath });
+    await chrome.storage.local.set({
+      [SETUP_PREF_KEY]: { repositoryUrl, checkoutPath },
+    });
+    setupStatus.textContent = "Setup ZIP requested. Extract it and open Install PDF Magic.command, then try Enhance again.";
+  } catch (error) {
+    setupStatus.textContent = error?.message || "Could not prepare PDF Enhancer setup";
+  }
+});
 
 
 function updateEnhancementProgress(stage, completed, total) {
