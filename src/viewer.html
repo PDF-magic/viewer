@@ -72,6 +72,13 @@
           <path d="m9 18 6-6-6-6" />
         </svg>
       </button>
+      <form id="printed-page-jump" class="printed-page-control" role="search" aria-label="Find printed page number">
+        <label for="printed-page-number">Printed №</label>
+        <input id="printed-page-number" type="text" autocomplete="off" spellcheck="false" placeholder="№"
+          aria-label="Printed page number" title="Enter the number printed on the page, not the PDF page index" />
+        <button id="printed-page-go" type="submit" aria-label="Go to printed page" title="Go to printed page">↵</button>
+        <span id="printed-page-status" class="printed-page-status" role="status" aria-live="polite"></span>
+      </form>
       <div class="search-tools">
         <button id="copy-file-url" class="mark-button" type="button" aria-label="Copy file URL" title="Copy file URL">
           <img src="assets/pinkie-mirror.png" alt="" aria-hidden="true" />
@@ -329,6 +336,7 @@
     <script type="module" src="viewer/search/search-highlight-cues.js"></script>
     <script type="module" src="viewer/navigation/minimap.js"></script>
     <script type="module" src="viewer/navigation/page-tabs.js"></script>
+    <script type="module" src="viewer/navigation/printed-page-jump.js"></script>
     <script type="module" src="viewer/navigation/page-number-input.js"></script>
     <script type="module" src="viewer/navigation/document-scrubber.js"></script>
     <script type="module" src="viewer/navigation/footnote-jump.js"></script>

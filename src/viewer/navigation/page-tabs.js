@@ -1,18 +1,11 @@
-import { pdfDocumentSessionReady } from "../pdf-document-session.js";
-import { findPrintedPageCounter, mergedPageTabLabels } from "./page-tab-labels.js";
+import { pageLabelIndexReady } from "./printed-page-index.js";
 
 const rail = document.querySelector("#page-tabs");
 const pageInput = document.querySelector("#page-number");
 const root = document.documentElement;
-let documentSession;
 let tabs = [];
 let labels = [];
 let selectedPage = 0;
-let counters = [];
-let nextPageToScan = 0;
-let scanRunning = false;
-let embeddedLabels = null;
-let metadataLoaded = false;
 
 function isVisible() {
   return root.classList.contains("minimap-page-tabs") &&
@@ -53,36 +46,17 @@ function renderLabels(nextLabels) {
     const tab = tabs[index];
     tab.textContent = label;
     tab.title = label === String(index + 1)
-      ? `PDF page ${index + 1}` : `Document page ${label} (PDF page ${index + 1})`;
-    tab.setAttribute("aria-label", `Go to document page ${label}, PDF page ${index + 1}`);
+      ? "PDF page " + (index + 1)
+      : "Document page " + label + " (PDF page " + (index + 1) + ")";
+    tab.setAttribute("aria-label", "Go to document page " + label + ", PDF page " + (index + 1));
   }
   labels = nextLabels;
 }
 
 async function scanVisiblePageNumbers() {
-  if (scanRunning || embeddedLabels || !metadataLoaded || !documentSession || !isVisible()) return;
-  scanRunning = true;
-  const pdf = documentSession.document;
-  try {
-    while (nextPageToScan < pdf.numPages && isVisible()) {
-      const index = nextPageToScan++;
-      try {
-        const page = await pdf.getPage(index + 1);
-        const viewport = page.getViewport({ scale: 1 });
-        const content = await page.getTextContent();
-        counters[index] = findPrintedPageCounter(content.items, viewport);
-      } catch {
-        // A scanned page without selectable text retains its physical PDF position.
-      }
-      if (nextPageToScan % 8 === 0 || nextPageToScan === pdf.numPages) {
-        renderLabels(mergedPageTabLabels(pdf.numPages, null, counters));
-        await new Promise((resolve) => setTimeout(resolve, 0));
-      }
-    }
-  } finally {
-    renderLabels(mergedPageTabLabels(pdf.numPages, null, counters));
-    scanRunning = false;
-  }
+  if (!isVisible()) return;
+  const index = await pageLabelIndexReady;
+  if (index && isVisible()) await index.scan(isVisible);
 }
 
 function updateVisibility() {
@@ -116,35 +90,23 @@ rail.addEventListener("keydown", (event) => {
 });
 
 async function initialize() {
-  documentSession = await pdfDocumentSessionReady;
-  if (!documentSession) return;
-  const pdf = documentSession.document;
-  counters = new Array(pdf.numPages).fill(null);
+  const index = await pageLabelIndexReady;
+  if (!index) return;
+  const count = index.getLabels().length;
   const fragment = document.createDocumentFragment();
-  tabs = Array.from({ length: pdf.numPages }, (_, index) => {
+  tabs = Array.from({ length: count }, (_, pageIndex) => {
     const tab = document.createElement("button");
     tab.className = "page-tab";
     tab.type = "button";
-    tab.dataset.page = String(index + 1);
+    tab.dataset.page = String(pageIndex + 1);
     fragment.append(tab);
     return tab;
   });
   rail.replaceChildren(fragment);
-  renderLabels(mergedPageTabLabels(pdf.numPages));
+  index.subscribe(renderLabels);
   selectPage(Number(pageInput.value) || 1);
   updateVisibility();
-  try {
-    embeddedLabels = await pdf.getPageLabels();
-  } catch {
-    embeddedLabels = null;
-  }
-  if (Array.isArray(embeddedLabels) && embeddedLabels.length === pdf.numPages &&
-    embeddedLabels.every((label) => typeof label === "string" && label.trim())) {
-    renderLabels(mergedPageTabLabels(pdf.numPages, embeddedLabels));
-  } else {
-    embeddedLabels = null;
-  }
-  metadataLoaded = true;
+  await index.loadMetadata();
   void scanVisiblePageNumbers();
 }
 void initialize();

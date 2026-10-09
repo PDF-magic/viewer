@@ -54,12 +54,14 @@ export function findPrintedPageCounter(items, viewport) {
   return candidates.sort((a, b) => Number(b.explicit) - Number(a.explicit))[0] || null;
 }
 
-export function mergedPageTabLabels(pageCount, embeddedLabels, printedCounters = []) {
-  const labels = Array.from({ length: pageCount }, (_, index) => String(index + 1));
+// Null denotes a physical PDF page whose printed number cannot be trusted.
+// In particular, a fallback "3" must never become a searchable printed page 3.
+export function confirmedPrintedPageLabels(pageCount, embeddedLabels, printedCounters = []) {
   if (Array.isArray(embeddedLabels) && embeddedLabels.length === pageCount &&
     embeddedLabels.every((label) => typeof label === "string" && label.trim())) {
     return embeddedLabels.map((label) => label.trim());
   }
+  const labels = new Array(pageCount).fill(null);
   for (let i = 0; i < pageCount; i += 1) {
     const candidate = printedCounters[i];
     if (candidate?.explicit) labels[i] = candidate.label;
@@ -73,4 +75,9 @@ export function mergedPageTabLabels(pageCount, embeddedLabels, printedCounters =
     }
   }
   return labels;
+}
+
+export function mergedPageTabLabels(pageCount, embeddedLabels, printedCounters = []) {
+  return confirmedPrintedPageLabels(pageCount, embeddedLabels, printedCounters)
+    .map((label, index) => label ?? String(index + 1));
 }

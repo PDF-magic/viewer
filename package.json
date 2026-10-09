@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "node scripts/check-extension.mjs",
-    "test": "node --test tests/enhancer-setup.test.mjs tests/page-tab-labels.test.mjs tests/minimap.test.mjs tests/clickable-reference-links.test.mjs"
+    "test": "node --test tests/enhancer-setup.test.mjs tests/page-tab-labels.test.mjs tests/minimap.test.mjs tests/clickable-reference-links.test.mjs tests/printed-page-jump.test.mjs"
   },
   "dependencies": {
     "pdfjs-dist": "6.3.289",
