@@ -64,7 +64,7 @@
         </svg>
       </button>
       <label class="page-control" aria-label="Current page">
-        <input id="page-number" type="text" value="1" inputmode="numeric" pattern="[0-9]*" />
+        <input id="page-number" type="text" value="1" inputmode="text" autocomplete="off" spellcheck="false" title="PDF page, or append * to jump to a printed page (e.g. 181*)" />
         <span>/ <span id="page-count">—</span></span>
       </label>
       <button id="next-page" class="icon-button" type="button" aria-label="Next page" title="Next page">
@@ -72,7 +72,7 @@
           <path d="m9 18 6-6-6-6" />
         </svg>
       </button>
-      <form id="printed-page-jump" class="printed-page-control" role="search" aria-label="Find printed page number">
+      <form id="printed-page-jump" class="printed-page-control" role="search" aria-label="Find printed page number" hidden>
         <label for="printed-page-number">Printed №</label>
         <input id="printed-page-number" type="text" autocomplete="off" spellcheck="false" placeholder="№"
           aria-label="Printed page number" title="Enter the number printed on the page, not the PDF page index" />
@@ -171,6 +171,10 @@
           <label class="tool-toggle" title="Opt in to numbered page tabs in the side navigation (off by default)">
             <span>Enable numbered page tabs</span>
             <input id="page-tabs-opt-in" class="checkbox-input" type="checkbox" />
+          </label>
+          <label class="tool-toggle" title="Show a separate printed-page search field in the toolbar (off by default; you can always type 181* in the regular page field)">
+            <span>Show printed-page search</span>
+            <input id="printed-page-jump-opt-in" class="checkbox-input" type="checkbox" />
           </label>
           <label class="tool-toggle" title="Show created and modified dates as elapsed time; hover over a date for its UTC timestamp">
             <span>Relative dates</span>

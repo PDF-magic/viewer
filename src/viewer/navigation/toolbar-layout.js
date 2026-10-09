@@ -52,6 +52,9 @@ function updateToolbarRows() {
 }
 
 function directPageJump() {
+  // The viewer resolves a trailing * against printed page labels asynchronously.
+  // Never pre-scroll to the physical index while that lookup is in progress.
+  if (pageNumberInput.value.trim().endsWith("*")) return;
   const pageNumber = Number.parseInt(pageNumberInput.value, 10);
   const pageMaximum = Number.parseInt(pageNumberInput.max, 10);
   if (!Number.isFinite(pageNumber) || !Number.isFinite(pageMaximum) || pageMaximum < 1) {

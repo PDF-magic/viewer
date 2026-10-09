@@ -12,6 +12,7 @@ import { highlightFootnote, renderFootnoteHighlight } from "./navigation/footnot
 import { findPrintedContentsEntries, resolvePrintedContentsPage, contentsEntryHasEmbeddedLink } from "./navigation/printed-contents.js";
 import { createClickableReferenceLayer } from "./navigation/clickable-reference-links.js";
 import { outlinedSectionHeadings } from "./navigation/section-cross-references.js";
+import { printedPageShortcutQuery } from "./navigation/printed-page-shortcut.js";
 
 const sourceMode = window.location.pathname.includes("/src/");
 
@@ -1315,6 +1316,9 @@ async function downloadPdf() {
 }
 
 function bindControls() {
+  window.addEventListener("pdf-viewer-toast", (event) => {
+    if (typeof event.detail?.message === "string") showToast(event.detail.message);
+  });
   window.addEventListener("pdf-viewer-footnote-jump", (event) => goToFootnote(event.detail));
   window.addEventListener("pdf-viewer-section-cross-reference-target", (event) => {
     highlightFootnote({ highlightRegions: [] }, pageElements, rotation);
@@ -1341,6 +1345,16 @@ function bindControls() {
   downloadButton.addEventListener("click", () => void downloadPdf());
 
   pageNumberInput.addEventListener("change", () => {
+    const printedQuery = printedPageShortcutQuery(pageNumberInput.value);
+    if (printedQuery !== null) {
+      // A suffix of * means a document-printed page, not the PDF index.
+      // Restore the physical number while the potentially long scan runs.
+      pageNumberInput.value = String(currentPage);
+      window.dispatchEvent(new CustomEvent("pdf-viewer-printed-page-request", {
+        detail: { query: printedQuery },
+      }));
+      return;
+    }
     goToPage(Number.parseInt(pageNumberInput.value, 10) || currentPage, "auto");
   });
 

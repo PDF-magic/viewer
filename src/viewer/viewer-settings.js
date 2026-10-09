@@ -2,6 +2,7 @@ import { referenceClicksEnabled } from "./navigation/clickable-reference-links.j
 const THEME_STORAGE_KEY = "pdf-viewer-theme";
 const SEC_COMMENT_DARK_MODE_KEY = "pdf-viewer-sec-comment-dark-mode";
 const CLICKABLE_REFERENCES_STORAGE_KEY = "pdf-viewer-clickable-references";
+const PRINTED_PAGE_JUMP_STORAGE_KEY = "pdf-viewer-printed-page-jump";
 const STUDIO_GREEN = "#43af49";
 
 const toolsMenu = document.querySelector("#tools-menu");
@@ -100,7 +101,26 @@ function installClickableReferencesSetting() {
   input.addEventListener("change", () => apply(input.checked));
 }
 
+function installPrintedPageJumpSetting() {
+  const toggle = document.querySelector("#printed-page-jump-opt-in");
+  const form = document.querySelector("#printed-page-jump");
+  if (!toggle || !form) return;
+
+  const apply = (enabled, persist = true) => {
+    toggle.checked = enabled;
+    form.hidden = !enabled;
+    form.inert = !enabled;
+    if (persist) localStorage.setItem(PRINTED_PAGE_JUMP_STORAGE_KEY, String(enabled));
+  };
+
+  // The dedicated field is opt-in; the * shortcut in the ordinary page input
+  // remains available even while this extra toolbar control is hidden.
+  apply(localStorage.getItem(PRINTED_PAGE_JUMP_STORAGE_KEY) === "true", false);
+  toggle.addEventListener("change", () => apply(toggle.checked));
+}
+
 installClickableReferencesSetting();
+installPrintedPageJumpSetting();
 syncThemePreference();
 void addSecCommentSetting();
 

@@ -59,6 +59,12 @@ test('typed page jumps instantly before the viewer change handler', () => {
   assert.deepEqual(f.events[2], ['viewer-handler']);
 });
 
+test('typed printed-page shortcuts do not scroll to physical page numbers', () => {
+  const f = fixture({ value: '181*', max: '2000' });
+  f.changeListeners[0]();
+  assert.deepEqual(f.events, []);
+});
+
 test('typed page numbers clamp to the document bounds', () => {
   const f = fixture({ value: '9999', max: '2000' });
   f.changeListeners[0]();

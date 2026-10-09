@@ -28,18 +28,22 @@ function updateCurrentPrintedPage(pageNumber = currentPhysicalPage()) {
     : "No verified printed page number on PDF page " + pageNumber;
 }
 
-async function jumpToPrintedPage() {
-  const query = input.value.trim();
+export async function jumpToPrintedPage(rawQuery = input.value, notify = null) {
+  const query = String(rawQuery).trim();
+  const report = (message, state = "") => {
+    setStatus(message, state);
+    if (typeof notify === "function") notify(message);
+  };
   if (!query || query.length > 48) {
-    setStatus("Enter a printed page label (e.g. 12, iv or A-2).", "error");
+    report("Enter a printed page label (e.g. 12, iv or A-2).", "error");
     return;
   }
   const id = ++requestId;
-  setStatus("Finding printed page " + query + "…", "searching");
+  report("Finding printed page " + query + "…", "searching");
   const pageIndex = await pageLabelIndexReady;
   if (id !== requestId) return;
   if (!pageIndex) {
-    setStatus("PDF is not ready.", "error");
+    report("PDF is not ready.", "error");
     return;
   }
   // Searching works with page tabs and the minimap completely disabled.
@@ -47,7 +51,7 @@ async function jumpToPrintedPage() {
   if (id !== requestId) return;
   const matches = matchingDocumentPageLabels(query, pageIndex.getConfirmedLabels());
   if (!matches.length) {
-    setStatus("Printed page " + query + " not found. Unreadable or scanned pages may lack labels.", "error");
+    report("Printed page " + query + " not found. Unreadable or scanned pages may lack labels.", "error");
     return;
   }
   const key = query.normalize("NFKC").toLocaleLowerCase("en");
@@ -67,12 +71,18 @@ async function jumpToPrintedPage() {
   physicalPage.dispatchEvent(new Event("change", { bubbles: true }));
   input.blur();
   updateCurrentPrintedPage(destination);
-  setStatus(
+  report(
     "Printed " + query + " → PDF page " + destination +
       (matches.length > 1 ? " (" + matches.length + " matches; press Go again to cycle)" : ""),
     "success",
   );
 }
+
+window.addEventListener("pdf-viewer-printed-page-request", (event) => {
+  void jumpToPrintedPage(event.detail?.query ?? "", (message) => {
+    window.dispatchEvent(new CustomEvent("pdf-viewer-toast", { detail: { message } }));
+  });
+});
 
 form?.addEventListener("submit", (event) => {
   event.preventDefault();
