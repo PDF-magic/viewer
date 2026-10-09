@@ -245,17 +245,20 @@ test('wheel navigation eases full-document travel and accumulates rapid deltas',
       const deltaY = 0.1;
       const normalized = deltaY * (deltaMode === 1 ? 16 : deltaMode === 2 ? f.track.clientHeight : 1);
       const travel = vm.runInContext('mapHeight - viewportHeight', f.context);
-      const expected = Math.min(maximum, maximum / 2 + normalized * 0.55 / travel * maximum);
+      const perEventTravel = normalized * 0.55 / travel * maximum;
+      // Rapid wheel events add to one pending target, capped at the document end.
+      const expectedTarget = Math.min(maximum, maximum / 2 + perEventTravel * 2);
       f.listeners.wheel({ deltaY, deltaMode, preventDefault() { prevented = true; } });
       f.listeners.wheel({ deltaY, deltaMode, preventDefault() {} });
       assert.equal(f.window.scrollY, maximum / 2, 'wheel targets should be animated, not jump');
       assert.ok(prevented);
       assert.equal(animation.pending, 1, 'rapid inputs should share one animation');
+      assert.ok(Math.abs(vm.runInContext('wheelTarget', f.context) - expectedTarget) < 0.00001);
       animation.step();
       assert.ok(f.window.scrollY > maximum / 2);
-      assert.ok(f.window.scrollY < expected * 2 - maximum / 2);
+      assert.ok(f.window.scrollY < expectedTarget);
       animation.settle();
-      assert.ok(Math.abs(f.window.scrollY - (expected * 2 - maximum / 2)) < 0.00001);
+      assert.ok(Math.abs(f.window.scrollY - expectedTarget) < 0.00001);
       f.listeners.wheel({ deltaY: -1000000, deltaMode, preventDefault() {} });
       animation.settle();
       assert.equal(f.window.scrollY, 0);
