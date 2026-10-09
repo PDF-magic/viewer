@@ -315,6 +315,23 @@ test('scroll-only minimap updates skip expensive per-page geometry reads', () =>
   assert.ok(geometryReads > 0);
 });
 
+test('disabled minimap scrollbar matches the viewer theme in dark and light modes', () => {
+  assert.match(
+    styles,
+    /html\.minimap-disabled\s*\{\s*scrollbar-color:\s*var\(--muted\) var\(--body-bg\);/,
+  );
+  assert.match(
+    styles,
+    /html\.minimap-disabled::-webkit-scrollbar-track,[\s\S]*?background:\s*var\(--body-bg\);/,
+  );
+  assert.match(
+    styles,
+    /html\.minimap-disabled::-webkit-scrollbar-thumb,[\s\S]*?background:\s*var\(--muted\);/,
+  );
+  assert.match(viewerStyles, /:root\s*\{[\s\S]*?--body-bg:\s*#000000;/);
+  assert.match(viewerStyles, /:root\[data-theme="light"\]\s*\{[\s\S]*?--body-bg:\s*#ececef;/);
+});
+
 test('collapsed minimap uses a themed rounded scrollbar while the expanded minimap hides it', () => {
   assert.match(
     styles,
