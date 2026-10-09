@@ -139,7 +139,7 @@ function highlightRegions(entries, viewport, pageNumber) {
   const lines = [];
   for (const entry of entries) {
     const region = textRegion(entry, viewport);
-    const line = lines.find((line) => Math.abs(line.baseline - entry.y) <= entry.height * 0.6);
+    const line = lines.find((line) => Math.abs(line.baseline - readingBaseline(entry)) <= entry.height * 0.6);
     if (line) {
       const right = Math.max(line.left + line.width, region.left + region.width);
       const bottom = Math.max(line.top + line.height, region.top + region.height);
@@ -148,21 +148,30 @@ function highlightRegions(entries, viewport, pageNumber) {
       line.width = right - line.left;
       line.height = bottom - line.top;
     } else {
-      lines.push({ ...region, baseline: entry.y });
+      lines.push({ ...region, baseline: readingBaseline(entry) });
     }
   }
   return lines.map(({ baseline, ...region }) => ({ pageNumber, ...region }));
 }
 
+function readingBaseline(entry) {
+  // OCR words on a tilted scan share a sloped baseline. Compare their
+  // deskewed positions while retaining original coordinates for highlights.
+  const transform = entry.item.transform;
+  const slope = transform?.[0] ? transform[1] / transform[0] : 0;
+  return entry.y + (Math.abs(slope) < 0.1 ? entry.x * slope : 0);
+}
+
 function readingOrder(a, b) {
-  return Math.abs(a.y - b.y) < 2 ? a.x - b.x : a.y - b.y;
+  const difference = readingBaseline(a) - readingBaseline(b);
+  return Math.abs(difference) < 2 ? a.x - b.x : difference;
 }
 
 function joinNoteEntries(entries) {
   return entries.reduce((text, entry, index) => {
     const previous = entries[index - 1];
     if (!previous) return entry.text;
-    const sameLine = Math.abs(previous.y - entry.y) < 2;
+    const sameLine = Math.abs(readingBaseline(previous) - readingBaseline(entry)) < 2;
     const gap = entry.x - previous.x - Math.abs(previous.item.width || 0);
     const explicitSpace = /\s$/.test(previous.item.str) || /^\s/.test(entry.item.str);
     const contiguous = sameLine && Number.isFinite(previous.item.width) &&
@@ -339,7 +348,7 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
       // to be raised.
       const reference = Boolean(adjacent) && allEntries.some((other) => other !== entry && other.text === entry.text &&
         (other.priorPage || other.y < entry.y - entry.height) && other.height <= adjacent.height * 0.8 && allEntries.some((body) =>
-          body !== other && Boolean(body.priorPage) === Boolean(other.priorPage) &&
+          body !== other && body.height >= adjacent.height * 0.95 && Boolean(body.priorPage) === Boolean(other.priorPage) &&
           ((body.x < other.x && Math.abs(body.x + Math.abs(body.item.width || 0) - other.x) < adjacent.height) ||
             (body.x > other.x && body.x - other.x - Math.abs(other.item.width || 0) < adjacent.height)) &&
           body.y - other.y >= body.height * 0.15 && body.y - other.y <= body.height * 0.65));
@@ -352,6 +361,10 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
       const rule = column.rules.find((rule) => rule.y < entry.y && entry.y - rule.y > 2);
       const previousLine = entries.filter((other) => other.y < entry.y - 2).sort((a, b) => b.y - a.y)[0];
       const separated = !previousLine || entry.y - previousLine.y >= typicalHeight * 1.5;
+      const scanPreviousLine = entries.filter(other => readingBaseline(other) < readingBaseline(entry) - 2)
+        .sort((a, b) => readingBaseline(b) - readingBaseline(a))[0];
+      const scanSeparated = !scanPreviousLine ||
+        readingBaseline(entry) - readingBaseline(scanPreviousLine) >= typicalHeight * 1.5;
       // Plain numbers beginning a small-text block may be dates or release
       // citations continued from another column. Inline markers need an
       // explicit delimiter or an established note block in this column.
@@ -360,10 +373,20 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
           Math.abs(note.textHeight - entry.height) < entry.height * 0.15);
       const smallerBlock = inlineMarker && !column.rules.length && separated && entry.yRatio >= 0.52 && entry.height <= typicalHeight * 0.8 &&
         (inlineText || adjacent.height <= typicalHeight * 0.8);
+      // Scan OCR can flatten the superscript label and omit the separator.
+      // Recover a slightly smaller, multi-line paragraph at the page bottom.
+      const scannedSmallBlock = !column.rules.length && !inlineText && scanSeparated &&
+        entry.yRatio >= 0.8 && entry.height <= typicalHeight * 0.9 &&
+        adjacent.height <= typicalHeight * 0.9 && entries.filter(other =>
+          readingBaseline(other) > readingBaseline(entry) + entry.height * 0.8 &&
+          readingBaseline(other) < readingBaseline(entry) + entry.height * 4 &&
+          other.x < adjacent.x && Math.abs(other.height - adjacent.height) < adjacent.height * 0.1 &&
+          /[A-Za-z]/.test(other.text)).length >= 2;
       if (column.rules.length && !rule) continue;
-      if (!reference && !wideNoteBlock && !(superscript && rule) && !smallerBlock) continue;
+      if (!reference && !wideNoteBlock && !(superscript && rule) && !smallerBlock && !scannedSmallBlock) continue;
       notes.push({ pageNumber, number, xRatio: entry.xRatio, yRatio: entry.yRatio, label: entry.text,
-        baseline, textHeight: inlineText ? entry.height : adjacent.height, columnIndex: column.index,
+        baseline, scannedSmallBlock, readingY: readingBaseline(inlineText ? entry : adjacent),
+        textHeight: inlineText ? entry.height : adjacent.height, columnIndex: column.index,
         columnLeft: column.left, columnRight: column.right });
     }
     // Some scanned SEC filings render a numeric footnote label correctly while
@@ -416,12 +439,15 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
       const resumedBody = entries.filter((entry) => entry.y > note.baseline + 2 &&
         (note.hangingMargin === undefined || entry.x >= note.hangingMargin - 3) &&
         entry.height > note.textHeight * 1.2).sort(readingOrder)[0];
-      const textEntries = entries.filter((entry) => entry.y >= note.baseline - 2 &&
+      const textEntries = entries.filter((entry) => (note.readingY === undefined ? entry.y : readingBaseline(entry)) >= (note.readingY ?? note.baseline) - 2 &&
         (note.hangingMargin === undefined || entry.x >= note.hangingMargin - 3) &&
         (!resumedBody || entry.y < resumedBody.y - 2) &&
-        (!next || entry.y < next.yRatio * viewport.height - 2) && isPreviewText(entry, note.textHeight) &&
-        !(/^\d+$/.test(entry.text) && entry.yRatio > 0.92)).sort(readingOrder);
-      const joinedText = joinNoteEntries(textEntries);
+        (!next || (next.readingY === undefined ? entry.y : readingBaseline(entry)) < (next.readingY ?? next.yRatio * viewport.height) - 2) && isPreviewText(entry, note.textHeight) &&
+        !(/^\d+$/.test(entry.text) && entry.yRatio > 0.92 && !(note.scannedSmallBlock && entries.some(other =>
+          other !== entry && /[A-Za-z]/.test(other.text) &&
+          Math.abs(readingBaseline(other) - readingBaseline(entry)) < 2)))).sort(readingOrder);
+      const joinedText = joinNoteEntries(textEntries.filter(entry =>
+        !(entry.text === String(note.number) && entry.xRatio === note.xRatio && entry.yRatio === note.yRatio)));
       const text = (note.inferredMarker && joinedText.startsWith(note.inferredMarker)
         ? joinedText.slice(note.inferredMarker.length)
         : joinedText.replace(markerPattern(note.number), "")).trim();
@@ -432,7 +458,7 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
       if (text.length >= 3) result.push({ ...note, text, endPageNumber: pageNumber, endColumnIndex: column.index,
         highlightRegions: highlightRegions(highlightedEntries, viewport, pageNumber),
         continues: !next && textEntries.at(-1)?.yRatio >= 0.88 &&
-          (note.hangingMargin === undefined || !/[.!?]["')\]]?$/.test(text)) });
+          ((note.hangingMargin === undefined && !note.scannedSmallBlock) || !/[.!?]["')\]]?$/.test(text)) });
     }
   }
   return result;

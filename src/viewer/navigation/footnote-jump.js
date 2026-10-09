@@ -44,6 +44,16 @@ async function pageData(pdfDocument, pageNumber) {
 }
 
 async function findFootnoteTarget(pdfDocument, number, originPage, requestId, operators) {
+  // A complete, confidently indexed note on the current page is already the
+  // closest match. Avoid decoding every scanned page just to find it again.
+  const origin = await pdfDocument.getPage(originPage);
+  const { items: originItems } = await origin.getTextContent();
+  if (requestId !== lookupRequestId) return null;
+  const originNotes = [];
+  appendFootnotesForPage(originNotes, originItems, origin.getViewport({ scale: 1 }), originPage, null, operators);
+  const localNote = originNotes.find(note => note.number === number && !note.continues);
+  if (localNote) return localNote;
+
   let best;
   const notes = [];
   let previous;
