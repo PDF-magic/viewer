@@ -14,7 +14,7 @@ export function matchingDocumentPageLabels(query, confirmedLabels) {
     typeof label === "string" && normalizeLabel(label) === key ? [index + 1] : []);
 }
 
-// Shared by the optional side page tabs and the always-available printed-page jump.
+// Shared by optional page tabs, the opt-in printed-page field, and the * shortcut.
 // A document is scanned only on explicit navigation or while the tab rail is shown.
 export function createPageLabelIndex(pdf) {
   const count = pdf.numPages;

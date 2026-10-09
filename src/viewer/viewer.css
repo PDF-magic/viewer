@@ -451,7 +451,7 @@ input {
 }
 
 .page-control input {
-  width: 38px;
+  width: 48px;
   border: 0;
   outline: 0;
   background: transparent;
@@ -478,6 +478,7 @@ input {
   background: var(--control-bg);
   color: var(--text);
 }
+.printed-page-control[hidden] { display: none; }
 .printed-page-control label {
   white-space: nowrap;
   color: var(--muted);

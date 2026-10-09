@@ -3,6 +3,7 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 import { confirmedPrintedPageLabels, parsePrintedPageCounter } from "../src/viewer/navigation/page-tab-labels.js";
 import { createPageLabelIndex, matchingDocumentPageLabels } from "../src/viewer/navigation/printed-page-index.js";
+import { printedPageShortcutQuery } from "../src/viewer/navigation/printed-page-shortcut.js";
 
 const fixturePage = (footer) => ({
   getViewport() {
@@ -85,4 +86,33 @@ test("standalone printed page search is wired separately from the physical page 
   assert.match(tabs, /pageLabelIndexReady/);
   const viewer = readFileSync(new URL("../src/viewer/viewer.js", import.meta.url), "utf8");
   assert.match(viewer, /document.activeElement === document.querySelector\("#printed-page-number"\)/);
+});
+
+test("asterisk suffix requests printed labels rather than PDF page indices", () => {
+  assert.equal(printedPageShortcutQuery("181*"), "181");
+  assert.equal(printedPageShortcutQuery(" iv* "), "iv");
+  assert.equal(printedPageShortcutQuery("A-2 *"), "A-2");
+  assert.equal(printedPageShortcutQuery("181"), null);
+  assert.equal(printedPageShortcutQuery("*"), "");
+  assert.deepEqual(matchingDocumentPageLabels(printedPageShortcutQuery("181*"), ["1", "2", "181"]), [3]);
+});
+
+test("standalone printed search defaults off, but * uses the ordinary field", () => {
+  const html = readFileSync(new URL("../src/viewer.html", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../src/viewer/viewer.css", import.meta.url), "utf8");
+  const settings = readFileSync(new URL("../src/viewer/viewer-settings.js", import.meta.url), "utf8");
+  const viewer = readFileSync(new URL("../src/viewer/viewer.js", import.meta.url), "utf8");
+  const toolbar = readFileSync(new URL("../src/viewer/navigation/toolbar-layout.js", import.meta.url), "utf8");
+  assert.match(html, /id="printed-page-jump"[^>]* hidden>/);
+  assert.match(html, /id="printed-page-jump-opt-in"/);
+  assert.match(html, /id="page-number"[^>]*inputmode="text"/);
+  assert.match(css, /\.printed-page-control\[hidden\]\s*\{\s*display:\s*none/);
+  assert.match(settings, /apply\(localStorage\.getItem\(PRINTED_PAGE_JUMP_STORAGE_KEY\) === "true", false\)/);
+  assert.match(settings, /form\.hidden = !enabled/);
+  assert.match(viewer, /printedPageShortcutQuery\(pageNumberInput\.value\)/);
+  assert.match(viewer, /"pdf-viewer-printed-page-request"/);
+  const jump = readFileSync(new URL("../src/viewer/navigation/printed-page-jump.js", import.meta.url), "utf8");
+  assert.match(jump, /addEventListener\("pdf-viewer-printed-page-request"/);
+  assert.match(viewer, /"pdf-viewer-toast"/);
+  assert.match(toolbar, /pageNumberInput\.value\.trim\(\)\.endsWith\("\*"\)/);
 });
