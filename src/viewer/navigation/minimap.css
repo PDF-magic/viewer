@@ -63,6 +63,24 @@
   }
 }
 
+/* Match the native scrollbar track to the chosen theme without altering its width. */
+html.minimap-disabled {
+  scrollbar-color: var(--muted) var(--body-bg);
+}
+
+html.minimap-disabled::-webkit-scrollbar,
+html.minimap-disabled body::-webkit-scrollbar,
+html.minimap-disabled::-webkit-scrollbar-track,
+html.minimap-disabled body::-webkit-scrollbar-track {
+  background: var(--body-bg);
+}
+
+html.minimap-disabled::-webkit-scrollbar-thumb,
+html.minimap-disabled body::-webkit-scrollbar-thumb {
+  background: var(--muted);
+  border-radius: 999px;
+}
+
 .minimap-shell {
   --minimap-accent: var(--accent, #43af49);
   position: fixed;
