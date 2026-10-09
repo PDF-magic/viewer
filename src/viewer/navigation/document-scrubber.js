@@ -265,31 +265,46 @@ window.addEventListener("resize", () => {
   scheduleTracking();
 });
 
-async function initializeScrubber() {
-  const session = await pdfDocumentSessionReady;
-  if (!session?.document) return;
-  let previousPageText;
-  // Only retain compact note metadata; yield between pages so rendering can continue.
-  for (let pageNumber = 1; pageNumber <= session.document.numPages; pageNumber += 1) {
-    try {
-      const page = await session.document.getPage(pageNumber);
-      const content = await page.getTextContent();
-      const viewport = page.getViewport({ scale: 1 });
-      const operators = await page.getOperatorList().catch(() => null);
-      appendFootnotesForPage(notes, content.items, viewport, pageNumber, operators, session.operators, previousPageText);
-      previousPageText = { items: content.items, viewport };
-    } catch (error) {
-      previousPageText = undefined;
-      console.warn(`Could not index footnotes on page ${pageNumber}`, error);
-    }
-    await new Promise((resolve) => setTimeout(resolve, 0));
-  }
-  if (!notes.length) return;
+function publishFootnoteIndex(index) {
+  if (!index.length) return;
+  const selected = notes[selectedIndex];
+  notes = index;
+  const matchingIndex = selected ? notes.findIndex(note =>
+    note.number === selected.number && note.pageNumber === selected.pageNumber) : -1;
   range.max = String(notes.length);
   scrubber.hidden = false;
   document.documentElement.style.setProperty("--document-scrubber-height", "28px");
-  updateScrubber(0);
+  updateScrubber(matchingIndex >= 0 ? matchingIndex : 0);
   scheduleTracking();
+}
+
+async function initializeScrubber() {
+  const session = await pdfDocumentSessionReady;
+  if (!session?.document) return;
+  // Text extraction is cheap even for large scans. Publish those notes first;
+  // drawing operators may decode hundreds of large scanned page images.
+  // Refine the index with separator rules in a second pass.
+  for (const includeOperators of [false, true]) {
+    const index = [];
+    let previousPageText;
+    for (let pageNumber = 1; pageNumber <= session.document.numPages; pageNumber += 1) {
+      try {
+        const page = await session.document.getPage(pageNumber);
+        const content = await page.getTextContent();
+        const viewport = page.getViewport({ scale: 1 });
+        const operators = includeOperators ? await page.getOperatorList().catch(() => null) : null;
+        appendFootnotesForPage(index, content.items, viewport, pageNumber, operators, session.operators, previousPageText);
+        previousPageText = { items: content.items, viewport };
+        // Keep the text index available while the refined index is incomplete.
+        if (!includeOperators || !notes.length) publishFootnoteIndex(index);
+      } catch (error) {
+        previousPageText = undefined;
+        console.warn(`Could not index footnotes on page ${pageNumber}`, error);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    publishFootnoteIndex(index);
+  }
 }
 
 void initializeScrubber();

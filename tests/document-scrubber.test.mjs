@@ -84,7 +84,7 @@ test("split page counters are excluded from footnote text and highlights", () =>
   }
 });
 
-async function loadScrubber(pages, operators) {
+async function loadScrubber(pages, operators, options = {}) {
   const elements = new Map();
   const jumps = [];
   const frames = [];
@@ -121,7 +121,8 @@ async function loadScrubber(pages, operators) {
           getTextContent: async () => ({ items: page.items || page }),
           getViewport: () => page.items ? { width: page.width, height: page.height,
             convertToViewportPoint: (x, y) => [x, page.height - y] } : viewport,
-          getOperatorList: async () => page.operators || { argsArray: [] },
+          getOperatorList: async () => options.getOperatorList
+            ? options.getOperatorList(number) : page.operators || { argsArray: [] },
         };
       },
     } }),
@@ -132,7 +133,7 @@ async function loadScrubber(pages, operators) {
     setTimeout: (callback) => { callback(); }, console,
   });
   vm.runInContext(source.replace(/^import .*$/gm, "").replace("void initializeScrubber();", "globalThis.ready = initializeScrubber();"), context);
-  await context.ready;
+  if (options.wait !== false) await context.ready;
   return { element, jumps, frames, properties, context, motionPreference };
 }
 
@@ -453,4 +454,24 @@ test("large footnote numbers and typed digits reserve enough space beside the sl
   input.blur();
   assert.equal(input.value, "123456");
   assert.equal(properties["--scrubber-number-width"], "calc(6ch + 12px)");
+});
+
+
+test("slider appears from text before slow scanned drawing data finishes", async () => {
+  let release;
+  const drawingData = new Promise(resolve => { release = resolve; });
+  const { element, context, properties } = await loadScrubber([noteItems, body], undefined, {
+    wait: false,
+    getOperatorList: async () => { await drawingData; return { argsArray: [] }; },
+  });
+  try {
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(element("#document-scrubber").hidden, false);
+    assert.equal(element("#document-scrubber-range").max, "2");
+    assert.equal(properties["--document-scrubber-height"], "28px");
+    assert.match(element("#document-scrubber-range").attributes["aria-valuetext"], /Footnote 7/);
+  } finally {
+    release();
+    await context.ready;
+  }
 });
