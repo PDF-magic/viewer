@@ -1412,6 +1412,7 @@ function bindControls() {
 
     if (
       document.activeElement === pageNumberInput ||
+      document.activeElement === document.querySelector("#printed-page-number") ||
       document.activeElement === searchInput ||
       sectionPopover.contains(document.activeElement)
     ) {
