@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { runInNewContext } from "node:vm";
 import { readFileSync } from "node:fs";
 import { confirmedPrintedPageLabels, parsePrintedPageCounter } from "../src/viewer/navigation/page-tab-labels.js";
 import { createPageLabelIndex, matchingDocumentPageLabels } from "../src/viewer/navigation/printed-page-index.js";
@@ -115,4 +116,38 @@ test("standalone printed search defaults off, but * uses the ordinary field", ()
   assert.match(jump, /addEventListener\("pdf-viewer-printed-page-request"/);
   assert.match(viewer, /"pdf-viewer-toast"/);
   assert.match(toolbar, /pageNumberInput\.value\.trim\(\)\.endsWith\("\*"\)/);
+});
+
+test("clicking total page count requests the final physical page", () => {
+  const html = readFileSync(new URL("../src/viewer.html", import.meta.url), "utf8");
+  const css = readFileSync(new URL("../src/viewer/viewer.css", import.meta.url), "utf8");
+  const script = readFileSync(new URL("../src/viewer/navigation/page-number-input.js", import.meta.url), "utf8");
+  assert.match(html, /<button id="page-count" type="button" aria-label="Go to last page"/);
+  assert.match(html, /id="page-number"[^>]*aria-label="Current page"/);
+  assert.match(css, /#page-count:focus-visible/);
+
+  const handlers = {};
+  const changes = [];
+  let selected = false;
+  const input = {
+    max: "", value: "2",
+    addEventListener(type, fn) { handlers[type] = fn; },
+    select() { selected = true; },
+    dispatchEvent(event) { changes.push([event.type, event.bubbles, this.value]); },
+  };
+  const button = { addEventListener(type, fn) { handlers["count:" + type] = fn; } };
+  runInNewContext(script, {
+    document: { querySelector(id) { return id === "#page-number" ? input : id === "#page-count" ? button : null; } },
+    Event: class { constructor(type, options) { this.type = type; this.bubbles = options.bubbles; } },
+  });
+
+  handlers["count:click"]();
+  assert.equal(input.value, "2");
+  assert.equal(changes.length, 0);
+  input.max = "9";
+  handlers["count:click"]();
+  assert.equal(input.value, "9");
+  assert.deepEqual(changes, [["change", true, "9"]]);
+  handlers.click();
+  assert.ok(selected, "the current page is still selectable");
 });

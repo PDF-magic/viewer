@@ -3,7 +3,9 @@ import { EventBus, PDFLinkService } from "../../node_modules/pdfjs-dist/web/pdf_
 import { abandonPdfDocumentSession, publishPdfDocument } from "./pdf-document-session.js";
 import { referenceUrlFromPdfMetadata, resolveDocumentReferenceUrl } from "./document-reference-url.js";
 import { resolvePdfSource } from "./pdf-source.js";
+import { readResumedPage, saveResumedPage } from "./page-resume.js";
 import { findSearchMatches } from "./search/search-matches.js";
+import { installMarkdownCopy, markPdfTextStyles, markPdfTextStructure } from "./selection/markdown-copy.js";
 import { highlightTextLayer, registerSearchText } from "./search/search-highlight.js";
 import { normalizeSearchText } from "./search/search-text.js";
 import { PagePreviews } from "./page-previews.js";
@@ -58,6 +60,7 @@ const downloadButton = document.querySelector("#download-pdf");
 const toast = document.querySelector("#toast");
 
 const THEME_STORAGE_KEY = "pdf-viewer-theme";
+const initialViewerHash = window.location.hash;
 const LUNA_ICON = extensionAssetUrl("src/assets/luna-mark.png", "assets/luna-mark.png");
 const CELESTIA_ICON = extensionAssetUrl("src/assets/celestia-mark.png", "assets/celestia-mark.png");
 const DARK_MODE_SHARE_ICON = extensionAssetUrl(
@@ -208,6 +211,15 @@ function getInitialPage(...urls) {
   return 1;
 }
 
+function recordCurrentPage() {
+  if (!pdfDocument || !originalUrl) return;
+  try {
+    saveResumedPage(window.sessionStorage, originalUrl, initialViewerHash, currentPage);
+  } catch {
+    // Storage may be unavailable in a restricted viewer context.
+  }
+}
+
 function setCurrentPage(pageNumber, deferSharpRender = false) {
   if (!pdfDocument) {
     return;
@@ -219,6 +231,7 @@ function setCurrentPage(pageNumber, deferSharpRender = false) {
   }
 
   currentPage = nextPage;
+  recordCurrentPage();
   pagePreviews?.update(currentPage);
   pageNumberInput.value = String(currentPage);
   window.dispatchEvent(new CustomEvent("pdf-viewer-page-changed", { detail: { pageNumber: currentPage } }));
@@ -859,6 +872,16 @@ async function renderPageNow(pageNumber) {
   }
 
   container.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
+  markPdfTextStyles(page, textContent, textLayerTask.textDivs);
+  // Read semantic content order separately: PDF.js does not expose content-stream
+  // /ActualText, but the structure tree identifies each tagged paragraph.
+  void page.getStructTree().then((tree) => {
+    if (tree && generation === renderGeneration && container.contains(textLayer)) {
+      markPdfTextStructure(textLayer, tree);
+    }
+  }).catch(() => {
+    // Untagged or malformed PDFs retain their normal line-break behavior.
+  });
   registerSearchText(textLayer, textContent.items.filter(item => "str" in item), textLayerTask.textDivs);
   container.replaceChildren(
     canvas,
@@ -1316,6 +1339,7 @@ async function downloadPdf() {
 }
 
 function bindControls() {
+  installMarkdownCopy(viewer, document.querySelector("#copy-as-markdown"), document, document.querySelector("#copy-tagged-paragraphs"));
   window.addEventListener("pdf-viewer-toast", (event) => {
     if (typeof event.detail?.message === "string") showToast(event.detail.message);
   });
@@ -1452,7 +1476,13 @@ async function initialize() {
   const resolvedSource = await resolvePdfSource();
   mimeHandlerActive = resolvedSource.mimeHandlerActive;
   originalUrl = resolvedSource.originalUrl;
-  const requestedPage = getInitialPage(window.location, originalUrl);
+  let resumedPage = null;
+  try {
+    resumedPage = readResumedPage(window.sessionStorage, originalUrl, initialViewerHash);
+  } catch {
+    // Fall back to the incoming page link when storage is unavailable.
+  }
+  const requestedPage = resumedPage ?? getInitialPage(window.location, originalUrl);
   requestUrl = new URL(originalUrl.href);
   requestUrl.hash = "";
 
@@ -1519,6 +1549,7 @@ async function initialize() {
 }
 
 window.addEventListener("pagehide", () => {
+  recordCurrentPage();
   clearTimeout(sharpRenderTimer);
   pagePreviews?.stop();
 });

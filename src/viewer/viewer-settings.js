@@ -3,6 +3,8 @@ const THEME_STORAGE_KEY = "pdf-viewer-theme";
 const SEC_COMMENT_DARK_MODE_KEY = "pdf-viewer-sec-comment-dark-mode";
 const CLICKABLE_REFERENCES_STORAGE_KEY = "pdf-viewer-clickable-references";
 const PRINTED_PAGE_JUMP_STORAGE_KEY = "pdf-viewer-printed-page-jump";
+const MARKDOWN_COPY_STORAGE_KEY = "pdf-viewer-copy-as-markdown";
+const TAGGED_PARAGRAPH_COPY_STORAGE_KEY = "pdf-viewer-copy-tagged-paragraphs";
 const STUDIO_GREEN = "#43af49";
 
 const toolsMenu = document.querySelector("#tools-menu");
@@ -119,14 +121,35 @@ function installPrintedPageJumpSetting() {
   toggle.addEventListener("change", () => apply(toggle.checked));
 }
 
+function installMarkdownCopySetting() {
+  const toggle = document.querySelector("#copy-as-markdown");
+  if (!toggle) return;
+  styleSettingCheckbox(toggle);
+  toggle.checked = localStorage.getItem(MARKDOWN_COPY_STORAGE_KEY) === "true";
+  toggle.addEventListener("change", () => {
+    localStorage.setItem(MARKDOWN_COPY_STORAGE_KEY, String(toggle.checked));
+  });
+}
+
+function installTaggedParagraphCopySetting() {
+  const toggle = document.querySelector("#copy-tagged-paragraphs");
+  if (!toggle) return;
+  styleSettingCheckbox(toggle);
+  toggle.checked = localStorage.getItem(TAGGED_PARAGRAPH_COPY_STORAGE_KEY) !== "false";
+  toggle.addEventListener("change", () => {
+    localStorage.setItem(TAGGED_PARAGRAPH_COPY_STORAGE_KEY, String(toggle.checked));
+  });
+}
+
 installClickableReferencesSetting();
 installPrintedPageJumpSetting();
+installMarkdownCopySetting();
+installTaggedParagraphCopySetting();
 syncThemePreference();
 void addSecCommentSetting();
 
 const TOOLBAR_HEIGHT = 52;
 const PAGE_HORIZONTAL_GUTTER = 32;
-const PAGE_VERTICAL_GUTTER = 48;
 const DEFAULT_MAX_PAGE_WIDTH = 1100;
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
@@ -385,8 +408,18 @@ function viewportPageWidth() {
   return Math.max(160, availableWidth - minimapWidth - horizontalGutter);
 }
 
+function viewportPageTop() {
+  const viewer = document.querySelector("#viewer");
+  return viewer ? Number.parseFloat(getComputedStyle(viewer).paddingTop) : TOOLBAR_HEIGHT + 1;
+}
+
 function viewportPageHeight() {
-  return Math.max(160, window.innerHeight - TOOLBAR_HEIGHT - PAGE_VERTICAL_GUTTER);
+  const scrubber = document.querySelector("#document-scrubber");
+  const viewportBottom = scrubber?.getBoundingClientRect().height
+    ? scrubber.getBoundingClientRect().top
+    : window.innerHeight;
+  // Reserve only the page outline, not space for the following page.
+  return Math.max(160, viewportBottom - viewportPageTop() - 1);
 }
 
 function applyZoomLayout() {
@@ -526,8 +559,12 @@ function fitWidth() {
 }
 
 function fitHeight() {
+  const pageNumber = Number.parseInt(document.querySelector("#page-number")?.value, 10);
+  const page = document.querySelector(`.page[data-page="${pageNumber}"]`)
+    || document.querySelector(".page");
   zoomMode = "fit-height";
-  applyZoomLayoutPreservingPosition();
+  applyZoomLayout();
+  restoreZoomAnchor(page ? { page, ratio: 0, viewportY: viewportPageTop() } : null);
   syncZoomControls();
   scheduleViewerRerender();
 }
