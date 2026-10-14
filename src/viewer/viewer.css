@@ -459,6 +459,26 @@ input {
   text-align: right;
 }
 
+.page-control #page-count {
+  padding: 2px 3px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.page-control #page-count:hover {
+  background: var(--control-hover);
+  color: var(--text);
+}
+
+.page-control #page-count:focus-visible {
+  outline: 2px solid var(--search-focus-border);
+  outline-offset: 1px;
+}
+
 .page-control input::-webkit-inner-spin-button,
 .page-control input::-webkit-outer-spin-button {
   margin: 0;
