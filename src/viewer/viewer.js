@@ -4,7 +4,7 @@ import { abandonPdfDocumentSession, publishPdfDocument } from "./pdf-document-se
 import { referenceUrlFromPdfMetadata, resolveDocumentReferenceUrl } from "./document-reference-url.js";
 import { resolvePdfSource } from "./pdf-source.js";
 import { findSearchMatches } from "./search/search-matches.js";
-import { installMarkdownCopy, markPdfTextStyles } from "./selection/markdown-copy.js";
+import { installMarkdownCopy, markPdfTextStyles, markPdfTextStructure } from "./selection/markdown-copy.js";
 import { highlightTextLayer, registerSearchText } from "./search/search-highlight.js";
 import { normalizeSearchText } from "./search/search-text.js";
 import { PagePreviews } from "./page-previews.js";
@@ -861,6 +861,15 @@ async function renderPageNow(pageNumber) {
 
   container.style.aspectRatio = `${viewport.width} / ${viewport.height}`;
   markPdfTextStyles(page, textContent, textLayerTask.textDivs);
+  // Read semantic content order separately: PDF.js does not expose content-stream
+  // /ActualText, but the structure tree identifies each tagged paragraph.
+  void page.getStructTree().then((tree) => {
+    if (tree && generation === renderGeneration && container.contains(textLayer)) {
+      markPdfTextStructure(textLayer, tree);
+    }
+  }).catch(() => {
+    // Untagged or malformed PDFs retain their normal line-break behavior.
+  });
   registerSearchText(textLayer, textContent.items.filter(item => "str" in item), textLayerTask.textDivs);
   container.replaceChildren(
     canvas,
@@ -1318,7 +1327,7 @@ async function downloadPdf() {
 }
 
 function bindControls() {
-  installMarkdownCopy(viewer, document.querySelector("#copy-as-markdown"));
+  installMarkdownCopy(viewer, document.querySelector("#copy-as-markdown"), document, document.querySelector("#copy-tagged-paragraphs"));
   window.addEventListener("pdf-viewer-toast", (event) => {
     if (typeof event.detail?.message === "string") showToast(event.detail.message);
   });
