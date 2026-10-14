@@ -208,6 +208,42 @@ test('dragging the viewport follows the latest pointer position immediately', ()
 });
 
 
+test('local minimap pans its thumbnail strip during dragging all the way to document bounds', () => {
+  const f = fixture(100, 900, { 'pdf-viewer-minimap-mode': 'local' });
+  const maximum = 100 * 1420 - f.window.innerHeight;
+  f.track.getBoundingClientRect = () => ({ top: 0, height: f.track.clientHeight });
+  f.track.setPointerCapture = () => {};
+  f.track.hasPointerCapture = () => true;
+  f.track.releasePointerCapture = () => {};
+  const center = f.track.clientHeight / 2;
+
+  f.window.scrollY = maximum / 2;
+  f.sync();
+  const initialOffset = vm.runInContext('mapOffset', f.context);
+  f.listeners.pointerdown({ button: 0, clientY: center, pointerId: 1, preventDefault() {} });
+  f.listeners.pointermove({ clientY: 0 });
+  const shiftedOffset = vm.runInContext('mapOffset', f.context);
+  assert.ok(shiftedOffset < initialOffset, 'the local strip follows the drag upwards');
+  assert.equal(f.minimapPageContainer.style.transform, `translateY(${-shiftedOffset}px)`);
+  for (let move = 0; move < 50; move++) f.listeners.pointermove({ clientY: 0 });
+  assert.equal(f.window.scrollY, 0, 'the true start remains reachable beyond the initial local slice');
+  assert.equal(vm.runInContext('mapOffset', f.context), 0);
+  f.listeners.pointerup({ pointerId: 1 });
+
+  f.window.scrollY = maximum / 2;
+  f.sync();
+  f.listeners.pointerdown({ button: 0, clientY: center, pointerId: 2, preventDefault() {} });
+  f.listeners.pointermove({ clientY: f.track.clientHeight });
+  for (let move = 0; move < 50; move++) {
+    f.listeners.pointermove({ clientY: f.track.clientHeight });
+  }
+  assert.equal(f.window.scrollY, maximum, 'the true end remains reachable beyond the initial local slice');
+  const lastOffset = vm.runInContext('mapOffset', f.context);
+  const maximumOffset = vm.runInContext('mapHeight - minimapTrackHeight', f.context);
+  assert.equal(lastOffset, maximumOffset);
+  f.listeners.pointerup({ pointerId: 2 });
+});
+
 function animationHarness(f) {
   // The fixture's initial requestAnimationFrame stub never executes its callback.
   vm.runInContext('syncFrame = undefined', f.context);

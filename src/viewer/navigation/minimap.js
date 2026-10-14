@@ -810,6 +810,11 @@ function dragViewportTo(viewportTop) {
   const clampedTop = clamp(viewportTop, 0, viewportTravel);
   minimapViewport.style.top = `${clampedTop - mapOffset}px`;
   scrollFromViewportTop(clampedTop);
+  // Dragging suppresses scheduled syncs; update the local strip immediately
+  // so its visible edge never becomes a false document boundary.
+  if (minimapDisplayMode === "local") {
+    syncMinimapPosition();
+  }
 }
 
 function normalizedWheelDelta(event) {
