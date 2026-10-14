@@ -3,6 +3,7 @@ const THEME_STORAGE_KEY = "pdf-viewer-theme";
 const SEC_COMMENT_DARK_MODE_KEY = "pdf-viewer-sec-comment-dark-mode";
 const CLICKABLE_REFERENCES_STORAGE_KEY = "pdf-viewer-clickable-references";
 const PRINTED_PAGE_JUMP_STORAGE_KEY = "pdf-viewer-printed-page-jump";
+const MARKDOWN_COPY_STORAGE_KEY = "pdf-viewer-copy-as-markdown";
 const STUDIO_GREEN = "#43af49";
 
 const toolsMenu = document.querySelector("#tools-menu");
@@ -119,8 +120,19 @@ function installPrintedPageJumpSetting() {
   toggle.addEventListener("change", () => apply(toggle.checked));
 }
 
+function installMarkdownCopySetting() {
+  const toggle = document.querySelector("#copy-as-markdown");
+  if (!toggle) return;
+  styleSettingCheckbox(toggle);
+  toggle.checked = localStorage.getItem(MARKDOWN_COPY_STORAGE_KEY) === "true";
+  toggle.addEventListener("change", () => {
+    localStorage.setItem(MARKDOWN_COPY_STORAGE_KEY, String(toggle.checked));
+  });
+}
+
 installClickableReferencesSetting();
 installPrintedPageJumpSetting();
+installMarkdownCopySetting();
 syncThemePreference();
 void addSecCommentSetting();
 
