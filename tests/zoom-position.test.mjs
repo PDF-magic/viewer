@@ -11,6 +11,28 @@ function loadFunction(name, context) {
   vm.runInContext(definition, context);
 }
 
+test("fit height fills the space between the actual toolbar and bottom controls", () => {
+  let paddingTop = 53;
+  let scrubberHeight = 28;
+  const context = vm.createContext({
+    TOOLBAR_HEIGHT: 52,
+    window: { innerHeight: 900 },
+    getComputedStyle: () => ({ paddingTop: `${paddingTop}px` }),
+    document: {
+      querySelector: (selector) => selector === "#viewer" ? {} : {
+        getBoundingClientRect: () => ({ height: scrubberHeight, top: 900 - scrubberHeight }),
+      },
+    },
+  });
+  loadFunction("viewportPageTop", context);
+  loadFunction("viewportPageHeight", context);
+  assert.equal(context.viewportPageHeight(), 818);
+  paddingTop = 143;
+  assert.equal(context.viewportPageHeight(), 728);
+  scrubberHeight = 0;
+  assert.equal(context.viewportPageHeight(), 756);
+});
+
 function fixture() {
   let pageHeight = 1000;
   let pageDocumentTop = 90_000;

@@ -126,7 +126,6 @@ void addSecCommentSetting();
 
 const TOOLBAR_HEIGHT = 52;
 const PAGE_HORIZONTAL_GUTTER = 32;
-const PAGE_VERTICAL_GUTTER = 48;
 const DEFAULT_MAX_PAGE_WIDTH = 1100;
 const MIN_ZOOM = 0.25;
 const MAX_ZOOM = 4;
@@ -385,8 +384,18 @@ function viewportPageWidth() {
   return Math.max(160, availableWidth - minimapWidth - horizontalGutter);
 }
 
+function viewportPageTop() {
+  const viewer = document.querySelector("#viewer");
+  return viewer ? Number.parseFloat(getComputedStyle(viewer).paddingTop) : TOOLBAR_HEIGHT + 1;
+}
+
 function viewportPageHeight() {
-  return Math.max(160, window.innerHeight - TOOLBAR_HEIGHT - PAGE_VERTICAL_GUTTER);
+  const scrubber = document.querySelector("#document-scrubber");
+  const viewportBottom = scrubber?.getBoundingClientRect().height
+    ? scrubber.getBoundingClientRect().top
+    : window.innerHeight;
+  // Reserve only the page outline, not space for the following page.
+  return Math.max(160, viewportBottom - viewportPageTop() - 1);
 }
 
 function applyZoomLayout() {
@@ -526,8 +535,12 @@ function fitWidth() {
 }
 
 function fitHeight() {
+  const pageNumber = Number.parseInt(document.querySelector("#page-number")?.value, 10);
+  const page = document.querySelector(`.page[data-page="${pageNumber}"]`)
+    || document.querySelector(".page");
   zoomMode = "fit-height";
-  applyZoomLayoutPreservingPosition();
+  applyZoomLayout();
+  restoreZoomAnchor(page ? { page, ratio: 0, viewportY: viewportPageTop() } : null);
   syncZoomControls();
   scheduleViewerRerender();
 }
