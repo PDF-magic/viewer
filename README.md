@@ -15,6 +15,7 @@ A Chrome Manifest V3 extension that replaces the normal PDF tab with a local PDF
 - Honors an existing `#page=N` fragment when opening a document.
 - Places Download beside the page-link icon and keeps rotate left/right and print in the **More tools** menu.
 - Keeps the More tools menu open across repeated rotate actions.
+- Offers an opt-in **More PDF tools → Copy selection as Markdown** setting. When enabled, normal Copy on selected PDF text writes Markdown to the clipboard: detected italics use `_underscores_`, bold uses `**asterisks**`, and line/page boundaries are retained. The preference persists across PDFs; copying outside PDF text stays unchanged. Font identification is best-effort (not all PDFs disclose readable font metadata), and image-only scans need OCR text before they can be copied.
 - Prepares compressed previews of every page in the background for fast scrolling, while keeping sharp rendering and selectable text near the current page.
 - Shows a PDF Enhancer button in the top-left section slot when a document has no section navigator; enhanced local copies retain the original web reference URL for link copying and ChatGPT summaries.
 
