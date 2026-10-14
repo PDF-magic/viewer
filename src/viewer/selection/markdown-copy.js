@@ -9,6 +9,37 @@ export function fontTraits(font, textStyle = {}) {
   };
 }
 
+// PDF.js separates font/style runs into positioned text spans. An actual word
+// space can therefore be visible on the page without existing in either span.
+// Infer it only from a clear inline gap on the same baseline, not merely from
+// a change in italic or bold styling (which can occur inside words).
+export function hasPdfWordGap(previous, current) {
+  if (!previous || previous.hasEOL || !previous.str || !current.str ||
+      /\s$/u.test(previous.str) || /^\s/u.test(current.str) ||
+      previous.dir === 'rtl' || current.dir === 'rtl') return false;
+  const from = previous.transform;
+  const to = current.transform;
+  if (!Array.isArray(from) || from.length < 6 ||
+      !Array.isArray(to) || to.length < 6 ||
+      !(previous.width > 0) || !(current.width > 0)) return false;
+  const fromLength = Math.hypot(from[0], from[1]);
+  const toLength = Math.hypot(to[0], to[1]);
+  if (!(fromLength > 0 && toLength > 0)) return false;
+  const ux = from[0] / fromLength;
+  const uy = from[1] / fromLength;
+  if ((from[0] * to[0] + from[1] * to[1]) / (fromLength * toLength) < 0.98) return false;
+  const dx = to[4] - from[4];
+  const dy = to[5] - from[5];
+  const fontHeight = Math.min(previous.height || fromLength, current.height || toLength);
+  if (!(fontHeight > 0) || Math.abs(dx * -uy + dy * ux) > fontHeight * 0.2) return false;
+  const projectedGap = dx * ux + dy * uy - previous.width;
+  const characterWidth = Math.min(
+    previous.width / Array.from(previous.str).length,
+    current.width / Array.from(current.str).length,
+  );
+  return projectedGap > Math.max(0.8, fontHeight * 0.12, characterWidth * 0.35);
+}
+
 export function markPdfTextStyles(page, textContent, textDivs) {
   const textItems = textContent.items.filter(item => typeof item.str === 'string');
   const cache = new Map();
@@ -27,6 +58,7 @@ export function markPdfTextStyles(page, textContent, textDivs) {
       cache.set(item.fontName, traits);
     }
     span.dataset.markdownItem = 'true';
+    if (hasPdfWordGap(textItems[index - 1], item)) span.dataset.markdownSpaceBefore = 'true';
     if (traits.bold) span.dataset.markdownBold = 'true';
     if (traits.italic) span.dataset.markdownItalic = 'true';
     if (item.hasEOL) span.dataset.markdownEol = 'true';
@@ -112,6 +144,7 @@ export function markdownFromRuns(runs, { markdown = true, reflow = true } = {}) 
           run.block !== null && run.block === previous.block ? ' ' : '\n';
       }
     }
+    if (!separator && previous && run.spaceBefore) separator = ' ';
     if (separator === ' ') {
       // Keep a single Markdown emphasis span across soft line wraps.
       const adjacentSpace = /\s$/.test(current?.text ?? parts.at(-1) ?? '') || /^\s/.test(run.text);
@@ -183,6 +216,7 @@ export function selectionToMarkdown(root, selection, doc = document,
       text,
       bold: span.dataset.markdownBold === 'true',
       italic: span.dataset.markdownItalic === 'true',
+      spaceBefore: span.dataset.markdownSpaceBefore === 'true',
       page,
       eol: span.dataset.markdownEol === 'true',
       block: span.dataset.copyBlock === undefined ? null : span.dataset.copyBlock,
