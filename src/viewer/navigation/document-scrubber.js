@@ -269,6 +269,9 @@ function publishFootnoteIndex(index) {
   if (!index.length) return;
   const selected = notes[selectedIndex];
   notes = index;
+  // The Markdown clipboard path uses the same recovered note regions rather
+  // than treating bottom-of-page footnotes as normal body paragraphs.
+  window.dispatchEvent(new CustomEvent('pdf-viewer-footnotes-indexed', { detail: notes }));
   const matchingIndex = selected ? notes.findIndex(note =>
     note.number === selected.number && note.pageNumber === selected.pageNumber) : -1;
   range.max = String(notes.length);

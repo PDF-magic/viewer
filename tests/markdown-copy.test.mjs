@@ -139,3 +139,73 @@ test("handles rotated text but ignores baseline changes and existing line breaks
       newLine: true, role: "P", block: "2" },
   ]), "It is _rather than research or trade_");
 });
+
+test("keeps scanned SEC petition footnote 11 out of the body and joins its page continuation", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { appendFootnotesForPage } = await import("../src/viewer/navigation/footnote-index.js");
+  const pages = JSON.parse(readFileSync(new URL("./fixtures/footnotes-sta-petition.json", import.meta.url)));
+  const viewport = page => ({
+    width: page.width, height: page.height,
+    convertToViewportPoint: (x, y) => [x, page.height - y],
+  });
+  const operators = page => ({ fnArray: [], argsArray: page.rules.map(rule =>
+    [null, [[0]], [rule.x, page.height - rule.y, rule.x + rule.width, page.height - rule.y]]) });
+  const footnotes = [];
+  let previousPageText;
+  for (const page of pages.slice(0, 5)) {
+    appendFootnotesForPage(footnotes, page.items, viewport(page), page.n,
+      operators(page), undefined, previousPageText);
+    previousPageText = { items: page.items, viewport: viewport(page) };
+  }
+  const note11 = footnotes.find(note => note.pageNumber === 5 && note.number === 11);
+  assert.ok(note11?.highlightRegions?.length);
+
+  const layer = { closest: selector => selector === ".text-layer" ? layer : null };
+  const spans = [];
+  const includedNodes = new Set();
+  for (const page of pages.slice(4, 6)) {
+    const pageElement = { dataset: { page: String(page.n) } };
+    const textItems = page.items.filter(item => typeof item.str === "string");
+    const pageSpans = textItems.map((item, index) => {
+      const node = { textContent: item.str, parentElement: layer };
+      const span = { node, dataset: {},
+        closest: selector => selector === ".page" ? pageElement : null };
+      // The copied page-5 passage ends at the body text, while its physical
+      // footer contains the note and page 6 begins with "policies".
+      const include = page.n === 5 ? index >= 44 && index <= 65 : index <= 2;
+      if (include && item.str) includedNodes.add(node);
+      return span;
+    });
+    markPdfTextStyles({ getViewport: () => viewport(page) },
+      { items: page.items, styles: {} }, pageSpans);
+    spans.push(...pageSpans);
+  }
+  const selection = {
+    isCollapsed: false, rangeCount: 1,
+    anchorNode: [...includedNodes][0], focusNode: [...includedNodes].at(-1),
+    getRangeAt: () => ({ intersectsNode: node => includedNodes.has(node),
+      startContainer: null, endContainer: null }),
+  };
+  const doc = { createTreeWalker(span) {
+    return { nextNode() {
+      if (this.done) return false;
+      this.done = true; this.currentNode = span.node; return true;
+    } };
+  } };
+  const root = { contains: element => element === layer, querySelectorAll: () => spans };
+  const oldNodeFilter = globalThis.NodeFilter;
+  globalThis.NodeFilter = { SHOW_TEXT: 4 };
+  try {
+    const output = selectionToMarkdown(root, selection, doc, { footnotes });
+    assert.match(output, /transfer agents\.\[\^11\]/);
+    assert.match(output, /develop policies, oversee its disciplinary process/);
+    assert.match(output, /organization it also may adopt/);
+    assert.match(output, /take disciplinary action against/);
+    assert.match(output, /\[\^11\]: In fact, immobilization of securities/);
+    assert.ok(output.indexOf("develop policies") < output.indexOf("[^11]: In fact"));
+    assert.equal(output.slice(0, output.indexOf("[^11]:")).includes("In fact, immobilization"), false);
+  } finally {
+    if (oldNodeFilter === undefined) delete globalThis.NodeFilter;
+    else globalThis.NodeFilter = oldNodeFilter;
+  }
+});
