@@ -26,6 +26,7 @@
   html.minimap-collapsed:not(.minimap-disabled) body::-webkit-scrollbar-track {
     background: var(--body-bg);
     margin-top: var(--native-scrollbar-top);
+    margin-bottom: var(--native-scrollbar-bottom);
   }
 
   html.minimap-collapsed:not(.minimap-disabled)::-webkit-scrollbar-thumb,
@@ -66,20 +67,29 @@
   }
 }
 
-/* Reserve the toolbar's height above the native scrollbar's travel area. */
+/* Keep the native scrollbar between the toolbar and bottom navigation controls. */
 :root {
   --native-scrollbar-top: 52px;
+  --native-scrollbar-bottom: var(--document-scrubber-height, 0px);
   /* Composite the translucent toolbar over the same base and continue its border. */
   --native-scrollbar-background: linear-gradient(
     to bottom,
     var(--toolbar-bg) 0 calc(var(--native-scrollbar-top) - 1px),
     var(--border) calc(var(--native-scrollbar-top) - 1px) var(--native-scrollbar-top),
-    var(--body-bg) var(--native-scrollbar-top)
+    var(--body-bg) var(--native-scrollbar-top) calc(100% - var(--native-scrollbar-bottom)),
+    var(--border) calc(100% - var(--native-scrollbar-bottom)) calc(100% - var(--native-scrollbar-bottom) + 1px),
+    var(--toolbar-bg) calc(100% - var(--native-scrollbar-bottom) + 1px)
   ), var(--body-bg);
 }
 
 :root.toolbar-two-rows {
   --native-scrollbar-top: 100px;
+}
+
+@media (min-width: 701px) {
+  html.minimap-collapsed:not(.minimap-disabled) {
+    --native-scrollbar-bottom: calc(var(--document-scrubber-height, 0px) + 36px);
+  }
 }
 
 html.minimap-disabled {
@@ -95,6 +105,7 @@ html.minimap-disabled::-webkit-scrollbar-track,
 html.minimap-disabled body::-webkit-scrollbar-track {
   background: var(--body-bg);
   margin-top: var(--native-scrollbar-top);
+  margin-bottom: var(--native-scrollbar-bottom);
 }
 
 html.minimap-disabled::-webkit-scrollbar-thumb,
@@ -308,6 +319,8 @@ html.minimap-disabled body::-webkit-scrollbar-thumb {
 
 .minimap-collapsed .minimap-shell {
   top: auto;
+  /* Fixed-position insets exclude the native scrollbar gutter. */
+  right: calc(100% - 100vw);
   width: 36px;
   height: 36px;
   min-height: 36px;

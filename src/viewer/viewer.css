@@ -753,6 +753,7 @@ input {
 .document-scrubber {
   position: fixed;
   inset: auto 0 0;
+  width: 100vw;
   z-index: 11;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
