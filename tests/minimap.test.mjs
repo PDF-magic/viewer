@@ -25,7 +25,12 @@ function fixture(count, height = 900, initialPreferences = {}) {
   const track = { clientHeight: height - 52,
     style: { setProperty(name, value) { this[name] = value; } },
     addEventListener(type, callback) { listeners[type] = callback; },
-    contains(target) { return target === this; }, setAttribute() {} };
+    contains(target) { return target === this; }, setAttribute() {},
+    setPointerCapture(pointerId) { this.capturedPointer = pointerId; },
+    hasPointerCapture(pointerId) { return this.capturedPointer === pointerId; },
+    releasePointerCapture(pointerId) {
+      if (this.capturedPointer === pointerId) this.capturedPointer = null;
+    } };
   const viewport = { style: {} };
   const toggle = { checked: true, addEventListener(type, callback) { listeners[`toggle-${type}`] = callback; } };
   const optIn = { checked: false, addEventListener(type, callback) { listeners[`opt-in-${type}`] = callback; } };
@@ -192,6 +197,7 @@ test('dragging the viewport follows the latest pointer position immediately', ()
     preventDefault() { prevented = true; },
   });
   f.listeners.pointermove({
+    pointerId: 1, buttons: 1,
     clientY: 100,
     getCoalescedEvents() {
       return [{ clientY: 400 }];
@@ -221,11 +227,11 @@ test('local minimap pans its thumbnail strip during dragging all the way to docu
   f.sync();
   const initialOffset = vm.runInContext('mapOffset', f.context);
   f.listeners.pointerdown({ button: 0, clientY: center, pointerId: 1, preventDefault() {} });
-  f.listeners.pointermove({ clientY: 0 });
+  f.listeners.pointermove({ pointerId: 1, buttons: 1, clientY: 0 });
   const shiftedOffset = vm.runInContext('mapOffset', f.context);
   assert.ok(shiftedOffset < initialOffset, 'the local strip follows the drag upwards');
   assert.equal(f.minimapPageContainer.style.transform, `translateY(${-shiftedOffset}px)`);
-  for (let move = 0; move < 50; move++) f.listeners.pointermove({ clientY: 0 });
+  for (let move = 0; move < 50; move++) f.listeners.pointermove({ pointerId: 1, buttons: 1, clientY: 0 });
   assert.equal(f.window.scrollY, 0, 'the true start remains reachable beyond the initial local slice');
   assert.equal(vm.runInContext('mapOffset', f.context), 0);
   f.listeners.pointerup({ pointerId: 1 });
@@ -233,15 +239,69 @@ test('local minimap pans its thumbnail strip during dragging all the way to docu
   f.window.scrollY = maximum / 2;
   f.sync();
   f.listeners.pointerdown({ button: 0, clientY: center, pointerId: 2, preventDefault() {} });
-  f.listeners.pointermove({ clientY: f.track.clientHeight });
+  f.listeners.pointermove({ pointerId: 2, buttons: 1, clientY: f.track.clientHeight });
   for (let move = 0; move < 50; move++) {
-    f.listeners.pointermove({ clientY: f.track.clientHeight });
+    f.listeners.pointermove({ pointerId: 2, buttons: 1, clientY: f.track.clientHeight });
   }
   assert.equal(f.window.scrollY, maximum, 'the true end remains reachable beyond the initial local slice');
   const lastOffset = vm.runInContext('mapOffset', f.context);
   const maximumOffset = vm.runInContext('mapHeight - minimapTrackHeight', f.context);
   assert.equal(lastOffset, maximumOffset);
   f.listeners.pointerup({ pointerId: 2 });
+});
+
+
+test('minimap drag stops when the primary button is no longer held', () => {
+  for (const mode of ['overview', 'local']) {
+    const f = fixture(100, 900, { 'pdf-viewer-minimap-mode': mode });
+    f.track.getBoundingClientRect = () => ({ top: 0, height: f.track.clientHeight });
+    f.listeners.pointerdown({ button: 0, buttons: 1, pointerId: 7, clientY: 200, preventDefault() {} });
+    f.listeners.pointermove({ pointerId: 7, buttons: 1, clientY: 350 });
+    const atRelease = f.window.scrollY;
+    // Simulate missing pointerup: movement without a button must not navigate.
+    f.listeners.pointermove({ pointerId: 7, buttons: 0, clientY: 700 });
+    assert.equal(f.window.scrollY, atRelease);
+    assert.equal(vm.runInContext('dragging', f.context), false);
+    assert.equal(f.track.hasPointerCapture(7), false);
+    f.listeners.pointermove({ pointerId: 7, buttons: 0, clientY: 20 });
+    assert.equal(f.window.scrollY, atRelease);
+  }
+});
+
+test('minimap drag ends when capture or window-level input is lost', () => {
+  for (const ending of ['lostpointercapture', 'window-pointerup', 'window-pointercancel', 'blur', 'outside-pointerdown']) {
+    const f = fixture(100);
+    f.track.getBoundingClientRect = () => ({ top: 0, height: f.track.clientHeight });
+    f.listeners.pointerdown({ button: 0, pointerId: 3, clientY: 200, preventDefault() {} });
+    f.listeners.pointermove({ pointerId: 3, buttons: 1, clientY: 350 });
+    const atRelease = f.window.scrollY;
+    if (ending === 'lostpointercapture') f.listeners.lostpointercapture({ pointerId: 3 });
+    else if (ending === 'window-pointerup') f.windowListeners.pointerup({ pointerId: 3 });
+    else if (ending === 'window-pointercancel') f.windowListeners.pointercancel({ pointerId: 3 });
+    else if (ending === 'blur') f.windowListeners.blur();
+    else f.windowListeners.pointerdown({ target: {} });
+
+    assert.equal(vm.runInContext('dragging', f.context), false, ending);
+    assert.equal(f.track.hasPointerCapture(3), false, ending);
+    f.listeners.pointermove({ pointerId: 3, buttons: 1, clientY: 700 });
+    assert.equal(f.window.scrollY, atRelease, ending);
+  }
+});
+
+test('unrelated pointers cannot move, steal, or end an active minimap drag', () => {
+  const f = fixture(100);
+  f.track.getBoundingClientRect = () => ({ top: 0, height: f.track.clientHeight });
+  f.listeners.pointerdown({ button: 0, pointerId: 3, clientY: 200, preventDefault() {} });
+  const startingScroll = f.window.scrollY;
+  f.listeners.pointermove({ pointerId: 4, buttons: 1, clientY: 700 });
+  f.listeners.pointerup({ pointerId: 4 });
+  f.listeners.pointerdown({ button: 0, pointerId: 4, clientY: 700, preventDefault() {} });
+  assert.equal(f.window.scrollY, startingScroll);
+  assert.equal(vm.runInContext('dragging', f.context), true);
+  f.listeners.pointermove({ pointerId: 3, buttons: 1, clientY: 350 });
+  assert.notEqual(f.window.scrollY, startingScroll);
+  f.listeners.pointerup({ pointerId: 3 });
+  assert.equal(vm.runInContext('dragging', f.context), false);
 });
 
 function animationHarness(f) {

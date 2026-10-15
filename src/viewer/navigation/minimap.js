@@ -44,6 +44,7 @@ let minimapDisplayMode = "overview";
 let wheelFrame;
 let wheelTarget;
 let dragging = false;
+let dragPointerId = null;
 let dragOffset = 0;
 let viewportHeight = 18;
 let mapHeight = 0;
@@ -839,7 +840,7 @@ function pointerMapPosition(event) {
 }
 
 minimap.addEventListener("pointerdown", (event) => {
-  if (event.button !== 0) {
+  if (dragging || event.button !== 0 || event.isPrimary === false) {
     return;
   }
 
@@ -849,6 +850,7 @@ minimap.addEventListener("pointerdown", (event) => {
   const currentBottom = currentTop + viewportHeight;
 
   dragging = true;
+  dragPointerId = event.pointerId;
   dragOffset = y >= currentTop && y <= currentBottom ? y - currentTop : viewportHeight / 2;
   minimap.setPointerCapture(event.pointerId);
   dragViewportTo(y - dragOffset);
@@ -856,7 +858,12 @@ minimap.addEventListener("pointerdown", (event) => {
 });
 
 minimap.addEventListener("pointermove", (event) => {
-  if (!dragging) {
+  if (!dragging || event.pointerId !== dragPointerId) {
+    return;
+  }
+  // Pointer capture can survive a missed release. A hover must never pan.
+  if (event.buttons !== undefined && !(event.buttons & 1)) {
+    endDrag(event);
     return;
   }
 
@@ -868,19 +875,26 @@ minimap.addEventListener("pointermove", (event) => {
 });
 
 function endDrag(event) {
-  if (!dragging) {
+  if (!dragging || (event?.pointerId !== undefined && event.pointerId !== dragPointerId)) {
     return;
   }
 
+  const pointerId = dragPointerId;
   dragging = false;
-  if (minimap.hasPointerCapture(event.pointerId)) {
-    minimap.releasePointerCapture(event.pointerId);
+  dragPointerId = null;
+  if (pointerId !== null && minimap.hasPointerCapture(pointerId)) {
+    minimap.releasePointerCapture(pointerId);
   }
   scheduleSync();
 }
 
 minimap.addEventListener("pointerup", endDrag);
 minimap.addEventListener("pointercancel", endDrag);
+minimap.addEventListener("lostpointercapture", endDrag);
+// Releases outside the track and focus loss must also stop tracking.
+window.addEventListener("pointerup", endDrag);
+window.addEventListener("pointercancel", endDrag);
+window.addEventListener("blur", () => endDrag());
 
 minimap.addEventListener(
   "wheel",
@@ -978,6 +992,7 @@ window.addEventListener("wheel", (event) => {
 }, { passive: true });
 window.addEventListener("pointerdown", (event) => {
   if (!minimap.contains(event.target)) {
+    endDrag();
     cancelWheelScroll();
   }
 }, { passive: true });
@@ -987,6 +1002,7 @@ window.addEventListener("resize", () => {
   scheduleThumbnailPreparation();
 });
 window.addEventListener("pagehide", () => {
+  endDrag();
   cancelWheelScroll();
   cancelScheduledThumbnailPreparation();
   thumbnailLoadGeneration += 1;
