@@ -78,6 +78,7 @@ const PDF_METADATA_FIELDS = [
   ["Author", "Author", "dc:creator"],
   ["Subject", "Subject", "dc:description"],
   ["Keywords", "Keywords", "pdf:keywords"],
+  ["Date", "DocumentDate", "dc:date"],
   ["Creator", "Creator", "xmp:creatortool"],
   ["Producer", "Producer", "pdf:producer"],
   ["Created", "CreationDate", "xmp:createdate"],
@@ -564,7 +565,7 @@ function renderPdfMetadata(entries) {
     const description = document.createElement("dd");
     row.className = "section-metadata-row";
     term.textContent = label;
-    if (label === "Href" && /^(?:https?:|file:)/i.test(value)) {
+    if (label === "href" && /^(?:https?:|file:)/i.test(value)) {
       const link = document.createElement("a");
       link.href = value;
       link.textContent = value;
@@ -592,7 +593,7 @@ async function getPdfMetadataDetails() {
     })).filter(({ value }) => Boolean(value));
 
     const href = referenceUrlFromPdfMetadata(info, metadata);
-    if (href) entries.push({ label: "Href", value: href });
+    if (href) entries.push({ label: "href", value: href });
     return { title, entries };
   } catch {
     return { title: "", entries: [] };
