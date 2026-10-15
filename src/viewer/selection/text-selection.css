@@ -56,8 +56,15 @@
   height: 100%;
 }
 
-.text-selection-surface {
-  backdrop-filter: grayscale(1) contrast(100);
+.page canvas.text-selection-surface {
+  /* Strengthen ink gently so scanned and antialiased edges stay smooth. */
+  filter: var(--page-filter) grayscale(1) contrast(1.35) brightness(1.12);
+  background: transparent;
+  border-radius: 0;
+}
+
+:root[data-theme="light"] .page canvas.text-selection-surface {
+  filter: grayscale(1) contrast(1.35);
 }
 
 .text-selection-tint {

@@ -186,6 +186,9 @@ function paintSelection() {
     }
     const lines = selectionLines(rectangles, 2);
     if (!lines.length) continue;
+    const page = layer.parentElement;
+    const source = page.querySelector("canvas:not(.page-image-overlay)");
+    if (!source?.width || !source.height) continue;
     const scaleX = layer.clientWidth / bounds.width;
     const scaleY = layer.clientHeight / bounds.height;
     const namespace = "http://www.w3.org/2000/svg";
@@ -199,7 +202,10 @@ function paintSelection() {
       height: (line.bottom - line.top) * scaleY,
     })), 2);
     // Filter the rendered PDF ink, including scans, rather than redrawing OCR text.
-    const surface = document.createElement("div");
+    const surface = document.createElement("canvas");
+    surface.width = source.width;
+    surface.height = source.height;
+    surface.getContext("2d").drawImage(source, 0, 0);
     surface.className = "text-selection-surface";
     surface.style.clipPath = `path("${paths.fill}")`;
     const tint = document.createElement("div");
@@ -212,7 +218,7 @@ function paintSelection() {
     outline.setAttribute("d", paths.outline);
     frame.append(outline);
     overlay.append(surface, tint, frame);
-    layer.parentElement.append(overlay);
+    page.append(overlay);
     selectionOverlays.set(layer, overlay);
     layer.classList.add("selection-painted");
   }
