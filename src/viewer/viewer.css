@@ -997,8 +997,6 @@ input {
   position: absolute;
   inset: 0;
   z-index: 1;
-  /* Blend the whole selection layer with the PDF, preserving its ink. */
-  mix-blend-mode: var(--highlight-blend);
   overflow: clip;
   color-scheme: only light;
   line-height: 1;

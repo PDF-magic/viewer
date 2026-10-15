@@ -1,4 +1,5 @@
 import { selectionLines } from "./selection-lines.js";
+import { regionPaths } from "../highlight-regions.js";
 
 const textLayers = new Map();
 let pointerDown = false;
@@ -188,28 +189,30 @@ function paintSelection() {
     const scaleX = layer.clientWidth / bounds.width;
     const scaleY = layer.clientHeight / bounds.height;
     const namespace = "http://www.w3.org/2000/svg";
-    const overlay = document.createElementNS(namespace, "svg");
+    const overlay = document.createElement("div");
     overlay.classList.add("text-selection-overlay");
     overlay.setAttribute("aria-hidden", "true");
-    const addRect = (left, top, right, bottom, radius = 2) => {
-      const rect = document.createElementNS(namespace, "rect");
-      rect.setAttribute("x", (left - bounds.left) * scaleX);
-      rect.setAttribute("y", (top - bounds.top) * scaleY);
-      rect.setAttribute("width", (right - left) * scaleX);
-      rect.setAttribute("height", (bottom - top) * scaleY);
-      rect.setAttribute("rx", radius);
-      overlay.append(rect);
-    };
-    for (const line of lines) addRect(line.left, line.top, line.right, line.bottom);
-    for (let index = 1; index < lines.length; index++) {
-      const previous = lines[index - 1], current = lines[index];
-      const left = Math.max(previous.left, current.left) + 2 / scaleX;
-      const right = Math.min(previous.right, current.right) - 2 / scaleX;
-      if (previous.bottom === current.top && right > left) {
-        addRect(left, current.top - 2 / scaleY, right, current.top + 2 / scaleY, 0);
-      }
-    }
-    layer.append(overlay);
+    const paths = regionPaths(lines.map(line => ({
+      left: (line.left - bounds.left) * scaleX,
+      top: (line.top - bounds.top) * scaleY,
+      width: (line.right - line.left) * scaleX,
+      height: (line.bottom - line.top) * scaleY,
+    })), 2);
+    // Filter the rendered PDF ink, including scans, rather than redrawing OCR text.
+    const surface = document.createElement("div");
+    surface.className = "text-selection-surface";
+    surface.style.clipPath = `path("${paths.fill}")`;
+    const tint = document.createElement("div");
+    tint.className = "text-selection-tint";
+    tint.style.clipPath = surface.style.clipPath;
+    const frame = document.createElementNS(namespace, "svg");
+    frame.setAttribute("viewBox", `0 0 ${layer.clientWidth} ${layer.clientHeight}`);
+    frame.setAttribute("preserveAspectRatio", "none");
+    const outline = document.createElementNS(namespace, "path");
+    outline.setAttribute("d", paths.outline);
+    frame.append(outline);
+    overlay.append(surface, tint, frame);
+    layer.parentElement.append(overlay);
     selectionOverlays.set(layer, overlay);
     layer.classList.add("selection-painted");
   }
