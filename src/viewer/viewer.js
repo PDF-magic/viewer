@@ -2,6 +2,7 @@ import { AnnotationLayer, createValidAbsoluteUrl, getDocument, GlobalWorkerOptio
 import { EventBus, PDFLinkService } from "../../node_modules/pdfjs-dist/web/pdf_viewer.mjs";
 import { abandonPdfDocumentSession, publishPdfDocument } from "./pdf-document-session.js";
 import { referenceUrlFromPdfMetadata, resolveDocumentReferenceUrl } from "./document-reference-url.js";
+import { metadataValue, pdfMetadataTitle } from "./pdf-metadata-title.js";
 import { resolvePdfSource } from "./pdf-source.js";
 import { readResumedPage, saveResumedPage } from "./page-resume.js";
 import { findSearchMatches } from "./search/search-matches.js";
@@ -554,27 +555,6 @@ function createOutlineList(items, parentReference = "") {
   return list;
 }
 
-function metadataText(value) {
-  if (Array.isArray(value)) {
-    return value.map(metadataText).filter(Boolean).join(", ");
-  }
-
-  if (typeof value === "string") {
-    return value.trim();
-  }
-
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-
-  return "";
-}
-
-function metadataValue(info, metadata, infoKey, xmpKey) {
-  const infoValue = metadataText(info?.[infoKey]);
-  return infoValue || metadataText(metadata?.get?.(xmpKey));
-}
-
 function renderPdfMetadata(entries) {
   const fragment = document.createDocumentFragment();
 
@@ -605,7 +585,7 @@ function renderPdfMetadata(entries) {
 async function getPdfMetadataDetails() {
   try {
     const { info, metadata } = await pdfDocument.getMetadata();
-    const title = metadataValue(info, metadata, "Title", "dc:title");
+    const title = pdfMetadataTitle(info, metadata);
     const entries = PDF_METADATA_FIELDS.map(([label, infoKey, xmpKey]) => ({
       label,
       value: metadataValue(info, metadata, infoKey, xmpKey),

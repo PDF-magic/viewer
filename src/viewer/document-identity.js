@@ -1,5 +1,7 @@
 import { formatMetadataDate, formatRelativeMetadataDate } from "./metadata-date.js";
 import { updatePdfFaviconForLocalSource } from "./local-file-favicon.js";
+import { pdfDocumentSessionReady } from "./pdf-document-session.js";
+import { pdfMetadataTitle } from "./pdf-metadata-title.js";
 
 const RELATIVE_DATES_KEY = "pdf-viewer-relative-dates";
 const relativeDatesToggle = document.querySelector("#relative-metadata-dates");
@@ -111,5 +113,19 @@ const originalUrl = await resolveOriginalUrl();
 updatePdfFaviconForLocalSource(originalUrl, document.querySelector('link[rel="icon"]'));
 const fileName = fileNameFromUrl(originalUrl);
 if (fileName) {
+  // Use the filename while the PDF is loading, then prefer its embedded title.
   document.title = fileName;
+}
+
+const session = await pdfDocumentSessionReady;
+if (session?.document) {
+  try {
+    const { info, metadata } = await session.document.getMetadata();
+    const title = pdfMetadataTitle(info, metadata);
+    if (title) {
+      document.title = title;
+    }
+  } catch {
+    // Leave the filename (or default viewer title) when metadata is unreadable.
+  }
 }
