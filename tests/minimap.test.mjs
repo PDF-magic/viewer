@@ -414,14 +414,15 @@ test('scroll-only minimap updates skip expensive per-page geometry reads', () =>
   assert.ok(geometryReads > 0);
 });
 
-test('disabled minimap scrollbar matches the viewer theme in dark and light modes', () => {
+test('disabled minimap scrollbar matches the viewer theme and respects toolbar offsets', () => {
+  assert.match(styles, /html\.minimap-disabled\s*\{\s*scrollbar-color:\s*auto;/);
   assert.match(
     styles,
-    /html\.minimap-disabled\s*\{\s*scrollbar-color:\s*var\(--muted\) var\(--body-bg\);/,
+    /html\.minimap-disabled::-webkit-scrollbar,\s*html\.minimap-disabled body::-webkit-scrollbar\s*\{\s*background:\s*var\(--native-scrollbar-background\);/,
   );
   assert.match(
     styles,
-    /html\.minimap-disabled::-webkit-scrollbar-track,[\s\S]*?background:\s*var\(--body-bg\);/,
+    /html\.minimap-disabled::-webkit-scrollbar-track,[\s\S]*?background:\s*var\(--body-bg\);[\s\S]*?margin-top:\s*var\(--native-scrollbar-top\);[\s\S]*?margin-bottom:\s*var\(--native-scrollbar-bottom\);/,
   );
   assert.match(
     styles,
@@ -431,14 +432,18 @@ test('disabled minimap scrollbar matches the viewer theme in dark and light mode
   assert.match(viewerStyles, /:root\[data-theme="light"\]\s*\{[\s\S]*?--body-bg:\s*#ececef;/);
 });
 
-test('collapsed minimap uses a themed rounded scrollbar while the expanded minimap hides it', () => {
+test('collapsed minimap keeps its accent thumb while offsetting the native scrollbar', () => {
   assert.match(
     styles,
-    /html\.minimap-collapsed:not\(\.minimap-disabled\)\s*\{[\s\S]*?scrollbar-color:\s*var\(--accent, #43af49\) transparent;[\s\S]*?scrollbar-width:\s*thin;/,
+    /html\.minimap-collapsed:not\(\.minimap-disabled\)\s*\{[\s\S]*?scrollbar-color:\s*auto;[\s\S]*?scrollbar-width:\s*auto;/,
   );
   assert.match(
     styles,
-    /html\.minimap-collapsed:not\(\.minimap-disabled\)::\-webkit-scrollbar[\s\S]*?width:\s*10px;/,
+    /html\.minimap-collapsed:not\(\.minimap-disabled\)::\-webkit-scrollbar[\s\S]*?width:\s*10px;[\s\S]*?background:\s*var\(--native-scrollbar-background\);/,
+  );
+  assert.match(
+    styles,
+    /html\.minimap-collapsed:not\(\.minimap-disabled\)::\-webkit-scrollbar-track,[\s\S]*?background:\s*var\(--body-bg\);[\s\S]*?margin-top:\s*var\(--native-scrollbar-top\);[\s\S]*?margin-bottom:\s*var\(--native-scrollbar-bottom\);/,
   );
   assert.match(
     styles,
@@ -448,6 +453,23 @@ test('collapsed minimap uses a themed rounded scrollbar while the expanded minim
     styles,
     /html:not\(\.minimap-disabled\):not\(\.minimap-collapsed\)::\-webkit-scrollbar[\s\S]*?display:\s*none;/,
   );
+});
+
+test('native scrollbar gutter follows one- and two-row toolbars and the bottom scrubber', () => {
+  assert.match(
+    styles,
+    /:root\s*\{[\s\S]*?--native-scrollbar-top:\s*52px;[\s\S]*?--native-scrollbar-bottom:\s*var\(--document-scrubber-height, 0px\);/,
+  );
+  assert.match(styles, /:root\.toolbar-two-rows\s*\{\s*--native-scrollbar-top:\s*100px;/);
+  assert.match(
+    styles,
+    /--native-scrollbar-background:\s*linear-gradient\([\s\S]*?var\(--toolbar-bg\)[\s\S]*?var\(--border\)[\s\S]*?var\(--body-bg\)/,
+  );
+  assert.match(
+    styles,
+    /@media\s*\(min-width:\s*701px\)[\s\S]*?--native-scrollbar-bottom:\s*calc\(var\(--document-scrubber-height, 0px\) \+ 36px\);/,
+  );
+  assert.match(viewerStyles, /\.document-scrubber\s*\{[\s\S]*?width:\s*100vw;/);
 });
 
 test('minimap toggle persists visibility and updates accessibility state', () => {
