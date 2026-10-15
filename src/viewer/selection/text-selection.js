@@ -3,6 +3,9 @@ import { regionPaths } from "../highlight-regions.js";
 
 const textLayers = new Map();
 let pointerDown = false;
+let selectionDragLayer = null;
+let endpointFrame = 0;
+let endpointPosition = null;
 let paintFrame = 0;
 const selectionOverlays = new Map();
 
@@ -121,8 +124,42 @@ observer.observe(document.querySelector("#viewer"), {
   subtree: true,
 });
 
-document.addEventListener("pointerdown", () => {
+document.addEventListener("pointerdown", (event) => {
   pointerDown = true;
+  selectionDragLayer = event.target instanceof Element ? event.target.closest(".text-layer") : null;
+});
+
+// Chromium can resolve a drag into trailing whitespace to a later paragraph
+// in an absolutely positioned PDF text layer. Use the nearby line's own edge.
+function settleLineEndpoint() {
+  endpointFrame = 0;
+  if (!selectionDragLayer?.isConnected || !endpointPosition) return;
+  const { x, y } = endpointPosition;
+  const hit = document.elementFromPoint(x, y);
+  if (hit !== selectionDragLayer && !hit?.classList.contains("text-selection-end")) return;
+  const selection = document.getSelection();
+  if (!selection || selection.isCollapsed || !selectionDragLayer.contains(selection.anchorNode)) return;
+  const walker = document.createTreeWalker(selectionDragLayer, NodeFilter.SHOW_TEXT);
+  let closest = null;
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (!node.textContent.length) continue;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    for (const rect of range.getClientRects()) {
+      if (!rect.width || y < rect.top || y > rect.bottom) continue;
+      const distance = Math.max(rect.left - x, x - rect.right, 0);
+      if (distance > 0 && (!closest || distance < closest.distance)) {
+        closest = { node, distance, offset: x < rect.left ? 0 : node.textContent.length };
+      }
+    }
+  }
+  if (closest) selection.extend(closest.node, closest.offset);
+}
+
+document.addEventListener("pointermove", (event) => {
+  if (!pointerDown || !selectionDragLayer) return;
+  endpointPosition = { x: event.clientX, y: event.clientY };
+  if (!endpointFrame) endpointFrame = requestAnimationFrame(settleLineEndpoint);
 });
 
 document.addEventListener("mousedown", (event) => {
@@ -134,8 +171,13 @@ document.addEventListener("mousedown", (event) => {
 
 document.addEventListener("selectionchange", syncSelectingLayers);
 
-document.addEventListener("pointerup", () => {
+document.addEventListener("pointerup", (event) => {
+  if (endpointFrame) cancelAnimationFrame(endpointFrame);
+  endpointPosition = { x: event.clientX, y: event.clientY };
+  settleLineEndpoint();
   pointerDown = false;
+  selectionDragLayer = null;
+  endpointPosition = null;
   resetAllTextLayers();
 });
 
@@ -147,6 +189,10 @@ document.addEventListener("keyup", () => {
 
 window.addEventListener("blur", () => {
   pointerDown = false;
+  selectionDragLayer = null;
+  endpointPosition = null;
+  if (endpointFrame) cancelAnimationFrame(endpointFrame);
+  endpointFrame = 0;
   resetAllTextLayers();
 });
 
@@ -174,8 +220,13 @@ function paintSelection() {
           if (!selected.intersectsNode(node)) continue;
           const range = document.createRange();
           range.selectNodeContents(node);
-          if (selected.startContainer === node) range.setStart(node, selected.startOffset);
-          if (selected.endContainer === node) range.setEnd(node, selected.endOffset);
+          if (range.compareBoundaryPoints(Range.START_TO_START, selected) < 0) {
+            range.setStart(selected.startContainer, selected.startOffset);
+          }
+          if (range.compareBoundaryPoints(Range.END_TO_END, selected) > 0) {
+            range.setEnd(selected.endContainer, selected.endOffset);
+          }
+          if (range.collapsed) continue;
           rectangles.push(...Array.from(range.getClientRects(), rect => ({
             left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
           })));
