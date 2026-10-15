@@ -140,7 +140,7 @@ test("handles rotated text but ignores baseline changes and existing line breaks
   ]), "It is _rather than research or trade_");
 });
 
-test("keeps scanned SEC petition footnote 11 out of the body and joins its page continuation", async () => {
+test("separates scanned SEC petition footnote 11 from body text on the same page", async () => {
   const { readFileSync } = await import("node:fs");
   const { appendFootnotesForPage } = await import("../src/viewer/navigation/footnote-index.js");
   const pages = JSON.parse(readFileSync(new URL("./fixtures/footnotes-sta-petition.json", import.meta.url)));
@@ -163,16 +163,16 @@ test("keeps scanned SEC petition footnote 11 out of the body and joins its page 
   const layer = { closest: selector => selector === ".text-layer" ? layer : null };
   const spans = [];
   const includedNodes = new Set();
-  for (const page of pages.slice(4, 6)) {
+  for (const page of pages.slice(4, 5)) {
     const pageElement = { dataset: { page: String(page.n) } };
     const textItems = page.items.filter(item => typeof item.str === "string");
     const pageSpans = textItems.map((item, index) => {
       const node = { textContent: item.str, parentElement: layer };
       const span = { node, dataset: {},
         closest: selector => selector === ".page" ? pageElement : null };
-      // The copied page-5 passage ends at the body text, while its physical
-      // footer contains the note and page 6 begins with "policies".
-      const include = page.n === 5 ? index >= 44 && index <= 65 : index <= 2;
+      // The copied selection contains the paragraph and printed footnote 11
+      // on the same physical PDF page. Nothing from the next page is selected.
+      const include = index >= 35 && index <= 65;
       if (include && item.str) includedNodes.add(node);
       return span;
     });
@@ -198,14 +198,23 @@ test("keeps scanned SEC petition footnote 11 out of the body and joins its page 
   try {
     const output = selectionToMarkdown(root, selection, doc, { footnotes });
     assert.match(output, /transfer agents\.\[\^11\]/);
-    assert.match(output, /develop policies, oversee its disciplinary process/);
+    assert.match(output, /The relationship between a transfer agent and DTC is commercial in nature/);
+    assert.match(output, /develop\s*\n\n\[\^11\]:/);
+    assert.doesNotMatch(output, /develop policies, oversee/);
     assert.match(output, /organization it also may adopt/);
     assert.match(output, /take disciplinary action against/);
     assert.match(output, /\[\^11\]: In fact, immobilization of securities/);
-    assert.ok(output.indexOf("develop policies") < output.indexOf("[^11]: In fact"));
+    assert.ok(output.indexOf("develop") < output.indexOf("[^11]: In fact"));
     assert.equal(output.slice(0, output.indexOf("[^11]:")).includes("In fact, immobilization"), false);
   } finally {
     if (oldNodeFilter === undefined) delete globalThis.NodeFilter;
     else globalThis.NodeFilter = oldNodeFilter;
   }
+});
+
+test("preserves page boundaries rather than guessing continuity from nearby footnotes", () => {
+  assert.equal(markdownFromRuns([
+    { text: "develop" },
+    { text: "policies", newPage: true, joinPreviousPage: true },
+  ]), "develop\n\npolicies");
 });

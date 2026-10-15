@@ -194,9 +194,7 @@ export function markdownFromRuns(runs, { markdown = true, reflow = true } = {}) 
     }
     let separator = '';
     if (previous) {
-      if (run.newPage && run.joinPreviousPage) {
-        separator = ' ';
-      } else if (run.newPage || run.newParagraph || (reflow && run.block !== null && run.block !== undefined &&
+      if (run.newPage || run.newParagraph || (reflow && run.block !== null && run.block !== undefined &&
           previous.block !== null && previous.block !== undefined && run.block !== previous.block)) {
         separator = '\n\n';
       } else if (run.newLine) {
@@ -316,17 +314,12 @@ export function selectionToMarkdown(root, selection, doc = document,
   let previous = null;
   let structuredParagraph = false;
   const runs = body.map(run => {
-    const previousPage = previous?.pageNumber;
     const reference = markdown && run.superscript ? footnotes.find(note =>
       note.pageNumber === run.pageNumber &&
       String(note.number) === run.text.trim().replace(/[lI|]/g, '1')) : null;
-    const joinPreviousPage = previous !== null && run.page !== previous.page &&
-      [...selectedNotes].some(note => note.pageNumber === previousPage) &&
-      !/[.!?;:]$/.test(previous.text.trim()) && /^[a-z]/.test(run.text.trimStart());
     const result = {
       ...run,
       newPage: previous !== null && run.page !== previous.page,
-      joinPreviousPage,
       newParagraph: previous !== null && run.page === previous.page &&
         run.paragraphStart && run.block === null,
       footnoteReference: reference?.number,
