@@ -81,7 +81,7 @@ if [[ "${PDF_MAGIC_SETUP_APPROVED:-0}" != "1" ]]; then
   cat <<EOF
 PDF Magic enhancer setup will:
   - acquire or reuse a local PDF-magic/enhancer checkout
-  - install a local copy of the native-messaging bridge
+  - link the native-messaging bridge to this viewer checkout when available
   - register that bridge for Chrome and Brave
 
 EOF
@@ -228,12 +228,35 @@ if ! command -v python3 >/dev/null 2>&1; then
   exit 1
 fi
 
-python3 - "$config_path" "$host_path" "$enhancer_dir" "$extension_id" "${manifest_dirs[@]}" <<'PY'
+linked_source=""
+if [[ -n "$host_source" && -f "$viewer_dir/manifest.json" && -f "$viewer_dir/src/viewer.html" ]]; then
+  linked_source=$host_source
+fi
+
+python3 - "$config_path" "$host_path" "$enhancer_dir" "$extension_id" "$linked_source" "${manifest_dirs[@]}" <<'PY'
 import json
 from pathlib import Path
 import sys
 
-config_path, host_path, enhancer_dir, extension_id, *manifest_dirs = sys.argv[1:]
+config_path, host_path, enhancer_dir, extension_id, linked_source, *manifest_dirs = sys.argv[1:]
+
+if linked_source:
+    # Keep the registered path stable while loading the checkout on every launch.
+    # Retain the installed copy for when the checkout is moved or unavailable.
+    installed = Path(host_path)
+    fallback = installed.with_name("pdfmagic-enhancer-host-fallback.py")
+    installed.replace(fallback)
+    installed.write_text(
+        "#!/usr/bin/env python3\n"
+        '"""Load the current viewer helper, with an installed fallback."""\n'
+        "from pathlib import Path\n"
+        "import runpy\n"
+        f"source = Path({str(Path(linked_source).resolve())!r})\n"
+        f"fallback = Path({str(fallback)!r})\n"
+        'runpy.run_path(str(source if source.is_file() else fallback), run_name="__main__")\n'
+    )
+    installed.chmod(0o755)
+    print(f"Linked native bridge to: {linked_source}")
 
 Path(config_path).write_text(
     json.dumps({"enhancer_dir": str(Path(enhancer_dir).resolve())}, indent=2) + "\n"

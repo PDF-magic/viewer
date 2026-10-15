@@ -60,7 +60,7 @@ To automatically create or reuse a personal fork using an authenticated GitHub C
 ./native/install-host.sh CHROME_EXTENSION_ID --fork-if-available
 ```
 
-The installer first reuses a sibling `../enhancer` checkout when one exists. Otherwise it creates a managed checkout under `~/Library/Application Support/PDF Magic/Enhancer` on macOS or `~/.local/share/pdf-magic/enhancer` on Linux. It installs a stable copy of the native bridge under `~/.config/pdf-magic/native` and registers it for both Chrome and Brave, so the registration does not depend on keeping the viewer repository at the same filesystem path.
+The installer first reuses a sibling `../enhancer` checkout when one exists. Otherwise it creates a managed checkout under `~/Library/Application Support/PDF Magic/Enhancer` on macOS or `~/.local/share/pdf-magic/enhancer` on Linux. It registers the native bridge under `~/.config/pdf-magic/native` for both Chrome and Brave. When setup runs from a viewer checkout, this stable launcher loads that checkout's current helper on every enhancement, so helper updates take effect automatically on the next request without reinstalling or reloading the extension. Running jobs finish with the version they started with. If the checkout is moved or unavailable, the launcher uses its installed fallback; rerun setup from the new location to relink it. Download-only setup installs a standalone copy and must be rerun to update it.
 
 After setup completes, click Enhance again. The host locates Homebrew tools even when the browser is launched from Finder and keeps OCR logs separate from native-messaging responses.
 
