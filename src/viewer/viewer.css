@@ -25,6 +25,7 @@
   --search-empty-ring: rgb(196 63 63 / 16%);
   --search-clear-filter: invert(1);
   --selection-bg: rgb(77 154 255 / 45%);
+  --highlight-blend: screen;
   --highlight-outline: rgb(67 175 73 / 95%);
   background: var(--body-bg);
   color: var(--text);
@@ -33,6 +34,7 @@
 :root[data-theme="light"] {
   color-scheme: light;
   --page-filter: none;
+  --highlight-blend: multiply;
   --body-bg: #ececef;
   --text: #171719;
   --muted: #5b5b61;
@@ -945,6 +947,7 @@ input {
 
 .page {
   position: relative;
+  isolation: isolate;
   width: min(1100px, calc(100vw - 32px));
   aspect-ratio: var(--page-ratio, 8.5 / 11);
   border-radius: 8px;
@@ -1046,6 +1049,7 @@ input {
   width: 100%;
   height: 100%;
   z-index: 2;
+  mix-blend-mode: var(--highlight-blend);
   pointer-events: none;
   overflow: visible;
 }

@@ -1,7 +1,11 @@
 import { selectionLines } from "./selection-lines.js";
+import { regionPaths } from "../highlight-regions.js";
 
 const textLayers = new Map();
 let pointerDown = false;
+let selectionDragLayer = null;
+let endpointFrame = 0;
+let endpointPosition = null;
 let paintFrame = 0;
 const selectionOverlays = new Map();
 
@@ -120,8 +124,42 @@ observer.observe(document.querySelector("#viewer"), {
   subtree: true,
 });
 
-document.addEventListener("pointerdown", () => {
+document.addEventListener("pointerdown", (event) => {
   pointerDown = true;
+  selectionDragLayer = event.target instanceof Element ? event.target.closest(".text-layer") : null;
+});
+
+// Chromium can resolve a drag into trailing whitespace to a later paragraph
+// in an absolutely positioned PDF text layer. Use the nearby line's own edge.
+function settleLineEndpoint() {
+  endpointFrame = 0;
+  if (!selectionDragLayer?.isConnected || !endpointPosition) return;
+  const { x, y } = endpointPosition;
+  const hit = document.elementFromPoint(x, y);
+  if (hit !== selectionDragLayer && !hit?.classList.contains("text-selection-end")) return;
+  const selection = document.getSelection();
+  if (!selection || selection.isCollapsed || !selectionDragLayer.contains(selection.anchorNode)) return;
+  const walker = document.createTreeWalker(selectionDragLayer, NodeFilter.SHOW_TEXT);
+  let closest = null;
+  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+    if (!node.textContent.length) continue;
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    for (const rect of range.getClientRects()) {
+      if (!rect.width || y < rect.top || y > rect.bottom) continue;
+      const distance = Math.max(rect.left - x, x - rect.right, 0);
+      if (distance > 0 && (!closest || distance < closest.distance)) {
+        closest = { node, distance, offset: x < rect.left ? 0 : node.textContent.length };
+      }
+    }
+  }
+  if (closest) selection.extend(closest.node, closest.offset);
+}
+
+document.addEventListener("pointermove", (event) => {
+  if (!pointerDown || !selectionDragLayer) return;
+  endpointPosition = { x: event.clientX, y: event.clientY };
+  if (!endpointFrame) endpointFrame = requestAnimationFrame(settleLineEndpoint);
 });
 
 document.addEventListener("mousedown", (event) => {
@@ -133,8 +171,13 @@ document.addEventListener("mousedown", (event) => {
 
 document.addEventListener("selectionchange", syncSelectingLayers);
 
-document.addEventListener("pointerup", () => {
+document.addEventListener("pointerup", (event) => {
+  if (endpointFrame) cancelAnimationFrame(endpointFrame);
+  endpointPosition = { x: event.clientX, y: event.clientY };
+  settleLineEndpoint();
   pointerDown = false;
+  selectionDragLayer = null;
+  endpointPosition = null;
   resetAllTextLayers();
 });
 
@@ -146,6 +189,10 @@ document.addEventListener("keyup", () => {
 
 window.addEventListener("blur", () => {
   pointerDown = false;
+  selectionDragLayer = null;
+  endpointPosition = null;
+  if (endpointFrame) cancelAnimationFrame(endpointFrame);
+  endpointFrame = 0;
   resetAllTextLayers();
 });
 
@@ -173,8 +220,13 @@ function paintSelection() {
           if (!selected.intersectsNode(node)) continue;
           const range = document.createRange();
           range.selectNodeContents(node);
-          if (selected.startContainer === node) range.setStart(node, selected.startOffset);
-          if (selected.endContainer === node) range.setEnd(node, selected.endOffset);
+          if (range.compareBoundaryPoints(Range.START_TO_START, selected) < 0) {
+            range.setStart(selected.startContainer, selected.startOffset);
+          }
+          if (range.compareBoundaryPoints(Range.END_TO_END, selected) > 0) {
+            range.setEnd(selected.endContainer, selected.endOffset);
+          }
+          if (range.collapsed) continue;
           rectangles.push(...Array.from(range.getClientRects(), rect => ({
             left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
           })));
@@ -185,31 +237,39 @@ function paintSelection() {
     }
     const lines = selectionLines(rectangles, 2);
     if (!lines.length) continue;
+    const page = layer.parentElement;
+    const source = page.querySelector("canvas:not(.page-image-overlay)");
+    if (!source?.width || !source.height) continue;
     const scaleX = layer.clientWidth / bounds.width;
     const scaleY = layer.clientHeight / bounds.height;
     const namespace = "http://www.w3.org/2000/svg";
-    const overlay = document.createElementNS(namespace, "svg");
+    const overlay = document.createElement("div");
     overlay.classList.add("text-selection-overlay");
     overlay.setAttribute("aria-hidden", "true");
-    const addRect = (left, top, right, bottom, radius = 2) => {
-      const rect = document.createElementNS(namespace, "rect");
-      rect.setAttribute("x", (left - bounds.left) * scaleX);
-      rect.setAttribute("y", (top - bounds.top) * scaleY);
-      rect.setAttribute("width", (right - left) * scaleX);
-      rect.setAttribute("height", (bottom - top) * scaleY);
-      rect.setAttribute("rx", radius);
-      overlay.append(rect);
-    };
-    for (const line of lines) addRect(line.left, line.top, line.right, line.bottom);
-    for (let index = 1; index < lines.length; index++) {
-      const previous = lines[index - 1], current = lines[index];
-      const left = Math.max(previous.left, current.left) + 2 / scaleX;
-      const right = Math.min(previous.right, current.right) - 2 / scaleX;
-      if (previous.bottom === current.top && right > left) {
-        addRect(left, current.top - 2 / scaleY, right, current.top + 2 / scaleY, 0);
-      }
-    }
-    layer.append(overlay);
+    const paths = regionPaths(lines.map(line => ({
+      left: (line.left - bounds.left) * scaleX,
+      top: (line.top - bounds.top) * scaleY,
+      width: (line.right - line.left) * scaleX,
+      height: (line.bottom - line.top) * scaleY,
+    })), 2);
+    // Filter the rendered PDF ink, including scans, rather than redrawing OCR text.
+    const surface = document.createElement("canvas");
+    surface.width = source.width;
+    surface.height = source.height;
+    surface.getContext("2d").drawImage(source, 0, 0);
+    surface.className = "text-selection-surface";
+    surface.style.clipPath = `path("${paths.fill}")`;
+    const tint = document.createElement("div");
+    tint.className = "text-selection-tint";
+    tint.style.clipPath = surface.style.clipPath;
+    const frame = document.createElementNS(namespace, "svg");
+    frame.setAttribute("viewBox", `0 0 ${layer.clientWidth} ${layer.clientHeight}`);
+    frame.setAttribute("preserveAspectRatio", "none");
+    const outline = document.createElementNS(namespace, "path");
+    outline.setAttribute("d", paths.outline);
+    frame.append(outline);
+    overlay.append(surface, tint, frame);
+    page.append(overlay);
     selectionOverlays.set(layer, overlay);
     layer.classList.add("selection-painted");
   }
