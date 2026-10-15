@@ -11,18 +11,19 @@
   }
 
   html.minimap-collapsed:not(.minimap-disabled) {
-    scrollbar-color: var(--accent, #43af49) transparent;
+    scrollbar-color: var(--accent, #43af49) var(--body-bg);
     scrollbar-width: thin;
   }
 
   html.minimap-collapsed:not(.minimap-disabled)::-webkit-scrollbar,
   html.minimap-collapsed:not(.minimap-disabled) body::-webkit-scrollbar {
     width: 10px;
+    background: var(--body-bg);
   }
 
   html.minimap-collapsed:not(.minimap-disabled)::-webkit-scrollbar-track,
   html.minimap-collapsed:not(.minimap-disabled) body::-webkit-scrollbar-track {
-    background: transparent;
+    background: var(--body-bg);
   }
 
   html.minimap-collapsed:not(.minimap-disabled)::-webkit-scrollbar-thumb,
