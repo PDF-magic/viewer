@@ -11,19 +11,21 @@
   }
 
   html.minimap-collapsed:not(.minimap-disabled) {
-    scrollbar-color: var(--accent, #43af49) var(--body-bg);
-    scrollbar-width: thin;
+    /* Use the track rules below so the thumb stays below the toolbar. */
+    scrollbar-color: auto;
+    scrollbar-width: auto;
   }
 
   html.minimap-collapsed:not(.minimap-disabled)::-webkit-scrollbar,
   html.minimap-collapsed:not(.minimap-disabled) body::-webkit-scrollbar {
     width: 10px;
-    background: var(--body-bg);
+    background: var(--toolbar-bg);
   }
 
   html.minimap-collapsed:not(.minimap-disabled)::-webkit-scrollbar-track,
   html.minimap-collapsed:not(.minimap-disabled) body::-webkit-scrollbar-track {
     background: var(--body-bg);
+    margin-top: var(--native-scrollbar-top);
   }
 
   html.minimap-collapsed:not(.minimap-disabled)::-webkit-scrollbar-thumb,
@@ -64,16 +66,28 @@
   }
 }
 
-/* Match the native scrollbar track to the chosen theme without altering its width. */
+/* Reserve the toolbar's height above the native scrollbar's travel area. */
+:root {
+  --native-scrollbar-top: 52px;
+}
+
+:root.toolbar-two-rows {
+  --native-scrollbar-top: 100px;
+}
+
 html.minimap-disabled {
-  scrollbar-color: var(--muted) var(--body-bg);
+  scrollbar-color: auto;
 }
 
 html.minimap-disabled::-webkit-scrollbar,
-html.minimap-disabled body::-webkit-scrollbar,
+html.minimap-disabled body::-webkit-scrollbar {
+  background: var(--toolbar-bg);
+}
+
 html.minimap-disabled::-webkit-scrollbar-track,
 html.minimap-disabled body::-webkit-scrollbar-track {
   background: var(--body-bg);
+  margin-top: var(--native-scrollbar-top);
 }
 
 html.minimap-disabled::-webkit-scrollbar-thumb,
