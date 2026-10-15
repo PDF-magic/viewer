@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { fontTraits, markdownFromRuns, markPdfTextStyles, selectionToMarkdown, installMarkdownCopy } from "../src/viewer/selection/markdown-copy.js";
+import { fontTraits, hasPdfWordGap, markdownFromRuns, markPdfTextStyles, selectionToMarkdown, installMarkdownCopy } from "../src/viewer/selection/markdown-copy.js";
 
 test("identifies original PDF font styles rather than PDF.js aliases", () => {
   assert.deepEqual(fontTraits({ name: "ABCDEF+TimesNewRomanPS-BoldItalicMT" }), { bold: true, italic: true });
@@ -90,4 +90,52 @@ test("copies only a partial selection and leaves native copy untouched when disa
     if (oldNodeFilter === undefined) delete globalThis.NodeFilter;
     else globalThis.NodeFilter = oldNodeFilter;
   }
+});
+
+
+test("recovers whitespace before italic runs from PDF text geometry", () => {
+  const item = (str, x, width, options = {}) => ({
+    str, width, height: 10, dir: "ltr", transform: [10, 0, 0, 10, x, 100], ...options,
+  });
+  const plain = item("investing is", 100, 55, { fontName: "plain" });
+  const italic = item("much too complex", 158, 89, { fontName: "italic" });
+  const continued = item(" or requires a ", 247, 80, { fontName: "plain" });
+  const spans = [{ dataset: {} }, { dataset: {} }, { dataset: {} }];
+  markPdfTextStyles({ commonObjs: { get(name) {
+    return { name: name === "italic" ? "Times-Italic" : "Times-Roman" };
+  } } }, { items: [plain, italic, continued], styles: {} }, spans);
+  assert.equal(spans[1].dataset.markdownSpaceBefore, "true");
+  assert.equal(spans[2].dataset.markdownSpaceBefore, undefined);
+  assert.equal(markdownFromRuns([
+    { text: plain.str },
+    { text: italic.str, italic: true, spaceBefore: spans[1].dataset.markdownSpaceBefore === "true" },
+    { text: continued.str },
+    { text: "full-time commitment,", italic: true },
+  ]), "investing is _much too complex_ or requires a _full-time commitment,_");
+});
+
+test("does not add spaces within words, before punctuation, or over existing whitespace", () => {
+  const item = (str, x, width, options = {}) => ({
+    str, width, height: 10, dir: "ltr", transform: [10, 0, 0, 10, x, 100], ...options,
+  });
+  assert.equal(hasPdfWordGap(item("pre", 100, 13), item("fix", 113, 12)), false);
+  assert.equal(hasPdfWordGap(item("end", 100, 16), item(".", 116, 3)), false);
+  assert.equal(hasPdfWordGap(item("is ", 100, 14), item("much", 114, 23)), false);
+  assert.equal(markdownFromRuns([{ text: "is " }, { text: "much", italic: true, spaceBefore: true }]), "is _much_");
+  assert.equal(markdownFromRuns([{ text: "pre" }, { text: "fix", italic: true }]), "pre_fix_");
+});
+
+test("handles rotated text but ignores baseline changes and existing line breaks", () => {
+  const rotated = (str, y, width) => ({
+    str, width, height: 10, dir: "ltr", transform: [0, 10, -10, 0, 100, y],
+  });
+  const plain = { str: "is", width: 9, height: 10, dir: "ltr", transform: [10, 0, 0, 10, 100, 100] };
+  assert.equal(hasPdfWordGap(rotated("is", 100, 9), rotated("much", 112, 20)), true);
+  assert.equal(hasPdfWordGap(plain, { ...plain, str: "much", transform: [10, 0, 0, 10, 113, 120] }), false);
+  assert.equal(hasPdfWordGap({ ...plain, hasEOL: true }, { ...plain, str: "much", transform: [10, 0, 0, 10, 113, 100] }), false);
+  assert.equal(markdownFromRuns([
+    { text: "It is", role: "P", block: "2" },
+    { text: "rather than research or trade", italic: true, spaceBefore: true,
+      newLine: true, role: "P", block: "2" },
+  ]), "It is _rather than research or trade_");
 });
