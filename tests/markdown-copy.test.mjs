@@ -248,10 +248,53 @@ test("preserves italics and bold in automatically included footnotes", async () 
   };
   const output = await copyPetitionSelection(6, 20, 32, { styleNote });
   assert.match(output, /\[12\]: _See, e\.g\.,_ \*\*NASDAQ Rule 4350\(l\); Section 501\.00 of the NYSE Listed Company Manual\.\*\*$/);
-  const selectedNote = await copyPetitionSelection(6, 51, 54, { styleNote });
-  assert.equal(selectedNote, output.slice(output.indexOf("[12]:")));
+  const selectedNote = await copyPetitionSelection(6, 51, 53, { styleNote });
+  assert.equal(selectedNote,
+    "_See, e.g.,_ **NASDAQ Rule 4350(l); Section 501.00 of the NYSE Listed Company Manual.**");
+  assert.doesNotMatch(selectedNote, /\\[12\\]:/);
 });
 
+
+test("does not prefix a footnote-only partial selection with its page or note identifier", () => {
+  const layer = { closest: selector => selector === ".text-layer" ? layer : null };
+  const node = { textContent: "29 15 U.S.C 78q-1(a)(3).", parentElement: layer };
+  const page = { dataset: { page: "7" } };
+  const span = {
+    node, textContent: node.textContent,
+    dataset: { markdownItem: "true", markdownXRatio: "0.2", markdownYRatio: "0.84" },
+    closest: selector => selector === ".page" ? page : null,
+  };
+  const root = { contains: element => element === layer, querySelectorAll: () => [span] };
+  const selection = {
+    isCollapsed: false, rangeCount: 1, anchorNode: node, focusNode: node,
+    getRangeAt: () => ({
+      intersectsNode: candidate => candidate === node,
+      startContainer: node, startOffset: 3, endContainer: node,
+      endOffset: node.textContent.length,
+    }),
+  };
+  const doc = { createTreeWalker() {
+    return { nextNode() {
+      if (this.done) return false;
+      this.done = true;
+      this.currentNode = node;
+      return true;
+    } };
+  } };
+  const footnotes = [{
+    number: 29, text: "15 U.S.C 78q-1(a)(3). Unselected text.",
+    highlightRegions: [{ pageNumber: 7, left: 0.1, top: 0.8, width: 0.7, height: 0.1 }],
+  }];
+  const oldNodeFilter = globalThis.NodeFilter;
+  globalThis.NodeFilter = { SHOW_TEXT: 4 };
+  try {
+    assert.equal(selectionToMarkdown(root, selection, doc, { footnotes }),
+      "15 U.S.C 78q-1(a)(3).");
+  } finally {
+    if (oldNodeFilter === undefined) delete globalThis.NodeFilter;
+    else globalThis.NodeFilter = oldNodeFilter;
+  }
+});
 
 test("copies inline footnote numbers as Unicode superscripts without HTML", () => {
   assert.equal(markdownFromRuns([

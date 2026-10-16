@@ -335,8 +335,11 @@ export function selectionToMarkdown(root, selection, doc = document,
   if (selected.every(run => run.order !== null && Number.isFinite(run.order))) {
     selected.sort((a, b) => a.order - b.order);
   }
+  // A selection consisting only of footnote text must copy those exact
+  // selected spans, not replace them with an indexed, numbered definition.
+  const noteOnlySelection = markdown && selected.every(run => footnoteAtPosition(run, footnotes));
   const selectedNotes = new Set();
-  const body = markdown ? selected.filter(run => {
+  const body = markdown && !noteOnlySelection ? selected.filter(run => {
     const note = footnoteAtPosition(run, footnotes);
     if (!note) return true;
     selectedNotes.add(note);
@@ -345,7 +348,7 @@ export function selectionToMarkdown(root, selection, doc = document,
   let previous = null;
   let structuredParagraph = false;
   const runs = body.map(run => {
-    const reference = markdown && run.superscript ? footnotes.find(note =>
+    const reference = markdown && !noteOnlySelection && run.superscript ? footnotes.find(note =>
       note.pageNumber === run.pageNumber &&
       String(note.number) === run.text.trim().replace(/[lI|]/g, '1')) : null;
     const result = {
@@ -364,7 +367,7 @@ export function selectionToMarkdown(root, selection, doc = document,
   // Without Markdown, only take over copy for semantic paragraphs. Otherwise
   // preserve the browser's native plain-text behavior for untagged PDFs.
   if (!markdown && !structuredParagraph) return null;
-  if (!markdown) return markdownFromRuns(runs, { markdown, reflow });
+  if (!markdown || noteOnlySelection) return markdownFromRuns(runs, { markdown, reflow });
   // Use the already-recovered footnote index text. In older OCR PDFs the
   // printed numeric label may be read as punctuation or omitted altogether.
   const definition = note => '[' + note.number + ']: ' + footnoteMarkdown(note, noteRuns.get(note));
