@@ -1,5 +1,6 @@
 import { appendFootnotesForPage, candidateForPage } from "./footnote-index.js";
 import { pdfDocumentSessionReady } from "../pdf-document-session.js";
+import { footnoteToMarkdown } from "../selection/markdown-copy.js";
 
 const form = document.querySelector("#footnote-jump");
 const footnoteInput = document.querySelector("#footnote-number");
@@ -82,7 +83,7 @@ function scrollToTarget(target, searchResult = false) {
   }));
 }
 
-async function jumpToFootnote(rawNumber, originPage = currentPageNumber()) {
+async function jumpToFootnote(rawNumber, originPage = currentPageNumber(), copyMarkdown = false) {
   const number = Number.parseInt(String(rawNumber).trim(), 10);
   if (!Number.isSafeInteger(number) || number <= 0) {
     setStatus("Enter a footnote number", "error");
@@ -122,12 +123,41 @@ async function jumpToFootnote(rawNumber, originPage = currentPageNumber()) {
 
   scrollToTarget(target, true);
   setStatus(`Footnote ${number} · page ${target.pageNumber}`, "success");
+  // Only reference clicks with Markdown enabled should alter the clipboard.
+  // The index retains the whole note, including any continuation pages, even
+  // when the browser has not rendered all of those PDF text layers.
+  if (!copyMarkdown) return;
+
+  const markdown = footnoteToMarkdown(target);
+  if (!markdown) {
+    setStatus(`Footnote ${number}: text unavailable to copy`, "error");
+    window.dispatchEvent(new CustomEvent("pdf-viewer-toast", {
+      detail: { message: `Footnote ${number} has no extractable text to copy` },
+    }));
+    return;
+  }
+
+  try {
+    await navigator.clipboard.writeText(markdown);
+    if (requestId !== lookupRequestId) return;
+    setStatus(`Footnote ${number} · copied as Markdown`, "success");
+    window.dispatchEvent(new CustomEvent("pdf-viewer-toast", {
+      detail: { message: `Copied footnote ${number} as Markdown` },
+    }));
+  } catch {
+    if (requestId !== lookupRequestId) return;
+    setStatus(`Could not copy footnote ${number}`, "error");
+    window.dispatchEvent(new CustomEvent("pdf-viewer-toast", {
+      detail: { message: `Could not copy footnote ${number}` },
+    }));
+  }
 }
 
 window.addEventListener("pdf-viewer-inline-footnote-jump", (event) => {
   const { number, originPage } = event.detail || {};
   if (Number.isSafeInteger(number) && number > 0) {
-    void jumpToFootnote(number, Number.isSafeInteger(originPage) ? originPage : currentPageNumber());
+    const copyMarkdown = document.querySelector("#copy-as-markdown")?.checked === true;
+    void jumpToFootnote(number, Number.isSafeInteger(originPage) ? originPage : currentPageNumber(), copyMarkdown);
   }
 });
 

@@ -151,6 +151,14 @@ function escapeMarkdown(value) {
   return value.replace(/([\\*_\[\]])/g, '\\$1').replaceAll(String.fromCharCode(96), '\\' + String.fromCharCode(96));
 }
 
+// Use the same recovered text and escaping as selection-based footnote copy.
+// A footnote can continue across multiple pages and must remain one definition.
+export function footnoteToMarkdown(note) {
+  if (!Number.isSafeInteger(note?.number) || note.number <= 0 ||
+      typeof note.text !== 'string' || !note.text.trim()) return null;
+  return '[^' + note.number + ']: ' + escapeMarkdown(note.text.trim());
+}
+
 function formatRun(run) {
   if (!run.bold && !run.italic) return escapeMarkdown(run.text);
   const leading = run.text.match(/^\s*/u)[0];
@@ -336,8 +344,7 @@ export function selectionToMarkdown(root, selection, doc = document,
   if (!markdown || !selectedNotes.size) return content;
   // Use the already-recovered footnote index text. In older OCR PDFs the
   // printed numeric label may be read as punctuation or omitted altogether.
-  const definitions = [...selectedNotes].map(note =>
-    '[^' + note.number + ']: ' + escapeMarkdown(note.text.trim()));
+  const definitions = [...selectedNotes].map(footnoteToMarkdown).filter(Boolean);
   return [content, ...definitions].filter(Boolean).join('\n\n');
 }
 
