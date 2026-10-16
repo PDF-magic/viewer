@@ -166,7 +166,7 @@ async function copyPetitionSelection(pageNumber, start, end, options = {}) {
     const textItems = page.items.filter(item => typeof item.str === "string");
     const pageSpans = textItems.map((item, index) => {
       const node = { textContent: item.str, parentElement: layer };
-      const span = { node, dataset: {},
+      const span = { node, textContent: item.str, dataset: {},
         closest: selector => selector === ".page" ? pageElement : null };
       const include = index >= start && index <= end;
       if (include && item.str) includedNodes.add(node);
@@ -174,6 +174,7 @@ async function copyPetitionSelection(pageNumber, start, end, options = {}) {
     });
     markPdfTextStyles({ getViewport: () => viewport(page) },
       { items: page.items, styles: {} }, pageSpans);
+    options.styleNote?.(pageSpans);
     spans.push(...pageSpans);
   }
   const selection = {
@@ -237,4 +238,16 @@ test("includes a note for a partial paragraph selection and avoids duplicate sel
   assert.doesNotMatch(withoutReference, /\[12\]/);
   const plain = await copyPetitionSelection(6, 20, 32, { markdown: false });
   assert.equal(plain, null);
+});
+
+
+test("preserves italics and bold in automatically included footnotes", async () => {
+  const styleNote = spans => {
+    spans[51].dataset.markdownItalic = "true";
+    spans[53].dataset.markdownBold = "true";
+  };
+  const output = await copyPetitionSelection(6, 20, 32, { styleNote });
+  assert.match(output, /\[12\]: _See, e\.g\.,_ \*\*NASDAQ Rule 4350\(l\); Section 501\.00 of the NYSE Listed Company Manual\.\*\*$/);
+  const selectedNote = await copyPetitionSelection(6, 51, 54, { styleNote });
+  assert.equal(selectedNote, output.slice(output.indexOf("[12]:")));
 });
