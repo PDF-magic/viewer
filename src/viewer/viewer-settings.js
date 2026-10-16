@@ -559,14 +559,34 @@ function fitWidth() {
 }
 
 function fitHeight() {
+  // Scroll-based page tracking runs on a frame; prefer the page actually in view
+  // over a possibly stale page-number field when the button is clicked.
+  const viewportTop = viewportPageTop();
+  const viewportCenter = viewportTop + viewportPageHeight() / 2;
+  const visiblePage = document.elementFromPoint(window.innerWidth / 2, viewportCenter)?.closest(".page");
   const pageNumber = Number.parseInt(document.querySelector("#page-number")?.value, 10);
-  const page = document.querySelector(`.page[data-page="${pageNumber}"]`)
+  const page = visiblePage
+    || document.querySelector(`.page[data-page="${pageNumber}"]`)
     || document.querySelector(".page");
+
   zoomMode = "fit-height";
-  applyZoomLayout();
-  restoreZoomAnchor(page ? { page, ratio: 0, viewportY: viewportPageTop() } : null);
+  const fitAndAlign = () => {
+    applyZoomLayout();
+    if (page && page.isConnected !== false) {
+      restoreZoomAnchor({ page, ratio: 0, viewportY: viewportPageTop() });
+    }
+  };
+  fitAndAlign();
   syncZoomControls();
   scheduleViewerRerender();
+
+  // Settle any fit-dependent layout on the very next frame, before it paints.
+  // This should not require a second click or override a newer zoom choice.
+  requestAnimationFrame(() => {
+    if (zoomMode !== "fit-height") return;
+    fitAndAlign();
+    syncZoomControls();
+  });
 }
 
 if (zoomControls) {
