@@ -103,3 +103,78 @@ test("repeated zoom layout changes do not drift to another part of the document"
     assert.equal(rect.top + rect.height * initialAnchor.ratio, viewportY);
   }
 });
+
+test("one fit-height click uses the visible page and settles its height before paint", () => {
+  const frames = [];
+  const stalePage = { isConnected: true };
+  const visiblePage = { isConnected: true };
+  let renderedHeight = 600;
+  let alignedPage = null;
+  let alignedTop = null;
+  let layoutCalls = 0;
+  const context = vm.createContext({
+    window: { innerWidth: 1200 },
+    document: {
+      elementFromPoint(x, y) {
+        assert.equal(x, 600);
+        assert.equal(y, 462);
+        return { closest: (selector) => selector === ".page" ? visiblePage : null };
+      },
+      querySelector(selector) {
+        if (selector === "#page-number") return { value: "6" };
+        if (selector === '.page[data-page="6"]' || selector === ".page") return stalePage;
+        return null;
+      },
+    },
+    viewportPageTop: () => 53,
+    viewportPageHeight: () => 818,
+    applyZoomLayout() {
+      layoutCalls += 1;
+      renderedHeight = layoutCalls === 1 ? 600 : 818;
+    },
+    restoreZoomAnchor(anchor) {
+      alignedPage = anchor.page;
+      alignedTop = anchor.viewportY;
+    },
+    syncZoomControls() {},
+    scheduleViewerRerender() {},
+    requestAnimationFrame(callback) { frames.push(callback); },
+  });
+  loadFunction("fitHeight", context);
+
+  context.fitHeight();
+  assert.equal(alignedPage, visiblePage);
+  assert.equal(alignedTop, 53);
+  assert.equal(renderedHeight, 600);
+  assert.equal(frames.length, 1);
+
+  frames.shift()();
+  assert.equal(layoutCalls, 2);
+  assert.equal(renderedHeight, 818);
+  assert.equal(alignedPage, visiblePage);
+  assert.equal(alignedTop, 53);
+});
+
+test("pending fit-height correction does not override a later zoom mode", () => {
+  const frames = [];
+  let layoutCalls = 0;
+  const context = vm.createContext({
+    window: { innerWidth: 1000 },
+    document: {
+      elementFromPoint: () => null,
+      querySelector: (selector) => selector === "#page-number" ? { value: "1" } : null,
+    },
+    viewportPageTop: () => 53,
+    viewportPageHeight: () => 700,
+    applyZoomLayout() { layoutCalls += 1; },
+    restoreZoomAnchor() {},
+    syncZoomControls() {},
+    scheduleViewerRerender() {},
+    requestAnimationFrame(callback) { frames.push(callback); },
+  });
+  loadFunction("fitHeight", context);
+  context.fitHeight();
+  vm.runInContext('zoomMode = "fit-width"', context);
+  frames.shift()();
+  assert.equal(layoutCalls, 1);
+});
