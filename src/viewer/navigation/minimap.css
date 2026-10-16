@@ -70,7 +70,8 @@
 /* Keep the native scrollbar between the toolbar and bottom navigation controls. */
 :root {
   --native-scrollbar-top: 52px;
-  --native-scrollbar-bottom: var(--document-scrubber-height, 0px);
+  --split-view-bottom-clearance: 0px;
+  --native-scrollbar-bottom: calc(var(--document-scrubber-height, 0px) + var(--split-view-bottom-clearance));
   /* Composite the translucent toolbar over the same base and continue its border. */
   --native-scrollbar-background: linear-gradient(
     to bottom,
@@ -88,7 +89,7 @@
 
 @media (min-width: 701px) {
   html.minimap-collapsed:not(.minimap-disabled) {
-    --native-scrollbar-bottom: calc(var(--document-scrubber-height, 0px) + 36px);
+    --native-scrollbar-bottom: calc(var(--document-scrubber-height, 0px) + 36px + var(--split-view-bottom-clearance));
   }
 }
 
@@ -117,7 +118,7 @@ html.minimap-disabled body::-webkit-scrollbar-thumb {
 .minimap-shell {
   --minimap-accent: var(--accent, #43af49);
   position: fixed;
-  inset: 52px 0 var(--document-scrubber-height, 0px) auto;
+  inset: 52px 0 calc(var(--document-scrubber-height, 0px) + var(--split-view-bottom-clearance)) auto;
   z-index: 9;
   display: flex;
   width: 96px;
@@ -341,6 +342,14 @@ html.minimap-disabled body::-webkit-scrollbar-thumb {
 .minimap-collapsed .minimap-collapse {
   display: grid;
   flex: 1 1 auto;
+}
+
+/* The bottom-right corner of a split pane may be occupied by host chrome.
+   Raise both expanded and collapsed minimap controls out of that hit area. */
+@media (max-width: 1200px) {
+  :root {
+    --split-view-bottom-clearance: 48px;
+  }
 }
 
 @media (max-width: 700px) {
