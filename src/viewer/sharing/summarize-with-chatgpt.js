@@ -7,6 +7,8 @@ const defaultTitle = summarizeButton.title;
 // Resolve PDF metadata while the viewer loads, before the user asks for a summary.
 const documentReferenceUrl = resolveDocumentReferenceUrl();
 let titleResetTimer;
+let summaryTooltipDismissed = false;
+let pointerLeftSinceDismissal = false;
 
 function showTemporaryTitle(title) {
   clearTimeout(titleResetTimer);
@@ -17,6 +19,27 @@ function showTemporaryTitle(title) {
     summarizeButton.setAttribute("aria-label", defaultTitle);
   }, 1800);
 }
+
+function dismissSummaryTooltip() {
+  clearTimeout(titleResetTimer);
+  // Chromium can keep a native title tooltip alive across the popup window switch.
+  summarizeButton.removeAttribute("title");
+  summarizeButton.setAttribute("aria-label", defaultTitle);
+  summarizeButton.blur();
+  summaryTooltipDismissed = true;
+  pointerLeftSinceDismissal = false;
+}
+
+summarizeButton.addEventListener("pointerleave", () => {
+  if (summaryTooltipDismissed) pointerLeftSinceDismissal = true;
+});
+
+summarizeButton.addEventListener("pointerenter", () => {
+  // Do not revive the tooltip when focus returns to the PDF at the same cursor position.
+  if (!summaryTooltipDismissed || !pointerLeftSinceDismissal) return;
+  summarizeButton.title = defaultTitle;
+  summaryTooltipDismissed = false;
+});
 
 function summaryPrompt(fileUrl) {
   return [
@@ -79,6 +102,7 @@ async function openChatGPTSummary() {
 }
 
 summarizeButton.addEventListener("click", async () => {
+  dismissSummaryTooltip();
   summarizeButton.disabled = true;
 
   try {
