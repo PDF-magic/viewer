@@ -21,7 +21,7 @@ import time
 from urllib.parse import unquote, urlparse
 from urllib.request import Request, urlopen
 
-PIPELINE_VERSION = 3
+PIPELINE_VERSION = 4
 
 HOST_CONFIG = Path.home() / ".config" / "pdf-magic" / "enhancer-host.json"
 
@@ -446,9 +446,9 @@ def run_enhancer(command: list[str], progress: bool, report_progress=None) -> No
 
 def enhancement_options(mode: str) -> list[str]:
     if mode in {"light", "deep"}:
-        # Tag embedded text directly; OCR only pages that need it. Expensive
-        # model review remains an explicit enhancer CLI option.
-        return ["--skip-text"]
+        # Existing text may itself be faulty OCR. Re-read every page and
+        # require image-based AI review before calling it enhanced.
+        return ["--force-ocr", "--ai-review"]
     raise ValueError(f"unsupported enhancement mode: {mode}")
 
 
