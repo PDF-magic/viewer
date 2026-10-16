@@ -2,7 +2,7 @@ import { AnnotationLayer, createValidAbsoluteUrl, getDocument, GlobalWorkerOptio
 import { EventBus, PDFLinkService } from "../../node_modules/pdfjs-dist/web/pdf_viewer.mjs";
 import { abandonPdfDocumentSession, publishPdfDocument } from "./pdf-document-session.js";
 import { referenceUrlFromPdfMetadata, resolveDocumentReferenceUrl } from "./document-reference-url.js";
-import { metadataValue, pdfMetadataTitle } from "./pdf-metadata-title.js";
+import { formatDocumentDate, metadataValue, pdfMetadataTitle } from "./pdf-metadata-title.js";
 import { resolvePdfSource } from "./pdf-source.js";
 import { readResumedPage, saveResumedPage } from "./page-resume.js";
 import { findSearchMatches } from "./search/search-matches.js";
@@ -573,7 +573,7 @@ function renderPdfMetadata(entries) {
       link.rel = "noopener noreferrer";
       description.append(link);
     } else {
-      description.textContent = value;
+      description.textContent = label === "Date" ? formatDocumentDate(value) : value;
     }
     row.append(term, description);
     fragment.append(row);
