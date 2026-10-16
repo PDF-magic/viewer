@@ -443,6 +443,44 @@ input {
   overflow-wrap: anywhere;
 }
 
+.section-metadata-row > dt[data-source]::after {
+  display: block;
+  margin-top: 2px;
+  color: #888890;
+  content: attr(data-source);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.section-metadata-conflict {
+  grid-column: 1 / -1;
+  padding: 5px 8px;
+  border: 1px solid #36363a;
+  border-radius: 6px;
+  color: #bdbdc4;
+}
+
+.section-metadata-conflict summary {
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.section-metadata-conflict dl {
+  margin: 8px 0 0;
+}
+
+.section-metadata-conflict dl > div {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.section-metadata-conflict dt {
+  color: #9d9da3;
+  font-weight: 600;
+}
+
 .page-control {
   display: flex;
   flex: 0 0 auto;

@@ -1,17 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { metadataValue, pdfMetadataTitle } from "../src/viewer/pdf-metadata-title.js";
+import { metadataField, metadataValue, pdfMetadataTitle } from "../src/viewer/pdf-metadata-title.js";
 
 function xmp(fields) {
   return { get(key) { return fields[key]; } };
 }
 
-test("PDF Info Title takes precedence over XMP and is normalized for the tab", () => {
+test("XMP Title takes precedence over PDF Info and is normalized for the tab", () => {
   assert.equal(pdfMetadataTitle(
     { Title: "  A Book\nAbout Markets  " },
     xmp({ "dc:title": "Different XMP Title" }),
-  ), "A Book About Markets");
+  ), "Different XMP Title");
 });
 
 test("XMP dc:title is used when the PDF Info title is missing or blank", () => {
@@ -30,8 +30,20 @@ test("missing, empty, or unreadable titles leave the filename fallback available
   }
 });
 
-test("other metadata fields still prefer Info over XMP", () => {
-  assert.equal(metadataValue({ Author: "Info Author" }, xmp({ "dc:creator": "XMP Author" }), "Author", "dc:creator"), "Info Author");
+test("XMP values take precedence with PDF Info fallback", () => {
+  assert.equal(metadataValue({ Author: "Info Author" }, xmp({ "dc:creator": "XMP Author" }), "Author", "dc:creator"), "XMP Author");
+  assert.equal(metadataValue({ Author: "Info Author" }, xmp({ "dc:creator": " " }), "Author", "dc:creator"), "Info Author");
+  assert.equal(metadataValue({ Keywords: "Legacy" }, xmp({ "dc:subject": ["Markets", "Securities"] }), "Keywords", ["pdf:keywords", "dc:subject"]), "Markets, Securities");
+  assert.equal(metadataValue({ Title: "Fallback" }, { get() { throw Error("bad XMP"); } }, "Title", "dc:title"), "Fallback");
+});
+
+test("differences are detected while preserving both metadata sources", () => {
+  assert.deepEqual(metadataField({ Title: "Old title" }, xmp({ "dc:title": "New title" }), "Title", "dc:title"), {
+    value: "New title", source: "XMP", xmpValue: "New title", infoValue: "Old title", conflict: true,
+  });
+  assert.equal(metadataField({ Title: " Same  title " }, xmp({ "dc:title": "Same title" }), "Title", "dc:title").conflict, false);
+  assert.equal(metadataField({ Title: "Fallback" }, null, "Title", "dc:title").source, "PDF Info");
+  assert.equal(metadataField({}, null, "Title", "dc:title").conflict, false);
 });
 
 test("document identity first uses the filename, then the embedded PDF title even without an outline", async () => {
