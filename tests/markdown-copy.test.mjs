@@ -140,7 +140,7 @@ test("handles rotated text but ignores baseline changes and existing line breaks
   ]), "It is _rather than research or trade_");
 });
 
-test("separates scanned SEC petition footnote 11 from body text on the same page", async () => {
+async function copyPetitionSelection(pageNumber, start, end, options = {}) {
   const { readFileSync } = await import("node:fs");
   const { appendFootnotesForPage } = await import("../src/viewer/navigation/footnote-index.js");
   const pages = JSON.parse(readFileSync(new URL("./fixtures/footnotes-sta-petition.json", import.meta.url)));
@@ -152,27 +152,23 @@ test("separates scanned SEC petition footnote 11 from body text on the same page
     [null, [[0]], [rule.x, page.height - rule.y, rule.x + rule.width, page.height - rule.y]]) });
   const footnotes = [];
   let previousPageText;
-  for (const page of pages.slice(0, 5)) {
+  for (const page of pages.slice(0, pageNumber)) {
     appendFootnotesForPage(footnotes, page.items, viewport(page), page.n,
       operators(page), undefined, previousPageText);
     previousPageText = { items: page.items, viewport: viewport(page) };
   }
-  const note11 = footnotes.find(note => note.pageNumber === 5 && note.number === 11);
-  assert.ok(note11?.highlightRegions?.length);
 
   const layer = { closest: selector => selector === ".text-layer" ? layer : null };
   const spans = [];
   const includedNodes = new Set();
-  for (const page of pages.slice(4, 5)) {
+  for (const page of pages.slice(pageNumber - 1, pageNumber)) {
     const pageElement = { dataset: { page: String(page.n) } };
     const textItems = page.items.filter(item => typeof item.str === "string");
     const pageSpans = textItems.map((item, index) => {
       const node = { textContent: item.str, parentElement: layer };
       const span = { node, dataset: {},
         closest: selector => selector === ".page" ? pageElement : null };
-      // The copied selection contains the paragraph and printed footnote 11
-      // on the same physical PDF page. Nothing from the next page is selected.
-      const include = index >= 35 && index <= 65;
+      const include = index >= start && index <= end;
       if (include && item.str) includedNodes.add(node);
       return span;
     });
@@ -196,20 +192,24 @@ test("separates scanned SEC petition footnote 11 from body text on the same page
   const oldNodeFilter = globalThis.NodeFilter;
   globalThis.NodeFilter = { SHOW_TEXT: 4 };
   try {
-    const output = selectionToMarkdown(root, selection, doc, { footnotes });
-    assert.match(output, /transfer agents\.\[\^11\]/);
-    assert.match(output, /The relationship between a transfer agent and DTC is commercial in nature/);
-    assert.match(output, /develop\s*\n\n\[\^11\]:/);
-    assert.doesNotMatch(output, /develop policies, oversee/);
-    assert.match(output, /organization it also may adopt/);
-    assert.match(output, /take disciplinary action against/);
-    assert.match(output, /\[\^11\]: In fact, immobilization of securities/);
-    assert.ok(output.indexOf("develop") < output.indexOf("[^11]: In fact"));
-    assert.equal(output.slice(0, output.indexOf("[^11]:")).includes("In fact, immobilization"), false);
+    return selectionToMarkdown(root, selection, doc, { footnotes, ...options });
   } finally {
     if (oldNodeFilter === undefined) delete globalThis.NodeFilter;
     else globalThis.NodeFilter = oldNodeFilter;
   }
+}
+
+test("separates scanned SEC petition footnote 11 from body text on the same page", async () => {
+  const output = await copyPetitionSelection(5, 35, 65);
+  assert.match(output, /transfer agents\.\[11\]/);
+  assert.match(output, /The relationship between a transfer agent and DTC is commercial in nature/);
+  assert.match(output, /transfer agents\.\[11\]\n\n\[11\]:/);
+  assert.doesNotMatch(output, /develop policies, oversee/);
+  assert.match(output, /organization it also may adopt/);
+  assert.match(output, /take disciplinary action against/);
+  assert.match(output, /\[11\]: In fact, immobilization of securities/);
+  assert.ok(output.indexOf("[11]: In fact") < output.indexOf("DTC is subject"));
+  assert.equal(output.slice(0, output.indexOf("[11]:")).includes("In fact, immobilization"), false);
 });
 
 test("preserves page boundaries rather than guessing continuity from nearby footnotes", () => {
@@ -217,4 +217,24 @@ test("preserves page boundaries rather than guessing continuity from nearby foot
     { text: "develop" },
     { text: "policies", newPage: true, joinPreviousPage: true },
   ]), "develop\n\npolicies");
+});
+
+test("includes unselected note 12 immediately after its citing paragraph", async () => {
+  const output = await copyPetitionSelection(6, 20, 42);
+  assert.match(output, /Direct Registration System\.\[12\] DRS permits/);
+  assert.match(output, /transfer agent\.\s*\n\n\[12\]: See, e\.g\., NASDAQ Rule 4350\(l\); Section 501\.00 of the NYSE Listed Company Manual\.\n\nTransfer agents/);
+  assert.equal((output.match(/\[12\]:/g) || []).length, 1);
+  assert.doesNotMatch(output, /\[\^12\]/);
+});
+
+test("includes a note for a partial paragraph selection and avoids duplicate selected definitions", async () => {
+  const partial = await copyPetitionSelection(6, 26, 31);
+  assert.match(partial, /System\.\[12\]/);
+  assert.match(partial, /\n\n\[12\]: See, e\.g\., NASDAQ/);
+  const selectedNote = await copyPetitionSelection(6, 20, 54);
+  assert.equal((selectedNote.match(/\[12\]:/g) || []).length, 1);
+  const withoutReference = await copyPetitionSelection(6, 34, 42);
+  assert.doesNotMatch(withoutReference, /\[12\]/);
+  const plain = await copyPetitionSelection(6, 20, 32, { markdown: false });
+  assert.equal(plain, null);
 });

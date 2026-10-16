@@ -163,6 +163,11 @@ function formatRun(run) {
   return leading + formatted + trailing;
 }
 
+function startsParagraph(run, previous, reflow) {
+  return previous && (run.newPage || run.newParagraph || (reflow &&
+    run.block != null && previous.block != null && run.block !== previous.block));
+}
+
 // A PDF line is not necessarily a paragraph. Tagged P content identifies
 // where PDF.js line breaks can be replaced with spaces without guessing.
 export function markdownFromRuns(runs, { markdown = true, reflow = true } = {}) {
@@ -188,14 +193,14 @@ export function markdownFromRuns(runs, { markdown = true, reflow = true } = {}) 
         }
         parts.pop();
       }
-      parts.push('[^' + run.footnoteReference + ']');
+      if (startsParagraph(run, previous, reflow)) parts.push('\n\n');
+      parts.push('[' + run.footnoteReference + ']');
       previous = run;
       continue;
     }
     let separator = '';
     if (previous) {
-      if (run.newPage || run.newParagraph || (reflow && run.block !== null && run.block !== undefined &&
-          previous.block !== null && previous.block !== undefined && run.block !== previous.block)) {
+      if (startsParagraph(run, previous, reflow)) {
         separator = '\n\n';
       } else if (run.newLine) {
         separator = reflow && run.role === 'P' && previous.role === 'P' &&
@@ -323,6 +328,7 @@ export function selectionToMarkdown(root, selection, doc = document,
       newParagraph: previous !== null && run.page === previous.page &&
         run.paragraphStart && run.block === null,
       footnoteReference: reference?.number,
+      footnote: reference,
       newLine: previous?.eol === true,
     };
     if (run.role === 'P') structuredParagraph = true;
@@ -332,13 +338,32 @@ export function selectionToMarkdown(root, selection, doc = document,
   // Without Markdown, only take over copy for semantic paragraphs. Otherwise
   // preserve the browser's native plain-text behavior for untagged PDFs.
   if (!markdown && !structuredParagraph) return null;
-  const content = markdownFromRuns(runs, { markdown, reflow });
-  if (!markdown || !selectedNotes.size) return content;
+  if (!markdown) return markdownFromRuns(runs, { markdown, reflow });
   // Use the already-recovered footnote index text. In older OCR PDFs the
   // printed numeric label may be read as punctuation or omitted altogether.
-  const definitions = [...selectedNotes].map(note =>
-    '[^' + note.number + ']: ' + escapeMarkdown(note.text.trim()));
-  return [content, ...definitions].filter(Boolean).join('\n\n');
+  const definition = note => '[' + note.number + ']: ' + escapeMarkdown(note.text.trim());
+  const paragraphs = [];
+  for (const run of runs) {
+    const paragraph = paragraphs.at(-1);
+    if (!paragraph || startsParagraph(run, paragraph.at(-1), reflow)) paragraphs.push([run]);
+    else paragraph.push(run);
+  }
+  const emittedNotes = new Set();
+  const output = [];
+  for (const paragraph of paragraphs) {
+    output.push(markdownFromRuns(paragraph, { markdown, reflow }));
+    for (const run of paragraph) {
+      if (!run.footnote || emittedNotes.has(run.footnote)) continue;
+      output.push(definition(run.footnote));
+      emittedNotes.add(run.footnote);
+    }
+  }
+  // Retain explicitly selected notes even when their citation is outside the
+  // selection, without duplicating notes already included with a paragraph.
+  for (const note of selectedNotes) {
+    if (!emittedNotes.has(note)) output.push(definition(note));
+  }
+  return output.filter(Boolean).join('\n\n');
 }
 
 export function installMarkdownCopy(root, markdownToggle, doc = document, paragraphToggle = null) {
