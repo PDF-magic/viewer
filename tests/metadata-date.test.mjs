@@ -44,3 +44,10 @@ test("relative dates show compact years, days, hours and minutes", () => {
   assert.equal(formatRelativeMetadataDate("D:20240101000000", start), "D:20240101000000");
   assert.equal(formatRelativeMetadataDate("unknown", start), "unknown");
 });
+
+test("document dates support absolute and relative formatting without a timezone shift", () => {
+  assert.equal(formatMetadataDate("2009-08-04"), "4 Aug 2009");
+  assert.equal(formatMetadataDate("2993-04-03"), "3 Apr 2993");
+  assert.equal(formatRelativeMetadataDate("2009-08-04", Date.parse("2009-08-06T00:00:00Z")), "2d ago");
+  assert.equal(formatMetadataDate("2009-02-30"), "2009-02-30");
+});
