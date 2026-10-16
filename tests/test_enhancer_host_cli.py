@@ -16,7 +16,7 @@ SPEC.loader.exec_module(host)
 class EnhancerCliTest(unittest.TestCase):
     def test_light_enhancement_uses_only_supported_ocr_arguments(self):
         with tempfile.TemporaryDirectory() as directory:
-            folder = Path(directory)
+            folder = Path(directory).resolve()
             enhancer_dir = folder / "enhancer"
             enhancer_dir.mkdir()
             executable = enhancer_dir / "ocr-scanned-pdf.sh"
@@ -44,7 +44,7 @@ class EnhancerCliTest(unittest.TestCase):
                 )
             self.assertEqual(result, output_file)
             self.assertEqual(calls, [[
-                "/bin/bash", str(executable), str(input_file), str(output_file), "--skip-text"
+                "/bin/bash", str(executable), str(input_file), str(output_file), "--force-ocr", "--ai-review"
             ]])
             stamp.assert_called_once_with(output_file, "https://example.org/document.pdf")
 

@@ -163,6 +163,11 @@ function formatRun(run) {
   return leading + formatted + trailing;
 }
 
+function startsParagraph(run, previous, reflow) {
+  return previous && (run.newPage || run.newParagraph || (reflow &&
+    run.block != null && previous.block != null && run.block !== previous.block));
+}
+
 // A PDF line is not necessarily a paragraph. Tagged P content identifies
 // where PDF.js line breaks can be replaced with spaces without guessing.
 export function markdownFromRuns(runs, { markdown = true, reflow = true } = {}) {
@@ -188,14 +193,14 @@ export function markdownFromRuns(runs, { markdown = true, reflow = true } = {}) 
         }
         parts.pop();
       }
-      parts.push('[^' + run.footnoteReference + ']');
+      if (startsParagraph(run, previous, reflow)) parts.push('\n\n');
+      parts.push(String(run.footnoteReference).replace(/\d/g, digit => '⁰¹²³⁴⁵⁶⁷⁸⁹'[Number(digit)]));
       previous = run;
       continue;
     }
     let separator = '';
     if (previous) {
-      if (run.newPage || run.newParagraph || (reflow && run.block !== null && run.block !== undefined &&
-          previous.block !== null && previous.block !== undefined && run.block !== previous.block)) {
+      if (startsParagraph(run, previous, reflow)) {
         separator = '\n\n';
       } else if (run.newLine) {
         separator = reflow && run.role === 'P' && previous.role === 'P' &&
@@ -261,12 +266,31 @@ function inPdfTextLayer(node, root) {
 function footnoteAtPosition(run, footnotes) {
   if (!Number.isInteger(run.pageNumber) || !Number.isFinite(run.xRatio) ||
       !Number.isFinite(run.yRatio)) return null;
-  return footnotes.find(note => note.pageNumber === run.pageNumber &&
+  return footnotes.find(note =>
     note.highlightRegions?.some(region => region.pageNumber === run.pageNumber &&
       run.xRatio >= region.left - 0.003 &&
       run.xRatio <= region.left + region.width + 0.003 &&
       run.yRatio >= region.top - 0.003 &&
       run.yRatio <= region.top + region.height + 0.003)) || null;
+}
+
+function footnoteMarkdown(note, runs = []) {
+  // Keep the recovered text (which repairs OCR labels and line wraps), and
+  // transfer font styles from the full note, including unselected text spans.
+  const text = note.text.trim().replace(/\s+/gu, ' ');
+  const styled = [];
+  let cursor = 0;
+  for (const run of runs) {
+    const content = run.text.trim().replace(/\s+/gu, ' ');
+    if (!content || run.superscript || (!cursor && content === String(note.number))) continue;
+    const start = text.indexOf(content, cursor);
+    if (start < 0) continue;
+    if (start > cursor) styled.push({ text: text.slice(cursor, start) });
+    styled.push({ text: content, bold: run.bold, italic: run.italic });
+    cursor = start + content.length;
+  }
+  if (cursor < text.length) styled.push({ text: text.slice(cursor) });
+  return markdownFromRuns(styled);
 }
 
 export function selectionToMarkdown(root, selection, doc = document,
@@ -276,13 +300,11 @@ export function selectionToMarkdown(root, selection, doc = document,
       !inPdfTextLayer(selection.focusNode, root)) return null;
 
   const selected = [];
+  const noteRuns = new Map();
   for (const span of root.querySelectorAll('.text-layer [data-markdown-item]')) {
-    const text = selectedSpanText(span, selection, doc);
-    if (text === null) continue;
     const page = span.closest('.page');
     if (!page) continue;
-    selected.push({
-      text,
+    const run = {
       bold: span.dataset.markdownBold === 'true',
       italic: span.dataset.markdownItalic === 'true',
       spaceBefore: span.dataset.markdownSpaceBefore === 'true',
@@ -296,7 +318,16 @@ export function selectionToMarkdown(root, selection, doc = document,
       block: span.dataset.copyBlock === undefined ? null : span.dataset.copyBlock,
       role: span.dataset.copyRole ?? null,
       order: span.dataset.copyOrder === undefined ? null : Number(span.dataset.copyOrder),
-    });
+    };
+    if (markdown) {
+      const note = footnoteAtPosition(run, footnotes);
+      if (note) {
+        if (!noteRuns.has(note)) noteRuns.set(note, []);
+        noteRuns.get(note).push({ ...run, text: span.textContent || '' });
+      }
+    }
+    const text = selectedSpanText(span, selection, doc);
+    if (text !== null) selected.push({ ...run, text });
   }
   if (!selected.length) return null;
   // Never reorder a selection containing untagged text: the tree cannot tell
@@ -304,8 +335,11 @@ export function selectionToMarkdown(root, selection, doc = document,
   if (selected.every(run => run.order !== null && Number.isFinite(run.order))) {
     selected.sort((a, b) => a.order - b.order);
   }
+  // A selection consisting only of footnote text must copy those exact
+  // selected spans, not replace them with an indexed, numbered definition.
+  const noteOnlySelection = markdown && selected.every(run => footnoteAtPosition(run, footnotes));
   const selectedNotes = new Set();
-  const body = markdown ? selected.filter(run => {
+  const body = markdown && !noteOnlySelection ? selected.filter(run => {
     const note = footnoteAtPosition(run, footnotes);
     if (!note) return true;
     selectedNotes.add(note);
@@ -314,7 +348,7 @@ export function selectionToMarkdown(root, selection, doc = document,
   let previous = null;
   let structuredParagraph = false;
   const runs = body.map(run => {
-    const reference = markdown && run.superscript ? footnotes.find(note =>
+    const reference = markdown && !noteOnlySelection && run.superscript ? footnotes.find(note =>
       note.pageNumber === run.pageNumber &&
       String(note.number) === run.text.trim().replace(/[lI|]/g, '1')) : null;
     const result = {
@@ -323,6 +357,7 @@ export function selectionToMarkdown(root, selection, doc = document,
       newParagraph: previous !== null && run.page === previous.page &&
         run.paragraphStart && run.block === null,
       footnoteReference: reference?.number,
+      footnote: reference,
       newLine: previous?.eol === true,
     };
     if (run.role === 'P') structuredParagraph = true;
@@ -332,13 +367,32 @@ export function selectionToMarkdown(root, selection, doc = document,
   // Without Markdown, only take over copy for semantic paragraphs. Otherwise
   // preserve the browser's native plain-text behavior for untagged PDFs.
   if (!markdown && !structuredParagraph) return null;
-  const content = markdownFromRuns(runs, { markdown, reflow });
-  if (!markdown || !selectedNotes.size) return content;
+  if (!markdown || noteOnlySelection) return markdownFromRuns(runs, { markdown, reflow });
   // Use the already-recovered footnote index text. In older OCR PDFs the
   // printed numeric label may be read as punctuation or omitted altogether.
-  const definitions = [...selectedNotes].map(note =>
-    '[^' + note.number + ']: ' + escapeMarkdown(note.text.trim()));
-  return [content, ...definitions].filter(Boolean).join('\n\n');
+  const definition = note => '[' + note.number + ']: ' + footnoteMarkdown(note, noteRuns.get(note));
+  const paragraphs = [];
+  for (const run of runs) {
+    const paragraph = paragraphs.at(-1);
+    if (!paragraph || startsParagraph(run, paragraph.at(-1), reflow)) paragraphs.push([run]);
+    else paragraph.push(run);
+  }
+  const emittedNotes = new Set();
+  const output = [];
+  for (const paragraph of paragraphs) {
+    output.push(markdownFromRuns(paragraph, { markdown, reflow }));
+    for (const run of paragraph) {
+      if (!run.footnote || emittedNotes.has(run.footnote)) continue;
+      output.push(definition(run.footnote));
+      emittedNotes.add(run.footnote);
+    }
+  }
+  // Retain explicitly selected notes even when their citation is outside the
+  // selection, without duplicating notes already included with a paragraph.
+  for (const note of selectedNotes) {
+    if (!emittedNotes.has(note)) output.push(definition(note));
+  }
+  return output.filter(Boolean).join('\n\n');
 }
 
 export function installMarkdownCopy(root, markdownToggle, doc = document, paragraphToggle = null) {
