@@ -8,12 +8,15 @@ const source = (await readFile(new URL("../src/viewer/sharing/summarize-with-cha
 
 function setup({ width = 1080, height = 1920, popupFails = false } = {}) {
   let resolveUrl;
-  let click;
+  const listeners = new Map();
   const calls = [];
   const button = {
     title: "Summarize with ChatGPT",
-    setAttribute() {},
-    addEventListener(event, listener) { click = listener; },
+    attributes: {},
+    setAttribute(name, value) { this.attributes[name] = value; },
+    removeAttribute(name) { if (name === "title") this.title = ""; },
+    blur() { this.blurred = true; },
+    addEventListener(event, listener) { listeners.set(event, listener); },
   };
   const context = {
     URL, crypto: { randomUUID: () => "request" },
@@ -39,7 +42,7 @@ function setup({ width = 1080, height = 1920, popupFails = false } = {}) {
     },
   };
   vm.runInNewContext(source, context);
-  return { click: () => click(), resolveUrl, calls, button };
+  return { click: () => listeners.get("click")(), dispatch: (event) => listeners.get(event)(), resolveUrl, calls, button };
 }
 
 test("opens the portrait popup before PDF metadata resolves, then stores the prompt before navigation", async () => {
@@ -55,6 +58,24 @@ test("opens the portrait popup before PDF metadata resolves, then stores the pro
   assert.deepEqual(fixture.calls.map(([name]) => name), ["popup", "store", "navigate"]);
   assert.ok(fixture.calls[1][1]["pdf-viewer-chatgpt-summary:request"].prompt.endsWith("https://example.com/original.pdf"));
   assert.equal(fixture.button.disabled, false);
+});
+
+test("clears the native tooltip during popup launch and restores it only on a new hover", async () => {
+  const fixture = setup();
+  const pendingClick = fixture.click();
+  assert.equal(fixture.button.title, "");
+  assert.equal(fixture.button.attributes["aria-label"], "Summarize with ChatGPT");
+  assert.equal(fixture.button.blurred, true);
+
+  fixture.resolveUrl("https://example.com/original.pdf");
+  await pendingClick;
+  assert.equal(fixture.button.title, "");
+  fixture.dispatch("pointerenter"); // Returning to the PDF without leaving the button.
+  assert.equal(fixture.button.title, "");
+  fixture.dispatch("pointerleave");
+  assert.equal(fixture.button.title, "");
+  fixture.dispatch("pointerenter");
+  assert.equal(fixture.button.title, "Summarize with ChatGPT");
 });
 
 test("closes the pending popup when no PDF reference exists", async () => {
