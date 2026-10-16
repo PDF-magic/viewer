@@ -687,6 +687,14 @@ input {
   top: calc(100% + 7px);
   right: 0;
   width: 176px;
+  max-width: calc(100vw - 16px);
+  /* Keep settings below the fold (including minimap and footnote options) reachable. */
+  max-height: calc(100vh - 64px);
+  max-height: calc(100dvh - 64px);
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block: 8px;
   padding: 6px;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -1136,6 +1144,14 @@ input {
 .toast.visible {
   transform: translate(-50%, 0);
   opacity: 1;
+}
+
+/* Split panes can place a floating host control over the lower-right corner.
+   Leave the footnote scrubber's interactive track clear of that corner. */
+@media (max-width: 1200px) {
+  .document-scrubber {
+    padding-right: calc(12px + var(--split-view-bottom-clearance));
+  }
 }
 
 @media (max-width: 720px) {
