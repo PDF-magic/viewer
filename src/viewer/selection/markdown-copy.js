@@ -194,7 +194,7 @@ export function markdownFromRuns(runs, { markdown = true, reflow = true } = {}) 
         parts.pop();
       }
       if (startsParagraph(run, previous, reflow)) parts.push('\n\n');
-      parts.push('[' + run.footnoteReference + ']');
+      parts.push(String(run.footnoteReference).replace(/\d/g, digit => '⁰¹²³⁴⁵⁶⁷⁸⁹'[Number(digit)]));
       previous = run;
       continue;
     }

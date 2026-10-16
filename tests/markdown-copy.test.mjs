@@ -202,9 +202,9 @@ async function copyPetitionSelection(pageNumber, start, end, options = {}) {
 
 test("separates scanned SEC petition footnote 11 from body text on the same page", async () => {
   const output = await copyPetitionSelection(5, 35, 65);
-  assert.match(output, /transfer agents\.\[11\]/);
+  assert.match(output, /transfer agents\.¹¹/);
   assert.match(output, /The relationship between a transfer agent and DTC is commercial in nature/);
-  assert.match(output, /transfer agents\.\[11\]\n\n\[11\]:/);
+  assert.match(output, /transfer agents\.¹¹\n\n\[11\]:/);
   assert.doesNotMatch(output, /develop policies, oversee/);
   assert.match(output, /organization it also may adopt/);
   assert.match(output, /take disciplinary action against/);
@@ -222,7 +222,7 @@ test("preserves page boundaries rather than guessing continuity from nearby foot
 
 test("includes unselected note 12 immediately after its citing paragraph", async () => {
   const output = await copyPetitionSelection(6, 20, 42);
-  assert.match(output, /Direct Registration System\.\[12\] DRS permits/);
+  assert.match(output, /Direct Registration System\.¹² DRS permits/);
   assert.match(output, /transfer agent\.\s*\n\n\[12\]: See, e\.g\., NASDAQ Rule 4350\(l\); Section 501\.00 of the NYSE Listed Company Manual\.\n\nTransfer agents/);
   assert.equal((output.match(/\[12\]:/g) || []).length, 1);
   assert.doesNotMatch(output, /\[\^12\]/);
@@ -230,12 +230,12 @@ test("includes unselected note 12 immediately after its citing paragraph", async
 
 test("includes a note for a partial paragraph selection and avoids duplicate selected definitions", async () => {
   const partial = await copyPetitionSelection(6, 26, 31);
-  assert.match(partial, /System\.\[12\]/);
+  assert.match(partial, /System\.¹²/);
   assert.match(partial, /\n\n\[12\]: See, e\.g\., NASDAQ/);
   const selectedNote = await copyPetitionSelection(6, 20, 54);
   assert.equal((selectedNote.match(/\[12\]:/g) || []).length, 1);
   const withoutReference = await copyPetitionSelection(6, 34, 42);
-  assert.doesNotMatch(withoutReference, /\[12\]/);
+  assert.doesNotMatch(withoutReference, /¹²|\[12\]/);
   const plain = await copyPetitionSelection(6, 20, 32, { markdown: false });
   assert.equal(plain, null);
 });
@@ -250,4 +250,12 @@ test("preserves italics and bold in automatically included footnotes", async () 
   assert.match(output, /\[12\]: _See, e\.g\.,_ \*\*NASDAQ Rule 4350\(l\); Section 501\.00 of the NYSE Listed Company Manual\.\*\*$/);
   const selectedNote = await copyPetitionSelection(6, 51, 54, { styleNote });
   assert.equal(selectedNote, output.slice(output.indexOf("[12]:")));
+});
+
+
+test("copies inline footnote numbers as Unicode superscripts without HTML", () => {
+  assert.equal(markdownFromRuns([
+    { text: "Text. " }, { text: "12", footnoteReference: 12 },
+    { text: " More." }, { text: "309", footnoteReference: 309 },
+  ]), "Text.¹² More.³⁰⁹");
 });
