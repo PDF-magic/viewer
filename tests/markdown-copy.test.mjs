@@ -251,7 +251,7 @@ test("preserves italics and bold in automatically included footnotes", async () 
   const selectedNote = await copyPetitionSelection(6, 51, 53, { styleNote });
   assert.equal(selectedNote,
     "_See, e.g.,_ **NASDAQ Rule 4350(l); Section 501.00 of the NYSE Listed Company Manual.**");
-  assert.doesNotMatch(selectedNote, /\\[12\\]:/);
+  assert.doesNotMatch(selectedNote, /\[12\]:/);
 });
 
 
