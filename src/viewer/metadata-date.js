@@ -55,6 +55,11 @@ function parsePdfDate(value) {
 }
 
 function parseMetadataDate(value) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const date = new Date(`${value}T00:00:00Z`);
+    return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value ? date : null;
+  }
+
   if (value.startsWith("D:")) {
     return parsePdfDate(value);
   }
@@ -77,8 +82,10 @@ export function formatMetadataDate(value) {
     return value;
   }
 
+  const calendarDate = `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value.trim())) return calendarDate;
   const minutes = String(date.getUTCMinutes()).padStart(2, "0");
-  return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()} at ${date.getUTCHours()}:${minutes} UTC`;
+  return `${calendarDate} at ${date.getUTCHours()}:${minutes} UTC`;
 }
 
 export function formatRelativeMetadataDate(value, now = Date.now()) {

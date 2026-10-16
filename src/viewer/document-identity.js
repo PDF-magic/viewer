@@ -57,7 +57,7 @@ function formatVisibleMetadataDates() {
 
   for (const row of metadataList.querySelectorAll(".section-metadata-row")) {
     const label = row.querySelector("dt")?.textContent?.trim();
-    if (label !== "Created" && label !== "Modified") {
+    if (label !== "Date" && label !== "Created" && label !== "Modified") {
       continue;
     }
 
