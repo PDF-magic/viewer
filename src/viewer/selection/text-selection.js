@@ -1,4 +1,5 @@
 import { selectionLines } from "./selection-lines.js";
+import { trailingPunctuationOffsets, shouldIncludeTrailingPunctuation } from "./terminal-punctuation.js";
 import { regionPaths } from "../highlight-regions.js";
 
 const textLayers = new Map();
@@ -129,6 +130,43 @@ document.addEventListener("pointerdown", (event) => {
   selectionDragLayer = event.target instanceof Element ? event.target.closest(".text-layer") : null;
 });
 
+// Let a forward drag capture final punctuation as soon as the pointer reaches
+// its glyph, rather than requiring the user to overshoot the end of the line.
+// Retreating just before the glyph leaves native selection in control.
+function settleTrailingPunctuation(selection, hit, x, y) {
+  if (!(hit instanceof Element)) return false;
+  const span = hit.closest(".text-layer span");
+  if (!span || !selectionDragLayer.contains(span)) return false;
+  const range = selection.getRangeAt(0);
+  const forward = range.endContainer === selection.focusNode &&
+    range.endOffset === selection.focusOffset;
+  if (!forward) return false;
+
+  const walker = document.createTreeWalker(span, NodeFilter.SHOW_TEXT);
+  let textNode = null;
+  while (walker.nextNode()) {
+    if (walker.currentNode.textContent.trim()) textNode = walker.currentNode;
+  }
+  if (!textNode || selection.focusNode !== textNode) return false;
+  const offsets = trailingPunctuationOffsets(textNode.textContent);
+  if (!offsets) return false;
+
+  const glyphRange = document.createRange();
+  glyphRange.setStart(textNode, offsets.start);
+  glyphRange.setEnd(textNode, offsets.end);
+  const rect = [...glyphRange.getClientRects()].find(box => box.width > 0 && box.height > 0);
+  if (!shouldIncludeTrailingPunctuation({
+    x, y, rect, offsets, focusOffset: selection.focusOffset, forward,
+  })) return false;
+  try {
+    selection.extend(textNode, offsets.end);
+    return true;
+  } catch {
+    // The text layer may have been replaced during a PDF rerender.
+    return false;
+  }
+}
+
 // Chromium can resolve a drag into trailing whitespace to a later paragraph
 // in an absolutely positioned PDF text layer. Use the nearby line's own edge.
 function settleLineEndpoint() {
@@ -136,9 +174,10 @@ function settleLineEndpoint() {
   if (!selectionDragLayer?.isConnected || !endpointPosition) return;
   const { x, y } = endpointPosition;
   const hit = document.elementFromPoint(x, y);
-  if (hit !== selectionDragLayer && !hit?.classList.contains("text-selection-end")) return;
   const selection = document.getSelection();
   if (!selection || selection.isCollapsed || !selectionDragLayer.contains(selection.anchorNode)) return;
+  if (settleTrailingPunctuation(selection, hit, x, y)) return;
+  if (hit !== selectionDragLayer && !hit?.classList.contains("text-selection-end")) return;
   const walker = document.createTreeWalker(selectionDragLayer, NodeFilter.SHOW_TEXT);
   let closest = null;
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
