@@ -187,14 +187,25 @@ function createImageOverlayCanvas(baseCanvas, viewport, imageCoordinates) {
     const bottomLeftY = clampUnit(imageCoordinates[offset + 3]) * overlay.height;
     const topRightX = clampUnit(imageCoordinates[offset + 4]) * overlay.width;
     const topRightY = clampUnit(imageCoordinates[offset + 5]) * overlay.height;
-    const bottomRightX = bottomLeftX + topRightX - topLeftX;
-    const bottomRightY = bottomLeftY + topRightY - topLeftY;
+    const imageWidth = Math.hypot(topRightX - topLeftX, topRightY - topLeftY);
+    const imageHeight = Math.hypot(bottomLeftX - topLeftX, bottomLeftY - topLeftY);
+    if (!imageWidth || !imageHeight) {
+      continue;
+    }
 
-    context.moveTo(topLeftX, topLeftY);
-    context.lineTo(bottomLeftX, bottomLeftY);
-    context.lineTo(bottomRightX, bottomRightY);
-    context.lineTo(topRightX, topRightY);
-    context.closePath();
+    // Round each image independently, keeping a subtle radius at the rendered size.
+    const radius = Math.min(8 * overlay.width / viewport.width, imageWidth / 2, imageHeight / 2);
+    context.save();
+    context.transform(
+      (topRightX - topLeftX) / imageWidth,
+      (topRightY - topLeftY) / imageWidth,
+      (bottomLeftX - topLeftX) / imageHeight,
+      (bottomLeftY - topLeftY) / imageHeight,
+      topLeftX,
+      topLeftY,
+    );
+    context.roundRect(0, 0, imageWidth, imageHeight, radius);
+    context.restore();
   }
   context.clip();
   context.drawImage(baseCanvas, 0, 0);
