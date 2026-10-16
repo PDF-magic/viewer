@@ -2,7 +2,7 @@ import { AnnotationLayer, createValidAbsoluteUrl, getDocument, GlobalWorkerOptio
 import { EventBus, PDFLinkService } from "../../node_modules/pdfjs-dist/web/pdf_viewer.mjs";
 import { abandonPdfDocumentSession, publishPdfDocument } from "./pdf-document-session.js";
 import { referenceUrlFromPdfMetadata, resolveDocumentReferenceUrl } from "./document-reference-url.js";
-import { metadataValue, pdfMetadataTitle } from "./pdf-metadata-title.js";
+import { metadataField, pdfMetadataTitle } from "./pdf-metadata-title.js";
 import { resolvePdfSource } from "./pdf-source.js";
 import { readResumedPage, saveResumedPage } from "./page-resume.js";
 import { findSearchMatches } from "./search/search-matches.js";
@@ -75,9 +75,11 @@ const LIGHT_MODE_SHARE_ICON = extensionAssetUrl(
 const SCANNED_PAGE_IMAGE_AREA_THRESHOLD = 0.8;
 const RENDER_WINDOW_RADIUS = 3;
 const PDF_METADATA_FIELDS = [
+  ["Title", "Title", "dc:title"],
   ["Author", "Author", "dc:creator"],
+  // XMP dc:subject contains keywords, not the PDF Info Subject.
   ["Subject", "Subject", "dc:description"],
-  ["Keywords", "Keywords", "pdf:keywords"],
+  ["Keywords", "Keywords", ["pdf:keywords", "dc:subject"]],
   ["Date", "DocumentDate", "dc:date"],
   ["Creator", "Creator", "xmp:creatortool"],
   ["Producer", "Producer", "pdf:producer"],
@@ -558,14 +560,17 @@ function createOutlineList(items, parentReference = "") {
 
 function renderPdfMetadata(entries) {
   const fragment = document.createDocumentFragment();
-
-  for (const { label, value } of entries) {
+  for (const { label, value, source, conflict, xmpValue, infoValue } of entries) {
     const row = document.createElement("div");
     const term = document.createElement("dt");
     const description = document.createElement("dd");
     row.className = "section-metadata-row";
     term.textContent = label;
-    if (label === "href" && /^(?:https?:|file:)/i.test(value)) {
+    if (source) {
+      term.dataset.source = source;
+      term.title = `Value from ${source}`;
+    }
+    if (label.toLowerCase() === "href" && /^(?:https?:|file:)/i.test(value)) {
       const link = document.createElement("a");
       link.href = value;
       link.textContent = value;
@@ -576,9 +581,26 @@ function renderPdfMetadata(entries) {
       description.textContent = value;
     }
     row.append(term, description);
+    if (conflict) {
+      const details = document.createElement("details");
+      const summary = document.createElement("summary");
+      const comparison = document.createElement("dl");
+      details.className = "section-metadata-conflict";
+      summary.textContent = "XMP and PDF Info differ";
+      for (const [origin, originValue] of [["XMP", xmpValue], ["PDF Info", infoValue]]) {
+        const pair = document.createElement("div");
+        const name = document.createElement("dt");
+        const content = document.createElement("dd");
+        name.textContent = origin;
+        content.textContent = originValue;
+        pair.append(name, content);
+        comparison.append(pair);
+      }
+      details.append(summary, comparison);
+      row.append(details);
+    }
     fragment.append(row);
   }
-
   sectionMetadataList.replaceChildren(fragment);
   sectionMetadata.hidden = entries.length === 0;
 }
@@ -589,9 +611,8 @@ async function getPdfMetadataDetails() {
     const title = pdfMetadataTitle(info, metadata);
     const entries = PDF_METADATA_FIELDS.map(([label, infoKey, xmpKey]) => ({
       label,
-      value: metadataValue(info, metadata, infoKey, xmpKey),
+      ...metadataField(info, metadata, infoKey, xmpKey),
     })).filter(({ value }) => Boolean(value));
-
     const href = referenceUrlFromPdfMetadata(info, metadata);
     if (href) entries.push({ label: "href", value: href });
     return { title, entries };
