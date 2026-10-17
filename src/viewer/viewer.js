@@ -3,6 +3,7 @@ import { EventBus, PDFLinkService } from "../../node_modules/pdfjs-dist/web/pdf_
 import { abandonPdfDocumentSession, publishPdfDocument } from "./pdf-document-session.js";
 import { referenceUrlFromPdfMetadata, resolveDocumentReferenceUrl } from "./document-reference-url.js";
 import { metadataField, pdfMetadataTitle } from "./pdf-metadata-title.js";
+import { doiFromPdfMetadata, doiResolverUrl } from "./metadata-doi.js";
 import { resolvePdfSource } from "./pdf-source.js";
 import { readResumedPage, saveResumedPage } from "./page-resume.js";
 import { findSearchMatches } from "./search/search-matches.js";
@@ -577,9 +578,11 @@ function renderPdfMetadata(entries) {
     const description = document.createElement("dd");
     row.className = "section-metadata-row";
     term.textContent = label;
-    if (label.toLowerCase() === "href" && /^(?:https?:|file:)/i.test(value)) {
+    const linkUrl = label === "DOI" ? doiResolverUrl(value)
+      : label.toLowerCase() === "href" && /^(?:https?:|file:)/i.test(value) ? value : null;
+    if (linkUrl) {
       const link = document.createElement("a");
-      link.href = value;
+      link.href = linkUrl;
       link.textContent = value;
       link.target = "_blank";
       link.rel = "noopener noreferrer";
@@ -604,6 +607,8 @@ async function getPdfMetadataDetails() {
     })).filter(({ value }) => Boolean(value));
     const href = referenceUrlFromPdfMetadata(info, metadata);
     if (href) entries.push({ label: "href", value: href });
+    const doi = doiFromPdfMetadata(info, metadata);
+    if (doi) entries.push({ label: "DOI", value: doi });
     return { title, entries };
   } catch {
     return { title: "", entries: [] };
