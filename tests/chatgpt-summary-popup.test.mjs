@@ -4,7 +4,7 @@ import test from "node:test";
 import vm from "node:vm";
 
 const source = (await readFile(new URL("../src/viewer/sharing/summarize-with-chatgpt.js", import.meta.url), "utf8"))
-  .replace(/^import .*;\n/, "");
+  .replace(/^import .*;\n/gm, "");
 
 function setup({ width = 1080, height = 1920, popupFails = false } = {}) {
   let resolveUrl;
@@ -25,6 +25,10 @@ function setup({ width = 1080, height = 1920, popupFails = false } = {}) {
     window: { screen: { availWidth: width, availHeight: height } },
     resolveDocumentReferenceUrl: () => new Promise((resolve) => { resolveUrl = resolve; }),
     chrome: {
+      runtime: { connect(options) {
+        calls.push(["connect", options]);
+        return { onMessage: { addListener() {} }, onDisconnect: { addListener() {} }, disconnect() {} };
+      } },
       windows: { async create(options) {
         calls.push(["popup", options]);
         if (popupFails) throw new Error("Popup unavailable");
@@ -55,8 +59,8 @@ test("opens the portrait popup before PDF metadata resolves, then stores the pro
   assert.ok(height / width <= 1.2 && height < 1000);
   fixture.resolveUrl("https://example.com/original.pdf");
   await pendingClick;
-  assert.deepEqual(fixture.calls.map(([name]) => name), ["popup", "store", "navigate"]);
-  assert.ok(fixture.calls[1][1]["pdf-viewer-chatgpt-summary:request"].prompt.endsWith("https://example.com/original.pdf"));
+  assert.deepEqual(fixture.calls.map(([name]) => name), ["popup", "store", "connect", "navigate"]);
+  assert.ok(fixture.calls[1][1]["pdf-viewer-chatgpt-summary:request"].prompt.includes("Source URL: https://example.com/original.pdf"));
   assert.equal(fixture.button.disabled, false);
 });
 
@@ -92,7 +96,7 @@ test("falls back to a tab when popup creation fails", async () => {
   const pendingClick = fixture.click();
   fixture.resolveUrl("https://example.com/original.pdf");
   await pendingClick;
-  assert.deepEqual(fixture.calls.map(([name]) => name), ["popup", "tab", "store", "navigate"]);
+  assert.deepEqual(fixture.calls.map(([name]) => name), ["popup", "tab", "store", "connect", "navigate"]);
 });
 
 test("keeps the popup within a small screen", async () => {
@@ -102,4 +106,17 @@ test("keeps the popup within a small screen", async () => {
   assert.ok(width <= 360 && height <= 500);
   fixture.resolveUrl(null);
   await pendingClick;
+});
+
+
+test("local file URLs are not substituted for PDF attachments", async () => {
+  const fixture = setup();
+  const click = fixture.click();
+  fixture.resolveUrl("file:///Users/example/Documents/Short%20Term%20Securities%20-%201918.pdf");
+  await click;
+  const data = fixture.calls.find(([action]) => action === "store")[1]["pdf-viewer-chatgpt-summary:request"];
+  assert.equal(data.attachmentRequired, true);
+  assert.ok(data.prompt.includes("Attached local PDF: Short Term Securities - 1918.pdf"));
+  assert.ok(!data.prompt.includes("file:///Users/"));
+  assert.equal(fixture.calls.find(([action]) => action === "connect")[1].name, "pdf-summary-source:request");
 });
