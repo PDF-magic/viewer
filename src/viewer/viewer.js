@@ -571,16 +571,12 @@ function createOutlineList(items, parentReference = "") {
 
 function renderPdfMetadata(entries) {
   const fragment = document.createDocumentFragment();
-  for (const { label, value, source, conflict, xmpValue, infoValue } of entries) {
+  for (const { label, value } of entries) {
     const row = document.createElement("div");
     const term = document.createElement("dt");
     const description = document.createElement("dd");
     row.className = "section-metadata-row";
     term.textContent = label;
-    if (source) {
-      term.dataset.source = source;
-      term.title = `Value from ${source}`;
-    }
     if (label.toLowerCase() === "href" && /^(?:https?:|file:)/i.test(value)) {
       const link = document.createElement("a");
       link.href = value;
@@ -592,24 +588,6 @@ function renderPdfMetadata(entries) {
       description.textContent = value;
     }
     row.append(term, description);
-    if (conflict) {
-      const details = document.createElement("details");
-      const summary = document.createElement("summary");
-      const comparison = document.createElement("dl");
-      details.className = "section-metadata-conflict";
-      summary.textContent = "XMP and PDF Info differ";
-      for (const [origin, originValue] of [["XMP", xmpValue], ["PDF Info", infoValue]]) {
-        const pair = document.createElement("div");
-        const name = document.createElement("dt");
-        const content = document.createElement("dd");
-        name.textContent = origin;
-        content.textContent = originValue;
-        pair.append(name, content);
-        comparison.append(pair);
-      }
-      details.append(summary, comparison);
-      row.append(details);
-    }
     fragment.append(row);
   }
   sectionMetadataList.replaceChildren(fragment);

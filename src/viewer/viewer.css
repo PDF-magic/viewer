@@ -443,42 +443,36 @@ input {
   overflow-wrap: anywhere;
 }
 
-.section-metadata-row > dt[data-source]::after {
-  display: block;
-  margin-top: 2px;
-  color: #888890;
-  content: attr(data-source);
-  font-size: 10px;
-  font-weight: 400;
+.section-enhance-actions {
+  border-top: 1px solid #2d2d31;
+  padding: 8px;
 }
 
-.section-metadata-conflict {
-  grid-column: 1 / -1;
-  padding: 5px 8px;
-  border: 1px solid #36363a;
-  border-radius: 6px;
-  color: #bdbdc4;
-}
-
-.section-metadata-conflict summary {
+.section-enhance-button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 11px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #e7e7ea;
   cursor: pointer;
-  font-size: 11px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
 }
 
-.section-metadata-conflict dl {
-  margin: 8px 0 0;
+.section-enhance-button:hover:not(:disabled),
+.section-enhance-button:focus-visible {
+  outline: 0;
+  background: #29292d;
 }
 
-.section-metadata-conflict dl > div {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  gap: 8px;
-  padding: 3px 0;
-}
-
-.section-metadata-conflict dt {
-  color: #9d9da3;
-  font-weight: 600;
+.section-enhance-button:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 .page-control {

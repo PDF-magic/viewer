@@ -9,14 +9,15 @@ const markup = readFileSync(new URL("../src/viewer.html", import.meta.url), "utf
 
 async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new Uint8Array([37, 80, 68, 70, 45]), sourceUrl = "https://example.com/source.pdf", documentOverrides = {}, setupOptions = {}) {
   const elements = new Map();
-  for (const id of ["enhance-nav", "enhance-pdf", "install-enhancer", "section-nav", "page-number", "toast", "enhance-progress", "enhance-progress-bar", "enhance-progress-label", "enhance-progress-percentage"]) {
+  const clickHandlers = new Map();
+  for (const id of ["enhance-nav", "enhance-pdf", "section-enhance-pdf", "section-popover", "section-toggle", "install-enhancer", "section-nav", "page-number", "toast", "enhance-progress", "enhance-progress-bar", "enhance-progress-label", "enhance-progress-percentage"]) {
     elements.set(`#${id}`, {
       hidden: id !== "enhance-pdf",
       title: "Enhance PDF",
       value: "1",
       setAttribute() {},
       removeAttribute() {},
-      addEventListener() {},
+      addEventListener(type, handler) { if (type === "click") clickHandlers.set(id, handler); },
       classList: { add() {}, remove() {} },
       style: { setProperty() {} },
     });
@@ -88,8 +89,24 @@ async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new U
   });
   vm.runInContext(source, context);
   await vm.runInContext("enhanceCurrentPdf()", context);
-  return { elements, destinations, messages, progressSnapshots, setupPrompts, clipboardWrites };
+  return { elements, clickHandlers, destinations, messages, progressSnapshots, setupPrompts, clipboardWrites };
 }
+
+test("Enhance appears at the bottom of the sections menu and uses the same action", async () => {
+  const sectionMarkup = markup.slice(markup.indexOf('id="section-popover"'), markup.indexOf('id="previous-page"'));
+  assert.ok(sectionMarkup.indexOf('id="section-enhance-pdf"') > sectionMarkup.indexOf('id="section-metadata"'));
+
+  const { elements, clickHandlers, destinations } = await enhancerFixture(
+    async () => ({ ok: true, outputUrl: "file:///tmp/enhanced.pdf" }),
+  );
+  elements.get("#section-popover").hidden = false;
+  clickHandlers.get("section-enhance-pdf")();
+  assert.equal(elements.get("#section-popover").hidden, true);
+  assert.equal(elements.get("#section-enhance-pdf").disabled, true);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(destinations.length, 2);
+  assert.equal(elements.get("#section-enhance-pdf").disabled, false);
+});
 
 test("missing native host asks for consent and copies a self-contained setup command", async () => {
   const { elements, setupPrompts, clipboardWrites } = await enhancerFixture(async () => {
