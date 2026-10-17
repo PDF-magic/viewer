@@ -1,4 +1,5 @@
 import { selectionLines } from "./selection-lines.js";
+import { recoverSelectionGaps } from "./selection-gaps.js";
 import { trailingPunctuationOffsets, shouldIncludeTrailingPunctuation } from "./terminal-punctuation.js";
 import { regionPaths } from "../highlight-regions.js";
 
@@ -248,9 +249,11 @@ function paintSelection() {
     const bounds = layer.getBoundingClientRect();
     if (!bounds.width || !bounds.height || !layer.clientWidth || !layer.clientHeight) continue;
     const rectangles = [];
+    const unselectedNodes = [];
     const walker = document.createTreeWalker(layer, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
       const node = walker.currentNode;
+      let hasSelectedRect = false;
       for (let index = 0; index < selection.rangeCount; index++) {
         const selected = selection.getRangeAt(index);
         // Rendering can replace range endpoints while pages enter/leave the
@@ -266,15 +269,46 @@ function paintSelection() {
             range.setEnd(selected.endContainer, selected.endOffset);
           }
           if (range.collapsed) continue;
-          rectangles.push(...Array.from(range.getClientRects(), rect => ({
+          const rects = Array.from(range.getClientRects(), rect => ({
             left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom,
-          })));
+          })).filter(rect => rect.right > rect.left && rect.bottom > rect.top);
+          if (rects.length) {
+            hasSelectedRect = true;
+            rectangles.push(...rects);
+          }
         } catch {
           continue;
         }
       }
+      if (!hasSelectedRect && node.textContent.trim()) unselectedNodes.push(node);
     }
-    const lines = selectionLines(rectangles, 2);
+    // Native selection ranges follow PDF content-stream order, which can
+    // omit words or entire lines from the visual passage in OCR documents.
+    // Recover only nearby text-backed gaps; do not widen selection endpoints.
+    const otherTextRects = [];
+    if (rectangles.length > 1) {
+      const firstTop = Math.min(...rectangles.map(rect => rect.top));
+      const lastBottom = Math.max(...rectangles.map(rect => rect.bottom));
+      for (const node of unselectedNodes) {
+        const span = node.parentElement?.closest("span");
+        if (span) {
+          const box = span.getBoundingClientRect();
+          if (box.bottom < firstTop || box.top > lastBottom) continue;
+        }
+        try {
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          for (const rect of range.getClientRects()) {
+            if (rect.bottom > firstTop && rect.top < lastBottom && rect.width > 0 && rect.height > 0) {
+              otherTextRects.push({ left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom });
+            }
+          }
+        } catch {
+          // Rendering may replace OCR text spans while the drag is active.
+        }
+      }
+    }
+    const lines = selectionLines(recoverSelectionGaps(rectangles, otherTextRects), 2);
     if (!lines.length) continue;
     const page = layer.parentElement;
     const source = page.querySelector("canvas:not(.page-image-overlay)");
