@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 
 import { metadataField, metadataValue, pdfMetadataTitle } from "../src/viewer/pdf-metadata-title.js";
 
@@ -88,4 +89,14 @@ test("document identity first uses the filename, then the embedded PDF title eve
       else globalThis[key] = value;
     }
   }
+});
+
+test("section metadata does not expose provenance or conflicting-source comparisons", () => {
+  const source = readFileSync(new URL("../src/viewer/viewer.js", import.meta.url), "utf8");
+  const renderer = source.slice(
+    source.indexOf("function renderPdfMetadata(entries) {"),
+    source.indexOf("async function getPdfMetadataDetails()"),
+  );
+  assert.match(renderer, /description\.textContent = value/);
+  assert.doesNotMatch(renderer, /dataset\.source|Value from|metadata-conflict|XMP and PDF Info differ/);
 });

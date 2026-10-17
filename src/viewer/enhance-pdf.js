@@ -6,6 +6,10 @@ import { downloadSetupZip } from "./enhancer-setup-download.js";
 const NATIVE_HOST = "org.pdfmagic.enhancer";
 const enhanceNav = document.querySelector("#enhance-nav");
 const enhanceButton = document.querySelector("#enhance-pdf");
+const sectionEnhanceButton = document.querySelector("#section-enhance-pdf");
+const sectionPopover = document.querySelector("#section-popover");
+const sectionToggle = document.querySelector("#section-toggle");
+const enhanceButtons = [enhanceButton, sectionEnhanceButton];
 const setupDialog = document.querySelector("#enhancer-setup-dialog");
 const setupForm = document.querySelector("#enhancer-setup-form");
 const setupRepository = document.querySelector("#enhancer-repository-url");
@@ -172,14 +176,17 @@ function showToast(message) {
   toastTimer = setTimeout(() => toast.classList.remove("visible"), 2600);
 }
 
+function setEnhanceTitle(title) {
+  for (const button of enhanceButtons) {
+    button.title = title;
+    button.setAttribute("aria-label", title);
+  }
+}
+
 function showTemporaryTitle(title) {
   clearTimeout(titleResetTimer);
-  enhanceButton.title = title;
-  enhanceButton.setAttribute("aria-label", title);
-  titleResetTimer = setTimeout(() => {
-    enhanceButton.title = defaultTitle;
-    enhanceButton.setAttribute("aria-label", defaultTitle);
-  }, 2200);
+  setEnhanceTitle(title);
+  titleResetTimer = setTimeout(() => setEnhanceTitle(defaultTitle), 2200);
 }
 
 async function replaceCurrentTab(outputUrl) {
@@ -202,9 +209,8 @@ async function replaceCurrentTab(outputUrl) {
 }
 
 async function enhanceCurrentPdf() {
-  enhanceButton.disabled = true;
-  enhanceButton.title = "Enhancing PDF…";
-  enhanceButton.setAttribute("aria-label", enhanceButton.title);
+  for (const button of enhanceButtons) button.disabled = true;
+  setEnhanceTitle("Enhancing PDF…");
   showToast("Enhancing PDF…");
   updateEnhancementProgress("preparing");
 
@@ -238,10 +244,9 @@ async function enhanceCurrentPdf() {
   } finally {
     progressContainer.hidden = true;
     document.documentElement.classList.remove("enhancement-active");
-    enhanceButton.disabled = false;
+    for (const button of enhanceButtons) button.disabled = false;
     if (enhanceButton.title === "Enhancing PDF…") {
-      enhanceButton.title = defaultTitle;
-      enhanceButton.setAttribute("aria-label", defaultTitle);
+      setEnhanceTitle(defaultTitle);
     }
   }
 }
@@ -253,3 +258,8 @@ new MutationObserver(syncEnhancerSlot).observe(sectionNav, {
 syncEnhancerSlot();
 
 enhanceButton.addEventListener("click", () => void enhanceCurrentPdf());
+sectionEnhanceButton.addEventListener("click", () => {
+  sectionPopover.hidden = true;
+  sectionToggle.setAttribute("aria-expanded", "false");
+  void enhanceCurrentPdf();
+});
