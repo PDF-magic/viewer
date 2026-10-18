@@ -84,7 +84,7 @@ export function markPdfTextStyles(page, textContent, textDivs) {
         const superscriptRise = item.transform[5] - previousBody.transform[5];
         const precedingRight = previousBody.transform[4] + (previousBody.width || 0);
         if (item.height > 0 && item.height < typicalHeight * 0.83 &&
-            /^[\dlI|]{1,3}$/.test(item.str.trim()) &&
+            /^[\dlI|sS]{1,3}$/.test(item.str.trim()) &&
             superscriptRise > typicalHeight * 0.2 && superscriptRise < typicalHeight &&
             Math.abs(item.transform[4] - precedingRight) < typicalHeight) {
           span.dataset.markdownSuperscript = 'true';
@@ -309,6 +309,7 @@ export function selectionToMarkdown(root, selection, doc = document,
 
   const selected = [];
   const noteRuns = new Map();
+  let precedingSelection = null;
   for (const span of root.querySelectorAll('.text-layer [data-markdown-item]')) {
     const page = span.closest('.page');
     if (!page) continue;
@@ -336,6 +337,16 @@ export function selectionToMarkdown(root, selection, doc = document,
     }
     const text = selectedSpanText(span, selection, doc);
     if (text !== null) selected.push({ ...run, text });
+    // A selection ending at the sentence's punctuation often stops just
+    // before its raised citation. Include that adjacent marker only when
+    // the selection reaches the end of the preceding text span.
+    else if (markdown && run.superscript && precedingSelection?.complete &&
+        precedingSelection.page === page && !footnoteAtPosition(run, footnotes)) {
+      selected.push({ ...run, text: span.textContent || '' });
+    }
+    precedingSelection = text !== null ? {
+      page, complete: !!text.trim() && (span.textContent || '').endsWith(text),
+    } : null;
   }
   if (!selected.length) return null;
   // Never reorder a selection containing untagged text: the tree cannot tell
@@ -358,7 +369,7 @@ export function selectionToMarkdown(root, selection, doc = document,
   const runs = body.map(run => {
     const reference = markdown && !noteOnlySelection && run.superscript ? footnotes.find(note =>
       note.pageNumber === run.pageNumber &&
-      String(note.number) === run.text.trim().replace(/[lI|]/g, '1')) : null;
+      String(note.number) === run.text.trim().replace(/[lI|]/g, '1').replace(/[sS]/g, '5')) : null;
     const result = {
       ...run,
       newPage: previous !== null && run.page !== previous.page,
