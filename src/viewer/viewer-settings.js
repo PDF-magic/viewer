@@ -5,6 +5,7 @@ const CLICKABLE_REFERENCES_STORAGE_KEY = "pdf-viewer-clickable-references";
 const PRINTED_PAGE_JUMP_STORAGE_KEY = "pdf-viewer-printed-page-jump";
 const MARKDOWN_COPY_STORAGE_KEY = "pdf-viewer-copy-as-markdown";
 const TAGGED_PARAGRAPH_COPY_STORAGE_KEY = "pdf-viewer-copy-tagged-paragraphs";
+const AUTO_COPY_SELECTION_STORAGE_KEY = "pdf-viewer-copy-on-select";
 const STUDIO_GREEN = "#43af49";
 
 const toolsMenu = document.querySelector("#tools-menu");
@@ -141,10 +142,21 @@ function installTaggedParagraphCopySetting() {
   });
 }
 
+function installAutoCopySelectionSetting() {
+  const toggle = document.querySelector("#copy-on-select");
+  if (!toggle) return;
+  styleSettingCheckbox(toggle);
+  toggle.checked = localStorage.getItem(AUTO_COPY_SELECTION_STORAGE_KEY) === "true";
+  toggle.addEventListener("change", () => {
+    localStorage.setItem(AUTO_COPY_SELECTION_STORAGE_KEY, String(toggle.checked));
+  });
+}
+
 installClickableReferencesSetting();
 installPrintedPageJumpSetting();
 installMarkdownCopySetting();
 installTaggedParagraphCopySetting();
+installAutoCopySelectionSetting();
 syncThemePreference();
 void addSecCommentSetting();
 
