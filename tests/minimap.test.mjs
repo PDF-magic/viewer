@@ -576,14 +576,14 @@ test('local thumbnails discard pending renders after navigation or rotation', as
   assert.equal(vm.runInContext('localThumbnails.size', f.context), 0);
 });
 
-test('persistent thumbnails and their work follow the global minimap preference', () => {
+test('persistent thumbnail caching still respects navigation visibility and page tabs', () => {
   assert.match(source, /restoreCachedThumbnailStrip\(generation\)/);
   assert.match(source, /void cacheThumbnailStrip\(strip\)/);
   assert.match(source, /composeThumbnailStrip\(thumbnails\)/);
   assert.match(source, /minimapPages\.append\(strip\)/);
   assert.match(source, /"image\/png"/);
   assert.match(source, /if \(thumbnailPreparationStarted \|\| !minimapEnabled\(\) \|\| pageTabsEnabled\(\) \|\| window\.innerWidth <= 700\)/);
-  assert.match(source, /else \{\s*stopThumbnailPreparation\(\);/);
+  assert.doesNotMatch(source, /minimapToggle\.addEventListener/);
   assert.match(source, /thumbnailLoadGeneration \+= 1;[\s\S]*?thumbnailDocument = undefined/);
   assert.match(source, /scheduleThumbnailPreparation\(\);\s*$/);
   assert.doesNotMatch(source, /void loadThumbnailDocument\(\)\.catch/);
