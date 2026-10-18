@@ -52,12 +52,24 @@ test("inline font fragments do not split a single-column footnote highlight", ()
   assert.doesNotMatch(note.text, /another note/);
 });
 
-test("footnote navigation is exposed in the tools menu", () => {
-  assert.match(markup, /id="footnote-jump"/);
-  assert.match(markup, /id="footnote-number"/);
+
+test("standalone footnote form is absent but inline navigation remains available", () => {
+  assert.doesNotMatch(markup, /id="footnote-jump"/);
+  assert.doesNotMatch(markup, /id="footnote-number"/);
   assert.match(markup, /viewer\/navigation\/footnote-jump\.js/);
-  assert.match(styles, /\.tool-footnote-jump/);
-  assert.match(styles, /\.tool-footnote-status\[data-state="error"\]/);
+  assert.match(source, /pdf-viewer-inline-footnote-jump/);
+  assert.match(source, /pdf-viewer-footnote-jump/);
+  assert.doesNotMatch(styles, /\.tool-footnote-jump/);
+});
+
+test("tools menu groups printed-page search with cross-references and separates date settings", () => {
+  const footnoteRefs = markup.indexOf('id="cross-reference-notes"');
+  const printedSearch = markup.indexOf('id="printed-page-jump-opt-in"');
+  const settings = markup.indexOf('id="copy-tagged-paragraphs"');
+  const pageTabs = markup.indexOf('id="page-tabs-opt-in"');
+  const relativeDates = markup.indexOf('id="relative-metadata-dates"');
+  assert.ok(footnoteRefs >= 0 && footnoteRefs < printedSearch && printedSearch < settings);
+  assert.match(markup.slice(pageTabs, relativeDates), /class="menu-separator" role="separator"/);
 });
 
 test("footnote lookup prefers a lower-page note over body text and centered page numbers", () => {
