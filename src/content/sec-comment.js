@@ -11,7 +11,9 @@
     ? "src/"
     : "";
   const SWEETIE_BOT_PATH = sourcePrefix + "assets/sweetie-bot.png";
-  const isCommentPage = /^\/comments\/.+\.html?$/i.test(window.location.pathname);
+  const isSecHost = /(^|\.)sec\.gov$/i.test(window.location.hostname);
+  const isCommentPage = isSecHost && /^\/comments\/.+\.html?$/i.test(window.location.pathname);
+  const isBasicHtml = isCommentPage || globalThis.pdfMagicIsPlainHtmlDocument?.(document);
 
   const selectionStyles = `
     ::selection {
@@ -32,9 +34,9 @@
     (document.head || document.documentElement).append(style);
   }
 
-  applySelectionStyle();
+  if (isSecHost) applySelectionStyle();
 
-  if (!isCommentPage) {
+  if (!isBasicHtml) {
     return;
   }
 
@@ -249,7 +251,8 @@
     const enabled = stored[SEC_COMMENT_DARK_MODE_KEY] !== false;
     const darkModeActive = enabled && theme === "dark";
     applyDarkMode(darkModeActive);
-    setCommentActionVisible(darkModeActive);
+    // SEC-specific ChatGPT formatting is not offered on unrelated websites.
+    setCommentActionVisible(darkModeActive && isCommentPage);
   }
 
   chrome.storage.onChanged.addListener((changes, areaName) => {

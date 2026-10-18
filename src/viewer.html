@@ -128,6 +128,7 @@
         <div id="tools-menu" class="tools-menu" role="menu" hidden>
           <button id="rotate-left" class="tool-button" type="button" role="menuitem">↶ <span>Rotate left</span></button>
           <button id="rotate-right" class="tool-button" type="button" role="menuitem">↷ <span>Rotate right</span></button>
+          <button id="view-raw-metadata" class="tool-button" type="button" role="menuitem" hidden>▤ <span>View metadata</span></button>
           <div class="menu-separator" role="separator"></div>
           <button id="print-pdf" class="tool-button" type="button" role="menuitem">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -291,6 +292,14 @@
       </section>
     </dialog>
 
+    <dialog id="raw-metadata-dialog" class="raw-metadata-dialog" aria-labelledby="raw-metadata-title">
+      <div class="raw-metadata-card">
+        <header class="raw-metadata-header"><h2 id="raw-metadata-title">Raw PDF metadata</h2>
+          <button id="raw-metadata-close" type="button" aria-label="Close metadata">×</button></header>
+        <p>Original PDF Info and XMP values, without Sections formatting or precedence.</p>
+        <div id="raw-metadata-content" class="raw-metadata-content"></div>
+      </div>
+    </dialog>
     <dialog id="enhancer-setup-dialog" class="enhancer-setup-dialog" aria-labelledby="enhancer-setup-title">
       <div class="enhancer-setup-card">
         <button id="enhancer-setup-close" class="enhancer-setup-close" type="button" aria-label="Close PDF Enhancer setup">×</button>
