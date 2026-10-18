@@ -197,6 +197,13 @@ if [[ ! -f "$enhancer_dir/ocr-scanned-pdf.sh" ]]; then
   exit 1
 fi
 
+# The user's explicit installer run also provisions isolated Python packages.
+# Older forks without the setup script retain the legacy interpreter fallback.
+if [[ -f "$enhancer_dir/setup-python-env.sh" ]]; then
+  printf 'Setting up the PDF Enhancer Python virtual environment...\n'
+  /bin/bash "$enhancer_dir/setup-python-env.sh"
+fi
+
 config_dir="$HOME/.config/pdf-magic"
 config_path="$config_dir/enhancer-host.json"
 host_install_dir="$config_dir/native"
