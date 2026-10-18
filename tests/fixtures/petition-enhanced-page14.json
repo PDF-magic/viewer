@@ -1,0 +1,2407 @@
+{
+  "n": 14,
+  "width": 612,
+  "height": 790.08,
+  "items": [
+    {
+      "str": "rules.2",
+      "dir": "ltr",
+      "width": 27.38610000000002,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        66.7,
+        671.04
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "4",
+      "dir": "ltr",
+      "width": 3.45,
+      "height": 6.9,
+      "transform": [
+        6.9,
+        0,
+        0,
+        6.9,
+        94.0477,
+        675.84
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 1.3793768115942016,
+      "height": 0,
+      "transform": [
+        6.9,
+        0,
+        0,
+        6.9,
+        97.49770000000001,
+        675.84
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "Again, transfer agents, however, are only \"limited participants\" in DTC -",
+      "dir": "ltr",
+      "width": 338.4334000000003,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        107.0154,
+        671.04
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6739999999999998,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        445.4488,
+        671.04
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "and not members.",
+      "dir": "ltr",
+      "width": 81.29625000000033,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        452.5258,
+        671.04
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "They are not shareholders and they do not participate in the governance of DTC, its rulemaking or its",
+      "dir": "ltr",
+      "width": 467.23979999999995,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        66.61930000000007,
+        645.5985
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "disciplinary processes, or share in its profits.",
+      "dir": "ltr",
+      "width": 198.95280000000014,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        66.61119999999994,
+        620.1585
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.9843999999999911,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        265.5640000000001,
+        620.16
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "Thus, they do not have the full procedural safeguards that",
+      "dir": "ltr",
+      "width": 258.3598500000001,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        275.9002,
+        620.16
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "Congress intended for members of self-regulatory organizations.",
+      "dir": "ltr",
+      "width": 283.96035000000023,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        66.6037,
+        595.2015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "2s",
+      "dir": "ltr",
+      "width": 6.394216699999985,
+      "height": 8,
+      "transform": [
+        6.2627,
+        0,
+        0,
+        8,
+        350.825,
+        599.52
+      ],
+      "fontName": "g_d0_f2",
+      "hasEOL": false
+    },
+    {
+      "str": "",
+      "dir": "ltr",
+      "width": 0,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        103.1754,
+        569.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "As we have stressed above, the relationship between DTC and transfer agents is commercial.",
+      "dir": "ltr",
+      "width": 430.77090000000004,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        103.1754,
+        569.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "Nevertheless,",
+      "dir": "ltr",
+      "width": 59.10029999999993,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        66.7593,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6274000000000025,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        125.85959999999996,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "the",
+      "dir": "ltr",
+      "width": 13.005300000000018,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        132.44729999999998,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6333999999999973,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        145.45260000000002,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "DTC",
+      "dir": "ltr",
+      "width": 20.834099999999978,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        152.1033,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6668000000000017,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        172.93739999999997,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "Rule",
+      "dir": "ltr",
+      "width": 19.73685000000004,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        179.9388,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6352999999999941,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        199.67565000000005,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "Filing also",
+      "dir": "ltr",
+      "width": 49.031850000000006,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        206.34629999999999,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6362999999999975,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        255.37815000000003,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "requires",
+      "dir": "ltr",
+      "width": 35.077350000000045,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        262.0593,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.629299999999998,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        297.13665000000003,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "limited participants to",
+      "dir": "ltr",
+      "width": 101.8552500000003,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        303.7443,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6245000000000009,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        405.59955,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "sign",
+      "dir": "ltr",
+      "width": 17.55705000000003,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        412.15680000000003,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6179000000000011,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        429.71385000000004,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "a",
+      "dir": "ltr",
+      "width": 4.662,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        436.20180000000005,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6130000000000022,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        440.8638,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "Balance Certificate",
+      "dir": "ltr",
+      "width": 86.65649999999997,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        447.30030000000005,
+        544.8015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "Agreemenr",
+      "dir": "ltr",
+      "width": 51.46328600000003,
+      "height": 10.5,
+      "transform": [
+        10.507,
+        0,
+        0,
+        10.5,
+        67.1754,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "6",
+      "dir": "ltr",
+      "width": 3.7,
+      "height": 7.4,
+      "transform": [
+        7.4,
+        0,
+        0,
+        7.4,
+        118.9446,
+        524.16
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.9896081081081095,
+      "height": 0,
+      "transform": [
+        7.4,
+        0,
+        0,
+        7.4,
+        122.6446,
+        524.16
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "and",
+      "dir": "ltr",
+      "width": 15.006600000000015,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        129.9677,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.719799999999999,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        144.97430000000003,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "Operational",
+      "dir": "ltr",
+      "width": 51.17700000000004,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        152.53220000000002,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.7489999999999939,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        203.7092000000001,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "Criteria,",
+      "dir": "ltr",
+      "width": 35.81129999999998,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        211.57370000000003,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.7113999999999989,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        247.38500000000005,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "the",
+      "dir": "ltr",
+      "width": 13.005300000000018,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        254.85470000000004,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.7273999999999996,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        267.86,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "tenns",
+      "dir": "ltr",
+      "width": 24.047099999999936,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        275.4977,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6039142192099768,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        299.5447999999999,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "of which",
+      "dir": "ltr",
+      "width": 42.88649999999992,
+      "height": 10.5,
+      "transform": [
+        11.6856,
+        0,
+        0,
+        10.5,
+        306.6019,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.7162000000000067,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        349.4883999999999,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "are",
+      "dir": "ltr",
+      "width": 13.097699999999994,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        357.00849999999997,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6736000000000028,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        370.10619999999994,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "one-sided",
+      "dir": "ltr",
+      "width": 42.487199999999966,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        377.179,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.7076000000000054,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        419.6661999999999,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "and",
+      "dir": "ltr",
+      "width": 15.006600000000015,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        427.09599999999995,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.765800000000002,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        442.10259999999994,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "dictated",
+      "dir": "ltr",
+      "width": 34.23525000000001,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        450.14349999999996,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.7275000000000124,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        484.37874999999985,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "by",
+      "dir": "ltr",
+      "width": 10.180799999999977,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        492.0175,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.7614000000000022,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        502.19829999999996,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "DTC.",
+      "dir": "ltr",
+      "width": 23.716349999999924,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        510.193,
+        519.36
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "Effectively, these agreements are adhesion contracts.",
+      "dir": "ltr",
+      "width": 240.2211000000002,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        67.14549999999997,
+        494.4015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.8447999999999909,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        307.36660000000006,
+        494.4015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "Transfer agents have no ability to negotiate the",
+      "dir": "ltr",
+      "width": 218.00650000000022,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        316.23699999999997,
+        494.4015
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "tenns",
+      "dir": "ltr",
+      "width": 24.526180800000017,
+      "height": 10.5,
+      "transform": [
+        10.6128,
+        0,
+        0,
+        10.5,
+        66.6889,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6047459437256095,
+      "height": 0,
+      "transform": [
+        10.6128,
+        0,
+        0,
+        10.5,
+        91.21508080000001,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "of their",
+      "dir": "ltr",
+      "width": 36.143999999999984,
+      "height": 10.5,
+      "transform": [
+        11.6856,
+        0,
+        0,
+        10.5,
+        98.2819,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6836000000000018,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        134.42589999999998,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "business",
+      "dir": "ltr",
+      "width": 36.598800000000054,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        141.6037,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.7173999999999978,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        178.20250000000004,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "relationship",
+      "dir": "ltr",
+      "width": 50.9438999999999,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        185.73520000000002,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.7172000000000047,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        236.67909999999998,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "on",
+      "dir": "ltr",
+      "width": 10.29419999999999,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        244.20970000000003,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.7065999999999993,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        254.50390000000002,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "significant",
+      "dir": "ltr",
+      "width": 46.40999999999994,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        261.9232,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.7060000000000118,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        308.33319999999986,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "issues,",
+      "dir": "ltr",
+      "width": 28.030799999999836,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        315.7462,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.7594000000000224,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        343.77699999999976,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "including",
+      "dir": "ltr",
+      "width": 41.01300000000005,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        351.7507,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6180000000000031,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        392.7637,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "operational",
+      "dir": "ltr",
+      "width": 49.23450000000002,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        399.2527,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.7520000000000069,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        448.4871999999999,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "issues,",
+      "dir": "ltr",
+      "width": 28.030799999999836,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        456.3832,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.7104000000000226,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        484.41399999999976,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "fees,",
+      "dir": "ltr",
+      "width": 19.01759999999993,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        491.8732,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.7498000000000069,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        510.8907999999999,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "and",
+      "dir": "ltr",
+      "width": 15.0065999999999,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        518.7637,
+        468.96
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "confidentiality, as would generally be the case with two commercial parties, again reflecting DTC's status",
+      "dir": "ltr",
+      "width": 467.29575000000085,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        67.08519999999993,
+        443.51849999999996
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "as a",
+      "dir": "ltr",
+      "width": 16.66349999999998,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        67.08369999999996,
+        418.56149999999997
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.23766055045871873,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        83.74719999999996,
+        418.56149999999997
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "defacto",
+      "dir": "ltr",
+      "width": 34.901799999999994,
+      "height": 10.9,
+      "transform": [
+        10.9,
+        0,
+        0,
+        10.9,
+        86.3377,
+        418.56
+      ],
+      "fontName": "g_d0_f3",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.33719047619047704,
+      "height": 0,
+      "transform": [
+        10.9,
+        0,
+        0,
+        10.9,
+        121.23949999999999,
+        418.56
+      ],
+      "fontName": "g_d0_f3",
+      "hasEOL": false
+    },
+    {
+      "str": "regulator.",
+      "dir": "ltr",
+      "width": 41.3238,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        124.78,
+        418.56
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "",
+      "dir": "ltr",
+      "width": 0,
+      "height": 0,
+      "transform": [
+        10.9,
+        0,
+        0,
+        10.9,
+        83.2917,
+        392.64
+      ],
+      "fontName": "g_d0_f3",
+      "hasEOL": true
+    },
+    {
+      "str": "The Commission Needs to Modernize Transfer Agent Regulation",
+      "dir": "ltr",
+      "width": 292.7173199999998,
+      "height": 10.9,
+      "transform": [
+        10.9,
+        0,
+        0,
+        10.9,
+        83.2917,
+        392.64
+      ],
+      "fontName": "g_d0_f3",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.3071613134043733,
+      "height": 0,
+      "transform": [
+        10.9,
+        0,
+        0,
+        10.9,
+        376.00901999999985,
+        392.64
+      ],
+      "fontName": "g_d0_f3",
+      "hasEOL": false
+    },
+    {
+      "str": "by",
+      "dir": "ltr",
+      "width": 10.273710399999977,
+      "height": 10.2,
+      "transform": [
+        10.0624,
+        0,
+        0,
+        10.2,
+        379.0998,
+        392.64
+      ],
+      "fontName": "g_d0_f4",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.26282473394495365,
+      "height": 0,
+      "transform": [
+        10.0624,
+        0,
+        0,
+        10.2,
+        389.3735104,
+        392.64
+      ],
+      "fontName": "g_d0_f4",
+      "hasEOL": false
+    },
+    {
+      "str": "Proposing New Regulations",
+      "dir": "ltr",
+      "width": 126.32010000000008,
+      "height": 10.9,
+      "transform": [
+        10.9,
+        0,
+        0,
+        10.9,
+        392.2383,
+        392.64
+      ],
+      "fontName": "g_d0_f3",
+      "hasEOL": false
+    },
+    {
+      "str": "",
+      "dir": "ltr",
+      "width": 0,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        103.1462,
+        367.68
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "DTC believes that its rule filings are necessary because the standards for participation in its",
+      "dir": "ltr",
+      "width": 431.1917000000002,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        103.1462,
+        367.68
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "programs have not changed substantially since 1975, and do not take into account changes that have",
+      "dir": "ltr",
+      "width": 467.08410000000083,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        67.2097,
+        342.2385
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "occurred since that time - including significant changes in technology.",
+      "dir": "ltr",
+      "width": 309.7306000000001,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        67.10470000000004,
+        317.28
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 1.3714326853851584,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        376.83530000000013,
+        317.28
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "In this regard, Petitioner agrees",
+      "dir": "ltr",
+      "width": 143.16510000000017,
+      "height": 10.5,
+      "transform": [
+        10.4175,
+        0,
+        0,
+        10.5,
+        391.1222,
+        317.28
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "that the transfer agent regulations in the United States may need to be modernized.",
+      "dir": "ltr",
+      "width": 373.05440000000044,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        67.17380000000003,
+        291.83849999999995
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.7659999999999844,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        440.22820000000013,
+        291.84
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "For many years the",
+      "dir": "ltr",
+      "width": 85.98029999999991,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        448.27119999999996,
+        291.84
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "Division's Staff has referred to rulemaking efforts under consideration within the Division that would",
+      "dir": "ltr",
+      "width": 467.14080000000035,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        67.14219999999995,
+        266.88149999999996
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "achieve that effect.",
+      "dir": "ltr",
+      "width": 84.24779999999991,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        67.0897,
+        241.43999999999997
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.7114000000000017,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        151.33749999999998,
+        241.43999999999997
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "In numerous public statements since the beginning of the new millennium, the Staff",
+      "dir": "ltr",
+      "width": 377.0583000000006,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        158.8072,
+        241.43999999999997
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "has referenced internal drafts of these rules, some of which would appear to address the same concerns",
+      "dir": "ltr",
+      "width": 467.1888000000001,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        67.18119999999993,
+        215.9985
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "",
+      "dir": "ltr",
+      "width": 0,
+      "height": 0,
+      "transform": [
+        10.3052,
+        0,
+        0,
+        10.5,
+        103.1487,
+        181.92
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "More detailed standards were set forth in Exchange Act Release No. 16900 (June 17, 1980).",
+      "dir": "ltr",
+      "width": 367.61608719999987,
+      "height": 10.5,
+      "transform": [
+        10.3052,
+        0,
+        0,
+        10.5,
+        103.1487,
+        181.92
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "Allowing DTC to establish rules for transfer agents, but without membership, presents other troubling",
+      "dir": "ltr",
+      "width": 431.101,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        103.1754,
+        164.64
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "\"",
+      "dir": "ltr",
+      "width": 5.821999999999999,
+      "height": 16.4,
+      "transform": [
+        16.4,
+        0,
+        0,
+        16.4,
+        66.9742,
+        161.28
+      ],
+      "fontName": "g_d0_f2",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 1.8775365853658539,
+      "height": 0,
+      "transform": [
+        16.4,
+        0,
+        0,
+        16.4,
+        72.7962,
+        161.28
+      ],
+      "fontName": "g_d0_f2",
+      "hasEOL": false
+    },
+    {
+      "str": "issues sinee DTC has potential conflicts of interest in protecting the interests of its members, who are banks",
+      "dir": "ltr",
+      "width": 430.77240000000006,
+      "height": 10.5,
+      "transform": [
+        10.4925,
+        0,
+        0,
+        10.5,
+        103.5878,
+        153.12
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "and brokers, and who also perfonn some of the same functions as transfer agents.",
+      "dir": "ltr",
+      "width": 324.624306,
+      "height": 10.5,
+      "transform": [
+        10.2207,
+        0,
+        0,
+        10.5,
+        103.0907,
+        141.6
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "",
+      "dir": "ltr",
+      "width": 0,
+      "height": 0,
+      "transform": [
+        9.8674,
+        0,
+        0,
+        10.5,
+        103.1769,
+        124.32
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "As noted in the STA's prior comment leners, with the significant dematerialization of stock certificates,",
+      "dir": "ltr",
+      "width": 430.7812000000006,
+      "height": 10.5,
+      "transform": [
+        9.8674,
+        0,
+        0,
+        10.5,
+        103.1769,
+        124.32
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "there",
+      "dir": "ltr",
+      "width": 19.737900000000003,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        103.16620000000006,
+        112.80149999999999
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.603248908296934,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        122.90410000000007,
+        112.80149999999999
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "is no need for such antiquated requirements as maintaining a \"balance certificate\" in lieu of the",
+      "dir": "ltr",
+      "width": 406.17032720000043,
+      "height": 10.5,
+      "transform": [
+        8.5875,
+        0,
+        0,
+        10.5,
+        128.0845,
+        112.8
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "standard book-entry electronic method of recordkeeping. However, the DTC Rule Filing still includes this",
+      "dir": "ltr",
+      "width": 431.208646,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        103.0462,
+        101.28
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "inefficient",
+      "dir": "ltr",
+      "width": 40.561499999999974,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        103.5877,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6321974033089738,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        144.14919999999998,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "and",
+      "dir": "ltr",
+      "width": 14.043241800000025,
+      "height": 10.5,
+      "transform": [
+        10.2207,
+        0,
+        0,
+        10.5,
+        150.6107,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6383769714285672,
+      "height": 0,
+      "transform": [
+        10.2207,
+        0,
+        0,
+        10.5,
+        164.65394180000004,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "unnecessary",
+      "dir": "ltr",
+      "width": 48.04800000000002,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        171.3569,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6819999999999974,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        219.40490000000003,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "process,",
+      "dir": "ltr",
+      "width": 31.79190000000009,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        226.5659,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6721999999999915,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        258.3578000000001,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "reflecting",
+      "dir": "ltr",
+      "width": 37.98689999999978,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        265.4159,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6253989121012339,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        303.40279999999973,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "again",
+      "dir": "ltr",
+      "width": 21.267529799999927,
+      "height": 10.5,
+      "transform": [
+        10.4973,
+        0,
+        0,
+        10.5,
+        309.9678,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6772257333333462,
+      "height": 0,
+      "transform": [
+        10.4973,
+        0,
+        0,
+        10.5,
+        331.2353297999999,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "DTC's",
+      "dir": "ltr",
+      "width": 26.59650000000007,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        338.3462,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6159999999999963,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        364.94270000000006,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "authoritarian",
+      "dir": "ltr",
+      "width": 51.0719999999997,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        371.4107,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6310000000000368,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        422.4826999999996,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "rather",
+      "dir": "ltr",
+      "width": 23.556749999999916,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        429.1082,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6586314229249114,
+      "height": 0,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        452.6649499999999,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "than",
+      "dir": "ltr",
+      "width": 16.364040000000024,
+      "height": 10.5,
+      "transform": [
+        10.12,
+        0,
+        0,
+        10.5,
+        459.3303,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 0.6283771428571375,
+      "height": 0,
+      "transform": [
+        10.12,
+        0,
+        0,
+        10.5,
+        475.69434000000007,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "collaborative",
+      "dir": "ltr",
+      "width": 52.13669999999976,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        482.2923,
+        89.76
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "approach with its limited participant transfer agents.",
+      "dir": "ltr",
+      "width": 207.03030600000002,
+      "height": 10.5,
+      "transform": [
+        10.5,
+        0,
+        0,
+        10.5,
+        103.08479999999997,
+        78.2415
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "",
+      "dir": "ltr",
+      "width": 0,
+      "height": 0,
+      "transform": [
+        7.4348,
+        0,
+        0,
+        8.4,
+        68.1045,
+        36.48
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": true
+    },
+    {
+      "str": "IS 192741.6.BUSINESS",
+      "dir": "ltr",
+      "width": 76.69099999999995,
+      "height": 8.4,
+      "transform": [
+        7.4348,
+        0,
+        0,
+        8.4,
+        68.1045,
+        36.48
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": " ",
+      "dir": "ltr",
+      "width": 14.054304623432719,
+      "height": 0,
+      "transform": [
+        8.4,
+        0,
+        0,
+        8.4,
+        144.79549999999998,
+        36.48
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    },
+    {
+      "str": "13",
+      "dir": "ltr",
+      "width": 10.367091499999988,
+      "height": 11.5,
+      "transform": [
+        10.7431,
+        0,
+        0,
+        11.5,
+        295.7823,
+        36.48
+      ],
+      "fontName": "g_d0_f1",
+      "hasEOL": false
+    }
+  ]
+}

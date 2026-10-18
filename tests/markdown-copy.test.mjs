@@ -161,7 +161,7 @@ async function copyPetitionSelection(pageNumber, start, end, options = {}) {
   const layer = { closest: selector => selector === ".text-layer" ? layer : null };
   const spans = [];
   const includedNodes = new Set();
-  for (const page of pages.slice(pageNumber - 1, pageNumber)) {
+  for (const page of [options.textPage ?? pages[pageNumber - 1]]) {
     const pageElement = { dataset: { page: String(page.n) } };
     const textItems = page.items.filter(item => typeof item.str === "string");
     const pageSpans = textItems.map((item, index) => {
@@ -301,4 +301,17 @@ test("copies inline footnote numbers as Unicode superscripts without HTML", () =
     { text: "Text. " }, { text: "12", footnoteReference: 12 },
     { text: " More." }, { text: "309", footnoteReference: 309 },
   ]), "Text.¹² More.³⁰⁹");
+});
+
+test("includes page 14 note 25 when OCR reads its raised marker as 2s", async () => {
+  const { readFileSync } = await import('node:fs');
+  const textPage = JSON.parse(readFileSync(new URL('./fixtures/petition-enhanced-page14.json', import.meta.url)));
+  for (const end of [10, 11]) {
+    const output = await copyPetitionSelection(14, 9, end, { textPage });
+    assert.match(output, /organizations\.²⁵\n\n\[25\]: Allowing DTC/);
+    assert.match(output, /same functions as transfer agents\.$/);
+    assert.doesNotMatch(output, /2s|\[5\]:/);
+  }
+  const plain = await copyPetitionSelection(14, 9, 10, { textPage, markdown: false });
+  assert.equal(plain, null);
 });
