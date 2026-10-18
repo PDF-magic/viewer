@@ -1077,6 +1077,39 @@ input {
   opacity: 1;
 }
 
+/* Keep native-host and OCR errors available after the progress bar closes. */
+.enhance-error-notice {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 21;
+  transform: translateX(-50%);
+  width: min(680px, calc(100vw - 32px));
+  max-height: min(45vh, 300px);
+  overflow-y: auto;
+  padding: 12px 14px;
+  border: 1px solid #c43f3f;
+  border-radius: 8px;
+  background: var(--toast-bg);
+  color: var(--text);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 20%);
+}
+.enhance-error-notice[hidden] { display: none; }
+.enhance-error-notice p {
+  margin: 8px 0 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.enhance-error-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.enhance-error-actions button {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--control-bg);
+  cursor: pointer;
+}
+
 /* Split panes can place a floating host control over the lower-right corner.
    Leave the footnote scrubber's interactive track clear of that corner. */
 @media (max-width: 1200px) {
