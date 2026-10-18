@@ -12,7 +12,6 @@ const minimapPages = document.querySelector("#minimap-pages");
 const minimapViewport = document.querySelector("#minimap-viewport");
 const rotateLeftButton = document.querySelector("#rotate-left");
 const rotateRightButton = document.querySelector("#rotate-right");
-const minimapToggle = document.querySelector("#show-minimap");
 const minimapModeButton = document.querySelector("#minimap-mode");
 const minimapModeIcon = document.querySelector("#minimap-mode-icon");
 const minimapSwapSideButton = document.querySelector("#minimap-swap-side");
@@ -120,17 +119,12 @@ function updateMinimapLayout(update) {
   window.dispatchEvent(new CustomEvent("pdf-viewer-minimap-layout-change", { detail: anchor }));
 }
 
-function setMinimapEnabled(enabled, persist = true) {
+function setMinimapEnabled(enabled) {
   updateMinimapLayout(() => {
     document.documentElement.classList.toggle("minimap-disabled", !enabled);
   });
-  minimapToggle.checked = enabled;
   setMinimapAccessibility();
   if (pageTabsEnabled()) notifyPageTabsVisibility();
-
-  if (persist) {
-    localStorage.setItem(MINIMAP_STORAGE_KEY, String(enabled));
-  }
 
   if (!enabled) {
     cancelWheelScroll();
@@ -188,7 +182,7 @@ function setPageTabsOptIn(enabled, persist = true) {
 
   if (persist) {
     localStorage.setItem(PAGE_TABS_OPT_IN_STORAGE_KEY, String(enabled));
-    if (enabled && !minimapEnabled()) setMinimapEnabled(true);
+    if (enabled && minimapCollapsed()) setMinimapCollapsed(false);
     setPageTabsEnabled(enabled);
   }
 }
@@ -948,15 +942,6 @@ minimapCollapseButton?.addEventListener("click", () => {
 });
 minimapPageTabsButton?.addEventListener("click", () => setPageTabsEnabled(!pageTabsEnabled()));
 pageTabsOptIn?.addEventListener("change", () => setPageTabsOptIn(pageTabsOptIn.checked));
-minimapToggle.addEventListener("change", () => {
-  setMinimapEnabled(minimapToggle.checked);
-  if (minimapToggle.checked) {
-    scheduleThumbnailPreparation();
-  } else {
-    stopThumbnailPreparation();
-  }
-});
-
 const storedMinimapPreference = localStorage.getItem(MINIMAP_STORAGE_KEY);
 const storedMinimapMode = localStorage.getItem(MINIMAP_MODE_STORAGE_KEY);
 const storedMinimapSide = localStorage.getItem(MINIMAP_SIDE_STORAGE_KEY);
@@ -968,8 +953,11 @@ const pageTabsOptedIn = storedPageTabsOptIn === "true" ||
   (storedPageTabsOptIn === null && storedPageTabs === "true");
 setMinimapMode(storedMinimapMode === "local" ? "local" : "overview", false);
 setMinimapSide(storedMinimapSide === "left" ? "left" : "right", false);
-setMinimapCollapsed(storedMinimapCollapsed === "true", false);
-setMinimapEnabled(storedMinimapPreference !== "false", false);
+// The previous menu checkbox could hide navigation completely. Translate
+// that legacy choice to a collapsible sidebar that can always be reopened.
+setMinimapCollapsed(storedMinimapCollapsed === "true" ||
+  (storedMinimapCollapsed === null && storedMinimapPreference === "false"), false);
+setMinimapEnabled(true);
 setPageTabsOptIn(pageTabsOptedIn, false);
 setPageTabsEnabled(pageTabsOptedIn && storedPageTabs === "true", false);
 

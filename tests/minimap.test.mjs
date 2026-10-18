@@ -10,7 +10,6 @@ const styles = readFileSync(new URL('../src/viewer/navigation/minimap.css', impo
 const viewerStyles = readFileSync(new URL('../src/viewer/viewer.css', import.meta.url), 'utf8');
 const viewerSource = readFileSync(new URL('../src/viewer/viewer.js', import.meta.url), 'utf8');
 const viewerMarkup = readFileSync(new URL('../src/viewer.html', import.meta.url), 'utf8');
-const toggleStyles = readFileSync(new URL('../src/viewer/theme/image-color-toggle.css', import.meta.url), 'utf8');
 function fixture(count, height = 900, initialPreferences = {}) {
   const windowEvents = [];
   const windowListeners = {};
@@ -32,7 +31,6 @@ function fixture(count, height = 900, initialPreferences = {}) {
       if (this.capturedPointer === pointerId) this.capturedPointer = null;
     } };
   const viewport = { style: {} };
-  const toggle = { checked: true, addEventListener(type, callback) { listeners[`toggle-${type}`] = callback; } };
   const optIn = { checked: false, addEventListener(type, callback) { listeners[`opt-in-${type}`] = callback; } };
   const pageTabsButton = {
     hidden: true,
@@ -47,7 +45,7 @@ function fixture(count, height = 900, initialPreferences = {}) {
     replaceChildren(...children) { this.children = children; },
   };
   const elements = { '#viewer': { querySelectorAll: () => pages }, '#minimap': track,
-    '#minimap-pages': minimapPageContainer, '#minimap-viewport': viewport, '#show-minimap': toggle,
+    '#minimap-pages': minimapPageContainer, '#minimap-viewport': viewport,
     '#page-tabs-opt-in': optIn, '#minimap-page-tabs-toggle': pageTabsButton };
   const classes = new Set();
   const document = { querySelector: selector => elements[selector],
@@ -72,7 +70,7 @@ function fixture(count, height = 900, initialPreferences = {}) {
   vm.runInContext(source, context);
   const sync = () => vm.runInContext('syncMinimap()', context);
   sync();
-  return { window, windowEvents, windowListeners, pages, tiles, track, viewport, toggle, optIn, pageTabsButton, classes, storedValues, context, sync, listeners, minimapPageContainer };
+  return { window, windowEvents, windowListeners, pages, tiles, track, viewport, optIn, pageTabsButton, classes, storedValues, context, sync, listeners, minimapPageContainer };
 }
 
 test('switching to local view keeps thumbnails unclipped at the middle and end', () => {
@@ -473,23 +471,25 @@ test('native scrollbar gutter respects toolbar rows, the scrubber, and split-vie
   assert.match(viewerStyles, /\.document-scrubber\s*\{[\s\S]*?width:\s*100vw;/);
 });
 
-test('minimap toggle persists visibility and updates accessibility state', () => {
-  const f = fixture(3);
-  f.toggle.checked = false;
-  f.listeners['toggle-change']();
-  assert.ok(f.classes.has('minimap-disabled'));
-  assert.equal(f.track.tabIndex, -1);
-  assert.equal(f.storedValues.get('pdf-viewer-show-minimap'), 'false');
 
-  f.toggle.checked = true;
-  f.listeners['toggle-change']();
-  assert.ok(!f.classes.has('minimap-disabled'));
+test('minimap has a dedicated collapse button without a duplicate settings toggle', () => {
+  const f = fixture(3);
+  assert.doesNotMatch(viewerMarkup, /id="show-minimap"/);
+  assert.match(viewerMarkup, /id="minimap-collapse"/);
+  assert.equal(f.classes.has('minimap-disabled'), false);
   assert.equal(f.track.tabIndex, 0);
-  assert.equal(f.storedValues.get('pdf-viewer-show-minimap'), 'true');
-  assert.deepEqual(f.windowEvents, Array(5).fill('pdf-viewer-minimap-layout-change'));
-  assert.match(viewerMarkup, /id="show-minimap" class="checkbox-input" type="checkbox"/);
-  assert.doesNotMatch(viewerMarkup, /id="show-minimap"[\s\S]{0,120}toggle-switch/);
-  assert.match(toggleStyles, /\.checkbox-input:checked\s*\{/);
+  assert.equal(f.storedValues.get('pdf-viewer-show-minimap'), undefined);
+});
+
+test('legacy disabled minimap preference migrates to re-expandable collapse', () => {
+  const f = fixture(5, 900, { 'pdf-viewer-show-minimap': 'false' });
+  assert.equal(f.classes.has('minimap-disabled'), false);
+  assert.equal(f.classes.has('minimap-collapsed'), true);
+  assert.equal(f.track.tabIndex, -1);
+  vm.runInContext('setMinimapCollapsed(false)', f.context);
+  assert.equal(f.classes.has('minimap-collapsed'), false);
+  assert.equal(f.track.tabIndex, 0);
+  assert.equal(f.storedValues.get('pdf-viewer-minimap-collapsed'), 'false');
 });
 
 test('the document becomes ready before the minimap finishes in the background', () => {
@@ -576,14 +576,14 @@ test('local thumbnails discard pending renders after navigation or rotation', as
   assert.equal(vm.runInContext('localThumbnails.size', f.context), 0);
 });
 
-test('persistent thumbnails and their work follow the global minimap preference', () => {
+test('persistent thumbnail caching still respects navigation visibility and page tabs', () => {
   assert.match(source, /restoreCachedThumbnailStrip\(generation\)/);
   assert.match(source, /void cacheThumbnailStrip\(strip\)/);
   assert.match(source, /composeThumbnailStrip\(thumbnails\)/);
   assert.match(source, /minimapPages\.append\(strip\)/);
   assert.match(source, /"image\/png"/);
   assert.match(source, /if \(thumbnailPreparationStarted \|\| !minimapEnabled\(\) \|\| pageTabsEnabled\(\) \|\| window\.innerWidth <= 700\)/);
-  assert.match(source, /else \{\s*stopThumbnailPreparation\(\);/);
+  assert.doesNotMatch(source, /minimapToggle\.addEventListener/);
   assert.match(source, /thumbnailLoadGeneration \+= 1;[\s\S]*?thumbnailDocument = undefined/);
   assert.match(source, /scheduleThumbnailPreparation\(\);\s*$/);
   assert.doesNotMatch(source, /void loadThumbnailDocument\(\)\.catch/);
@@ -682,12 +682,11 @@ test('numbered page tab availability and mode restore independently', () => {
   assert.equal(legacy.classes.has('minimap-page-tabs'), true);
 });
 
-test('opt-in reveals the side navigation when it was disabled', () => {
+test('numbered page-tab opt-in expands a previously hidden legacy minimap', () => {
   const f = fixture(5, 900, { 'pdf-viewer-show-minimap': 'false' });
-  assert.equal(f.classes.has('minimap-disabled'), true);
+  assert.equal(f.classes.has('minimap-collapsed'), true);
   f.optIn.checked = true;
   f.listeners['opt-in-change']();
-  assert.equal(f.classes.has('minimap-disabled'), false);
-  assert.equal(f.toggle.checked, true);
+  assert.equal(f.classes.has('minimap-collapsed'), false);
   assert.equal(f.classes.has('minimap-page-tabs'), true);
 });

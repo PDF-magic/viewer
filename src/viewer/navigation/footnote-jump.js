@@ -2,9 +2,6 @@ import { appendFootnotesForPage, candidateForPage } from "./footnote-index.js";
 import { pdfDocumentSessionReady } from "../pdf-document-session.js";
 import { footnoteToMarkdown } from "../selection/markdown-copy.js";
 
-const form = document.querySelector("#footnote-jump");
-const footnoteInput = document.querySelector("#footnote-number");
-const status = document.querySelector("#footnote-jump-status");
 const pageNumberInput = document.querySelector("#page-number");
 
 const pageCache = new Map();
@@ -14,17 +11,8 @@ function currentPageNumber() {
   return Math.max(1, Number.parseInt(pageNumberInput?.value, 10) || 1);
 }
 
-function setStatus(message, state = "") {
-  if (!status) {
-    return;
-  }
-
-  status.textContent = message;
-  if (state) {
-    status.dataset.state = state;
-  } else {
-    delete status.dataset.state;
-  }
+function reportFootnoteError(message) {
+  window.dispatchEvent(new CustomEvent("pdf-viewer-toast", { detail: { message } }));
 }
 
 async function pageData(pdfDocument, pageNumber) {
@@ -86,14 +74,11 @@ function scrollToTarget(target, searchResult = false) {
 async function jumpToFootnote(rawNumber, originPage = currentPageNumber(), copyMarkdown = false) {
   const number = Number.parseInt(String(rawNumber).trim(), 10);
   if (!Number.isSafeInteger(number) || number <= 0) {
-    setStatus("Enter a footnote number", "error");
-    footnoteInput?.focus();
-    footnoteInput?.select();
+    reportFootnoteError("Enter a footnote number");
     return;
   }
 
   const requestId = ++lookupRequestId;
-  setStatus(`Finding footnote ${number}…`, "searching");
 
   const session = await pdfDocumentSessionReady;
   if (requestId !== lookupRequestId) {
@@ -101,7 +86,7 @@ async function jumpToFootnote(rawNumber, originPage = currentPageNumber(), copyM
   }
 
   if (!session?.document) {
-    setStatus("PDF is not ready", "error");
+    reportFootnoteError("PDF is not ready");
     return;
   }
 
@@ -117,12 +102,11 @@ async function jumpToFootnote(rawNumber, originPage = currentPageNumber(), copyM
   }
 
   if (!target) {
-    setStatus(`Footnote ${number} not found`, "error");
+    reportFootnoteError(`Footnote ${number} not found`);
     return;
   }
 
   scrollToTarget(target, true);
-  setStatus(`Footnote ${number} · page ${target.pageNumber}`, "success");
   // Only reference clicks with Markdown enabled should alter the clipboard.
   // The index retains the whole note, including any continuation pages, even
   // when the browser has not rendered all of those PDF text layers.
@@ -130,7 +114,6 @@ async function jumpToFootnote(rawNumber, originPage = currentPageNumber(), copyM
 
   const markdown = footnoteToMarkdown(target);
   if (!markdown) {
-    setStatus(`Footnote ${number}: text unavailable to copy`, "error");
     window.dispatchEvent(new CustomEvent("pdf-viewer-toast", {
       detail: { message: `Footnote ${number} has no extractable text to copy` },
     }));
@@ -140,13 +123,11 @@ async function jumpToFootnote(rawNumber, originPage = currentPageNumber(), copyM
   try {
     await navigator.clipboard.writeText(markdown);
     if (requestId !== lookupRequestId) return;
-    setStatus(`Footnote ${number} · copied as Markdown`, "success");
     window.dispatchEvent(new CustomEvent("pdf-viewer-toast", {
       detail: { message: `Copied footnote ${number} as Markdown` },
     }));
   } catch {
     if (requestId !== lookupRequestId) return;
-    setStatus(`Could not copy footnote ${number}`, "error");
     window.dispatchEvent(new CustomEvent("pdf-viewer-toast", {
       detail: { message: `Could not copy footnote ${number}` },
     }));
@@ -161,17 +142,5 @@ window.addEventListener("pdf-viewer-inline-footnote-jump", (event) => {
   }
 });
 
-form?.addEventListener("submit", (event) => {
-  event.preventDefault();
-  void jumpToFootnote(footnoteInput?.value || "");
-});
-
-footnoteInput?.addEventListener("click", () => {
-  footnoteInput.select();
-});
-
-footnoteInput?.addEventListener("input", () => {
-  setStatus("");
-});
 
 export { scrollToTarget };

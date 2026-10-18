@@ -23,11 +23,7 @@ function makeViewer({ enabled = true, noteText = "A [citation] with *emphasis*."
     getViewport() { return { width: 612, height: 792 }; },
   };
   const pdfDocument = { numPages: 3, async getPage() { return page; } };
-  const form = { addEventListener(type, fn) { listeners.set("form:" + type, fn); } };
-  const input = { value: "12", addEventListener(type, fn) { listeners.set("input:" + type, fn); } };
-  const status = { textContent: "", dataset: {} };
   const nodes = {
-    "#footnote-jump": form, "#footnote-number": input, "#footnote-jump-status": status,
     "#page-number": { value: "2" }, "#copy-as-markdown": toggle,
   };
   const context = vm.createContext({
@@ -54,13 +50,9 @@ function makeViewer({ enabled = true, noteText = "A [citation] with *emphasis*."
     for (let index = 0; index < 3; index += 1) await new Promise(setImmediate);
   };
   return {
-    events, copied, status, toggle, listeners, flush,
+    events, copied, toggle, listeners, flush,
     async click() {
       listeners.get("pdf-viewer-inline-footnote-jump")({ detail: { number: 12, originPage: 2 } });
-      await flush();
-    },
-    async submit() {
-      listeners.get("form:submit")({ preventDefault() {} });
       await flush();
     },
   };
@@ -90,10 +82,10 @@ test("disabled Markdown setting retains navigation without writing the clipboard
   assert.equal(viewer.events.filter(event => event.type === "pdf-viewer-footnote-jump").length, 1);
 });
 
-test("toolbar footnote lookups do not copy even when Markdown is enabled", async () => {
+test("footnote lookup does not register a removed toolbar form listener", async () => {
   const viewer = makeViewer();
-  await viewer.submit();
-  assert.deepEqual(viewer.copied, []);
+  assert.equal(viewer.listeners.has("form:submit"), false);
+  await viewer.click();
   assert.equal(viewer.events.filter(event => event.type === "pdf-viewer-footnote-jump").length, 1);
 });
 
@@ -101,7 +93,8 @@ test("unextractable notes never overwrite the clipboard", async () => {
   const viewer = makeViewer({ noteText: " " });
   await viewer.click();
   assert.deepEqual(viewer.copied, []);
-  assert.equal(viewer.status.dataset.state, "error");
+  assert.ok(viewer.events.some(event => event.type === "pdf-viewer-toast" &&
+    event.detail.message === "Footnote 12 has no extractable text to copy"));
   assert.equal(viewer.events.filter(event => event.type === "pdf-viewer-footnote-jump").length, 1);
 });
 
@@ -109,7 +102,6 @@ test("clipboard failures do not block footnote navigation", async () => {
   const viewer = makeViewer({ rejectClipboard: true });
   await viewer.click();
   assert.deepEqual(viewer.copied, []);
-  assert.equal(viewer.status.dataset.state, "error");
   assert.ok(viewer.events.some(event => event.type === "pdf-viewer-toast" &&
     event.detail.message === "Could not copy footnote 12"));
 });

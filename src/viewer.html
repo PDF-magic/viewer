@@ -144,24 +144,12 @@
           <button id="choose-loading-image" class="tool-button" type="button" role="menuitem">▧ <span>Custom loading image…</span></button>
           <button id="reset-loading-image" class="tool-button" type="button" role="menuitem" hidden>↺ <span>Use default loading image</span></button>
           <input id="custom-loading-image" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
-          <form id="footnote-jump" class="tool-footnote-jump" aria-label="Jump to footnote">
-            <label for="footnote-number">Footnote</label>
-            <div class="tool-footnote-row">
-              <input
-                id="footnote-number"
-                type="text"
-                inputmode="numeric"
-                pattern="[0-9]*"
-                autocomplete="off"
-                placeholder="#"
-                aria-label="Footnote number"
-              />
-              <button id="footnote-jump-button" class="tool-footnote-button" type="submit">Go</button>
-            </div>
-            <span id="footnote-jump-status" class="tool-footnote-status" aria-live="polite"></span>
-          </form>
           <button id="section-cross-reference-notes" class="tool-button" type="button" role="menuitem">§ <span>Section cross-references</span></button>
           <button id="cross-reference-notes" class="tool-button" type="button" role="menuitem">↗ <span>Footnote cross-references</span></button>
+          <label class="tool-toggle" title="Show a separate printed-page search field in the toolbar (off by default; you can always type 181* in the regular page field)">
+            <span>Show printed-page search</span>
+            <input id="printed-page-jump-opt-in" class="checkbox-input" type="checkbox" />
+          </label>
           <div class="menu-separator" role="separator"></div>
           <label class="tool-toggle" title="Use PDF structure tags to join printed lines within paragraphs when copying text, while keeping separate paragraphs and headings. On by default for tagged PDFs.">
             <span>Join tagged paragraph lines on copy</span>
@@ -175,18 +163,11 @@
             <span>Click to jump to references</span>
             <input id="clickable-references" class="checkbox-input" type="checkbox" checked />
           </label>
-          <label class="tool-toggle" title="Use the document minimap instead of the browser scrollbar">
-            <span>Show minimap</span>
-            <input id="show-minimap" class="checkbox-input" type="checkbox" checked />
-          </label>
           <label class="tool-toggle" title="Opt in to numbered page tabs in the side navigation (off by default)">
             <span>Enable numbered page tabs</span>
             <input id="page-tabs-opt-in" class="checkbox-input" type="checkbox" />
           </label>
-          <label class="tool-toggle" title="Show a separate printed-page search field in the toolbar (off by default; you can always type 181* in the regular page field)">
-            <span>Show printed-page search</span>
-            <input id="printed-page-jump-opt-in" class="checkbox-input" type="checkbox" />
-          </label>
+          <div class="menu-separator" role="separator"></div>
           <label class="tool-toggle" title="Show created and modified dates as elapsed time; hover over a date for its UTC timestamp">
             <span>Relative dates</span>
             <input id="relative-metadata-dates" class="checkbox-input" type="checkbox" />
