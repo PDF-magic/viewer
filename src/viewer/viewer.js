@@ -1335,7 +1335,8 @@ async function downloadPdf() {
 }
 
 function bindControls() {
-  installMarkdownCopy(viewer, document.querySelector("#copy-as-markdown"), document, document.querySelector("#copy-tagged-paragraphs"));
+  installMarkdownCopy(viewer, document.querySelector("#copy-as-markdown"), document,
+    document.querySelector("#copy-tagged-paragraphs"), document.querySelector("#copy-on-select"));
   window.addEventListener("pdf-viewer-toast", (event) => {
     if (typeof event.detail?.message === "string") showToast(event.detail.message);
   });
