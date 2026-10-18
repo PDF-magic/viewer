@@ -455,7 +455,7 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
         (note.hangingMargin === undefined ? entry.yRatio === note.yRatio :
           entry.text === note.inferredMarker && Math.abs(entry.y - note.baseline) <= note.textHeight * 0.8));
       const highlightedEntries = marker && !textEntries.includes(marker) ? [marker, ...textEntries] : textEntries;
-      if (text.length >= 3) result.push({ ...note, text, endPageNumber: pageNumber, endColumnIndex: column.index,
+      if (text.length >= 3) result.push({ ...note, markerItemIndex: marker ? items.indexOf(marker.item) : -1, text, endPageNumber: pageNumber, endColumnIndex: column.index,
         highlightRegions: highlightRegions(highlightedEntries, viewport, pageNumber),
         continues: !next && textEntries.at(-1)?.yRatio >= 0.88 &&
           ((note.hangingMargin === undefined && !note.scannedSmallBlock) || !/[.!?]["')\]]?$/.test(text)) });

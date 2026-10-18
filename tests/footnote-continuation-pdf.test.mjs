@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import { getDocument, OPS } from "pdfjs-dist/legacy/build/pdf.mjs";
+import { findClickableReferences } from "../src/viewer/navigation/clickable-reference-links.js";
 import { appendFootnotesForPage } from "../src/viewer/navigation/footnote-index.js";
 
 test("one footnote highlights both columns and continues onto the next PDF page", async () => {
@@ -18,6 +19,10 @@ test("one footnote highlights both columns and continues onto the next PDF page"
       const { items } = await page.getTextContent();
       const viewport = page.getViewport({ scale: 1 });
       appendFootnotesForPage(notes, items, viewport, pageNumber, await page.getOperatorList(), OPS, previous);
+      // Both the raised body reference and the label beside the note are clickable.
+      const labels = findClickableReferences(items, { viewport, pageCount: pdf.numPages })
+        .filter(ref => /^\d+$/.test(items[ref.itemIndex].str.trim()) && ref.kind === "footnote");
+      assert.deepEqual(labels.map(ref => ref.number), pageNumber === 1 ? [44, 44] : [45]);
       previous = { items, viewport };
     }
     assert.deepEqual(notes.map((note) => note.number), [44, 45]);

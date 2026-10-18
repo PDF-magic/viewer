@@ -1,3 +1,4 @@
+import { footnotesForPage } from "./footnote-index.js";
 import { findExplicitSectionReferences } from "./section-cross-references.js";
 
 // This controls inferred text links only. The PDF's own link annotations, and
@@ -33,10 +34,18 @@ function superscriptMarker(items, index, viewport) {
 
 export function findClickableReferences(items, { pageCount, sectionTargets = new Map(), viewport } = {}) {
   const matches = [];
+  // Index confirmed note labels so ordinary body numbers remain selectable.
+  const labels = new Map((viewport ? footnotesForPage(items || [], viewport, 1) : [])
+    .filter(note => note.markerItemIndex >= 0)
+    .map(note => [note.markerItemIndex, note]));
   for (const [itemIndex, item] of (items || []).entries()) {
     const content = item?.str;
     if (typeof content !== "string") continue;
     const candidates = [];
+    const note = labels.get(itemIndex);
+    const label = note && content.match(/^\s*(?:\[\s*\d+\s*\]|\(\s*\d+\s*\)|\d+[.)]?)(?=\s|$)/);
+    if (label) candidates.push({ itemIndex, start: 0, end: label[0].length,
+      kind: "footnote", number: note.number });
 
     for (const match of content.matchAll(FOOTNOTE_REFERENCE)) {
       const number = Number(match[1]);
