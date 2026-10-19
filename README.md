@@ -14,6 +14,7 @@ A Chrome Manifest V3 extension that replaces the normal PDF tab with a local PDF
 - Tracks the page currently centered in the viewport.
 - Copies the original document URL as `#page=<current page>` silently when the mark is clicked.
 - Honors an existing `#page=N` fragment when opening a document.
+- **More PDF tools → Copy link to highlighted text** copies an original-PDF URL containing `#page=N:~:text=...`. Chromium can open these links natively, and PDF-magic resolves the text fragment through its PDF.js search to highlight and scroll to the passage. The PDF needs extractable text; a local `file://` URL is usable only where that path exists.
 - Places Download beside the page-link icon and keeps rotate left/right and print in the **More tools** menu.
 - Keeps the More tools menu open across repeated rotate actions.
 - Offers a default-on **More PDF tools → Join tagged paragraph lines on copy** setting. This uses PDF.js's exposed structure-tree paragraph tags and MCIDs to join soft printed line breaks and respect tagged block reading order in the clipboard; turning it off restores the original line breaks. Plain text copy works without enabling Markdown. PDFs lacking reliable tags retain their native copy behavior. Note: PDF.js does not currently expose /ActualText values stored only in content-stream BDC properties, so this reflows tagged text rather than reading that replacement string verbatim.
