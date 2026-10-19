@@ -458,7 +458,7 @@ test('native scrollbar gutter respects toolbar rows, the scrubber, and split-vie
     styles,
     /:root\s*\{\s*--native-scrollbar-top:\s*52px;\s*--split-view-bottom-clearance:\s*0px;\s*--native-scrollbar-bottom:\s*calc\(var\(--document-scrubber-height, 0px\) \+ var\(--split-view-bottom-clearance\)\);/,
   );
-  assert.match(styles, /@media\s*\(max-width:\s*1200px\)\s*\{\s*:root\s*\{\s*--split-view-bottom-clearance:\s*48px;/);
+  assert.match(styles, /@media\s*\(max-width:\s*1200px\)\s*\{\s*:root:has\(#document-scrubber:not\(\[hidden\]\)\)\s*\{\s*--split-view-bottom-clearance:\s*48px;/);
   assert.match(styles, /:root\.toolbar-two-rows\s*\{\s*--native-scrollbar-top:\s*100px;/);
   assert.match(
     styles,
@@ -471,6 +471,13 @@ test('native scrollbar gutter respects toolbar rows, the scrubber, and split-vie
   assert.match(viewerStyles, /\.document-scrubber\s*\{[\s\S]*?width:\s*100vw;/);
 });
 
+
+test('collapsed minimap toggle stays outside the native scrollbar and keeps its border', () => {
+  assert.match(styles, /\.minimap-collapsed \.minimap-shell\s*\{[^}]*?right:\s*0;/);
+  assert.doesNotMatch(styles, /right:\s*calc\(100% - 100vw\)/);
+  assert.match(styles, /\.minimap-collapsed \.minimap-controls\s*\{[^}]*?border:\s*1px solid var\(--border\);/);
+  assert.match(styles, /\.minimap-collapsed\.minimap-left \.minimap-shell\s*\{[^}]*?right:\s*auto;[^}]*?left:\s*0;/);
+});
 
 test('minimap has a dedicated collapse button without a duplicate settings toggle', () => {
   const f = fixture(3);
