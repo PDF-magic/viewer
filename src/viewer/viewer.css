@@ -334,6 +334,23 @@ input {
   padding-left: 14px;
 }
 
+.section-bookmark-toggle {
+  display: block;
+  margin: 4px 12px 10px;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: #c3bddb;
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.section-bookmark-toggle[hidden] {
+  display: none;
+}
+
 .section-entry {
   min-width: 0;
 }
