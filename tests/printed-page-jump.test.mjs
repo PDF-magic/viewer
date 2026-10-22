@@ -151,3 +151,35 @@ test("clicking total page count requests the final physical page", () => {
   handlers.click();
   assert.ok(selected, "the current page is still selectable");
 });
+
+test("compact two-row search ends beside Sweetie Bot instead of leaving a large gap", () => {
+  const html = readFileSync(new URL("../src/viewer.html", import.meta.url), "utf8");
+  const layout = readFileSync(new URL("../src/viewer/navigation/toolbar-layout.css", import.meta.url), "utf8");
+  const viewerCss = readFileSync(new URL("../src/viewer/viewer.css", import.meta.url), "utf8");
+  const toolbarScript = readFileSync(new URL("../src/viewer/navigation/toolbar-layout.js", import.meta.url), "utf8");
+
+  assert.match(toolbarScript, /TOOLBAR_ROW_BREAKPOINT\s*=\s*900/);
+  assert.match(html, /class="search-tools"[\s\S]*?id="search-input"[\s\S]*?class="search-actions"[\s\S]*?id="summarize-chatgpt"/);
+
+  const twoRow = layout.match(/:where\(:root\.toolbar-two-rows\)\s*\{([\s\S]*?)\n\}/)?.[1];
+  assert.ok(twoRow, "the narrow layout must retain its second toolbar row");
+  const search = twoRow.match(/  \.search-tools\s*\{([^}]*)\}/)?.[1];
+  const actions = twoRow.match(/  \.search-actions\s*\{([^}]*)\}/)?.[1];
+  assert.ok(search && actions);
+  assert.match(search, /top:\s*56px;/);
+  assert.match(search, /left:\s*8px;/);
+  assert.match(search, /width:\s*auto;/);
+  assert.match(actions, /top:\s*56px;/);
+  const searchRightInset = Number(search.match(/right:\s*(\d+)px;/)?.[1]);
+  const buttonRightInset = Number(actions.match(/right:\s*(\d+)px;/)?.[1]);
+  const markButton = viewerCss.match(/\.mark-button\s*\{([^}]*)\}/)?.[1];
+  const buttonWidth = Number(markButton?.match(/width:\s*(\d+)px;/)?.[1]);
+  assert.equal(buttonWidth, 30, "Sweetie Bot uses the shared mark-button width");
+
+  for (const width of [320, 500, 720, 900]) {
+    const searchRightEdge = width - searchRightInset;
+    const sweetieLeftEdge = width - buttonRightInset - buttonWidth;
+    assert.equal(sweetieLeftEdge - searchRightEdge, 8, `search/Sweetie spacing at ${width}px`);
+    assert.ok(searchRightEdge > 8 + buttonWidth + 8 + 40, "search field remains usable");
+  }
+});
