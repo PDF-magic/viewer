@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
 import { footnoteToMarkdown } from "../src/viewer/selection/markdown-copy.js";
+import { footnotesForPage } from "../src/viewer/navigation/footnote-index.js";
 
 const source = readFileSync(
   new URL("../src/viewer/navigation/footnote-jump.js", import.meta.url), "utf8",
@@ -104,4 +105,37 @@ test("clipboard failures do not block footnote navigation", async () => {
   assert.deepEqual(viewer.copied, []);
   assert.ok(viewer.events.some(event => event.type === "pdf-viewer-toast" &&
     event.detail.message === "Could not copy footnote 12"));
+});
+
+test("SEC November 2007 TIC footnotes separate arithmetic-only note 13 from note 12", () => {
+  // Reproduces the geometry of 2007-11.pdf page 173: the note 13 body
+  // begins with a number, and the multiplication sign uses a smaller glyph.
+  const height = 789;
+  const viewport = { width: 612, height, convertToViewportPoint: (x, y) => [x, height - y] };
+  const item = (str, x, y, size, width) => ({
+    str, width, height: size, transform: [1, 0, 0, size, x, height - y],
+  });
+  const items = [
+    item("The reporting burden is estimated", 75, 184, 12, 220),
+    item("12", 298, 177, 6, 8),
+    item("from industry discussions", 308, 184, 12, 190),
+    item("The participants would make disclosures", 75, 270, 12, 275),
+    item("13", 353, 263, 6, 8),
+    item("per year.", 362, 270, 12, 80),
+    item("12", 74, 487, 8, 10),
+    item("Based on discussions with industry representatives", 110, 490, 12, 320),
+    item("agreement six times a year, and others would do so seven times a year.", 74, 674, 12, 445),
+    item("13", 74, 692, 8, 10),
+    item("6.63", 110, 695, 12, 28),
+    item("X", 142, 695, 8, 8),
+    item("800 = 5,304.", 153, 695, 12, 78),
+    item("13", 303, 747, 12, 13), // printed page number, not a note
+  ];
+  const notes = footnotesForPage(items, viewport, 173, [{ x: 74, y: 367, width: 300 }]);
+  assert.deepEqual(notes.map(({ number }) => number), [12, 13]);
+  assert.match(notes[0].text, /others would do so seven times a year\\.$/);
+  assert.doesNotMatch(notes[0].text, /6\\.63|5,304/);
+  assert.equal(notes[1].text, "6.63 X 800 = 5,304.");
+  assert.ok(notes[0].highlightRegions.every(region => region.top + region.height < 687 / height));
+  assert.ok(notes[1].highlightRegions.every(region => region.top > 680 / height));
 });
