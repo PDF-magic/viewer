@@ -197,7 +197,9 @@
   .search-tools {
     top: 56px;
     left: 8px;
-    width: calc(100% - 88px);
+    /* Sweetie Bot: 8px outer inset + 30px button + 8px gap. */
+    right: 46px;
+    width: auto;
     transform: none;
   }
 
