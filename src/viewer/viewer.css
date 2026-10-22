@@ -1086,13 +1086,9 @@ input {
 }
 
 @media (max-width: 720px) {
+  /* Preserve the page outline and rounded corners in narrow split views. */
   .viewer {
-    padding-inline: 0;
-  }
-
-  .page {
-    width: 100%;
-    border-radius: 0;
+    padding-inline: 8px;
   }
 
   .toolbar {
