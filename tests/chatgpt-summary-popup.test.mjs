@@ -169,3 +169,14 @@ test("Shift-click deliberately starts a fresh chat even when the PDF has a saved
   assert.equal(data.conversationKey, null);
   assert.match(fixture.calls[3][1].url, /^https:\/\/chatgpt.com\/#/);
 });
+
+test("keeps an in-progress PDF transfer reachable after two minutes in a background tab", async () => {
+  const fixture = setup();
+  fixture.saved["pdf-viewer-chatgpt-conversation:123456"] = {
+    status: "pending", tabId: 19, createdAt: Date.now() - 3 * 60 * 1000,
+  };
+  const click = fixture.click();
+  fixture.resolveUrl("https://example.com/original.pdf");
+  await click;
+  assert.deepEqual(fixture.calls.map(([action]) => action), ["popup", "focus", "navigate", "close"]);
+});

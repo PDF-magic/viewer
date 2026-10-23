@@ -4,7 +4,7 @@ import { pdfDocumentSessionReady } from "../pdf-document-session.js";
 const summarizeButton = document.querySelector("#summarize-chatgpt");
 const STORAGE_PREFIX = "pdf-viewer-chatgpt-summary:";
 const CONVERSATION_PREFIX = "pdf-viewer-chatgpt-conversation:";
-const PENDING_MAX_AGE_MS = 120000;
+const PENDING_MAX_AGE_MS = 10 * 60 * 1000;
 const CHATGPT_URL = "https://chatgpt.com/";
 const defaultTitle = summarizeButton.title;
 // Resolve PDF metadata while the viewer loads, before the user asks for a summary.
@@ -71,7 +71,7 @@ function registerPdfTransfer(requestId, filename) {
   const port = chrome.runtime.connect({ name: "pdf-summary-source:" + requestId });
   let stopped = false;
   let awaitingAck;
-  const expire = setTimeout(() => port.disconnect(), 120000);
+  const expire = setTimeout(() => port.disconnect(), PENDING_MAX_AGE_MS);
   port.onDisconnect.addListener(() => {
     stopped = true;
     if (awaitingAck) awaitingAck.reject(new Error("PDF transfer disconnected"));

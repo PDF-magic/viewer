@@ -126,15 +126,15 @@ async function rememberConversation(conversationKey) {
     let elapsed = 0;
     const check = () => {
       const found = currentConversationUrl();
-      if (found || elapsed >= 60000) {
+      if (found || elapsed >= 10 * 60 * 1000) {
         clearInterval(interval);
         resolve(found);
       }
     };
     const interval = setInterval(() => {
-      elapsed += 500;
+      elapsed += 1000;
       check();
-    }, 500);
+    }, 1000);
     check();
   });
   if (url) {
