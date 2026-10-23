@@ -8,6 +8,7 @@ import { resolvePdfSource } from "./pdf-source.js";
 import { readResumedPage, saveResumedPage } from "./page-resume.js";
 import { findSearchMatches } from "./search/search-matches.js";
 import { installMarkdownCopy, markPdfTextStyles, markPdfTextStructure } from "./selection/markdown-copy.js";
+import { installParagraphDoubleClick } from "./selection/paragraph-double-click.js";
 import { highlightTextLayer, registerSearchText } from "./search/search-highlight.js";
 import { normalizeSearchText } from "./search/search-text.js";
 import { PagePreviews } from "./page-previews.js";
@@ -1336,6 +1337,7 @@ async function downloadPdf() {
 
 function bindControls() {
   installMarkdownCopy(viewer, document.querySelector("#copy-as-markdown"), document, document.querySelector("#copy-tagged-paragraphs"));
+  installParagraphDoubleClick(viewer, document.querySelector("#copy-as-markdown"));
   window.addEventListener("pdf-viewer-toast", (event) => {
     if (typeof event.detail?.message === "string") showToast(event.detail.message);
   });
