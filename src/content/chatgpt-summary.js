@@ -89,6 +89,43 @@ function clearRequestHash() {
 }
 
 
+function currentConversationUrl() {
+  const url = new URL(window.location.href);
+  return url.origin === "https://chatgpt.com" && /^\/c\/[a-z0-9-]+\/?$/i.test(url.pathname)
+    ? url.origin + url.pathname.replace(/\/$/, "") : null;
+}
+
+// A fresh ChatGPT conversation obtains its /c/ URL after send. Record it only
+// once it exists; subsequent summary requests reuse the attached PDF there.
+async function rememberConversation(conversationKey) {
+  const url = await new Promise((resolve) => {
+    let elapsed = 0;
+    const check = () => {
+      const found = currentConversationUrl();
+      if (found || elapsed >= 60000) {
+        clearInterval(interval);
+        resolve(found);
+      }
+    };
+    const interval = setInterval(() => {
+      elapsed += 500;
+      check();
+    }, 500);
+    check();
+  });
+  if (url) {
+    await chrome.storage.local.set({
+      [conversationKey]: { status: "complete", url, updatedAt: Date.now() },
+    });
+  } else {
+    // Do not leave an indefinitely pending entry after navigation fails.
+    const stored = await chrome.storage.local.get(conversationKey);
+    if (stored[conversationKey]?.status === "pending") {
+      await chrome.storage.local.remove(conversationKey);
+    }
+  }
+}
+
 function findPdfInput() {
   return Array.from(document.querySelectorAll('input[type="file"]')).find((input) => {
     const accepts = (input.accept || "").toLowerCase();
@@ -200,9 +237,18 @@ async function submitPendingSummary() {
     }, 30000);
     if (!sendButton) throw new Error("ChatGPT send button unavailable");
     sendButton.click();
+    if (payload.attachmentRequired && payload.conversationKey) {
+      void rememberConversation(payload.conversationKey).catch(() => {});
+    }
     port?.postMessage({ type: "finish" });
   } catch (error) {
     port?.postMessage({ type: "cancel" });
+    if (payload.attachmentRequired && payload.conversationKey) {
+      const current = await chrome.storage.local.get(payload.conversationKey);
+      if (current[payload.conversationKey]?.status === "pending") {
+        await chrome.storage.local.remove(payload.conversationKey);
+      }
+    }
     // Fail visibly and leave an unsent draft; never summarize just a file path.
     const draft = "PDF not attached automatically (" + error.message +
       "). Attach it manually before sending.\n\n" + payload.prompt;

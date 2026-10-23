@@ -3,6 +3,8 @@ import { pdfDocumentSessionReady } from "../pdf-document-session.js";
 
 const summarizeButton = document.querySelector("#summarize-chatgpt");
 const STORAGE_PREFIX = "pdf-viewer-chatgpt-summary:";
+const CONVERSATION_PREFIX = "pdf-viewer-chatgpt-conversation:";
+const PENDING_MAX_AGE_MS = 120000;
 const CHATGPT_URL = "https://chatgpt.com/";
 const defaultTitle = summarizeButton.title;
 // Resolve PDF metadata while the viewer loads, before the user asks for a summary.
@@ -118,11 +120,46 @@ function registerPdfTransfer(requestId, filename) {
   return port;
 }
 
-async function openChatGPTSummary() {
+function savedConversationUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.origin === "https://chatgpt.com" && /^\/c\/[a-z0-9-]+\/?$/i.test(url.pathname)
+      ? url.origin + url.pathname.replace(/\/$/, "") : null;
+  } catch {
+    return null;
+  }
+}
+
+async function pdfContentHash() {
+  const session = await pdfDocumentSessionReady;
+  if (!session?.document) throw new Error("PDF has not finished loading");
+  const bytes = await session.document.getData();
+  if (!bytes?.length || bytes.length > 512 * 1024 * 1024) {
+    throw new Error("PDF empty or over 512 MB attachment limit");
+  }
+  // Hash bytes, not the filename or URL: changed PDFs must not reuse an old attachment.
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function focusPendingSummary(entry) {
+  if (entry?.status !== "pending" || Date.now() - entry.createdAt > PENDING_MAX_AGE_MS) {
+    return false;
+  }
+  try {
+    const tab = await chrome.tabs.get(entry.tabId);
+    if (!tab) return false;
+    await chrome.windows.update(tab.windowId, { focused: true });
+    await chrome.tabs.update(tab.id, { active: true });
+    return true;
+  } catch {
+    return false; // The previous popup was closed.
+  }
+}
+
+async function openChatGPTSummary({ freshChat = false } = {}) {
   const requestId = crypto.randomUUID();
   const storageKey = `${STORAGE_PREFIX}${requestId}`;
-  const chatgptUrl = new URL(CHATGPT_URL);
-  chatgptUrl.hash = `pdf-viewer-summary=${encodeURIComponent(requestId)}`;
 
   const screenWidth = window.screen.availWidth || window.screen.width || 1440;
   const screenHeight = window.screen.availHeight || window.screen.height || 900;
@@ -148,6 +185,8 @@ async function openChatGPTSummary() {
   }
 
   let sourcePort;
+  let conversationKey;
+  let reserved = false;
   try {
     const fileUrl = await documentReferenceUrl;
     if (!fileUrl) {
@@ -156,29 +195,54 @@ async function openChatGPTSummary() {
       return;
     }
     const filename = pdfFilename(fileUrl);
-    await chrome.storage.local.set({
-      [storageKey]: {
-        prompt: summaryPrompt(fileUrl, filename),
-        createdAt: Date.now(),
-        attachmentRequired: true,
-      },
-    });
-    sourcePort = registerPdfTransfer(requestId, filename);
+    let existingConversation = null;
+    if (!freshChat) {
+      conversationKey = CONVERSATION_PREFIX + await pdfContentHash();
+      const stored = await chrome.storage.local.get(conversationKey);
+      existingConversation = stored[conversationKey];
+      if (await focusPendingSummary(existingConversation)) {
+        await chrome.tabs.remove(summaryTab.id);
+        return; // Focus the active upload rather than initiating another one.
+      }
+    }
+    const previousUrl = savedConversationUrl(existingConversation?.url);
+    const reuse = !freshChat && existingConversation?.status === "complete" && previousUrl;
+    const chatgptUrl = new URL(reuse || CHATGPT_URL);
+    chatgptUrl.hash = `pdf-viewer-summary=${encodeURIComponent(requestId)}`;
+    const payload = {
+      prompt: summaryPrompt(fileUrl, filename),
+      createdAt: Date.now(),
+      attachmentRequired: !reuse,
+      conversationKey: conversationKey || null,
+    };
+    const changes = { [storageKey]: payload };
+    if (conversationKey && !reuse) {
+      changes[conversationKey] = { status: "pending", tabId: summaryTab.id, createdAt: Date.now() };
+      reserved = true;
+    }
+    await chrome.storage.local.set(changes);
+    if (!reuse) sourcePort = registerPdfTransfer(requestId, filename);
     await chrome.tabs.update(summaryTab.id, { url: chatgptUrl.href });
   } catch (error) {
     sourcePort?.disconnect();
     await chrome.storage.local.remove(storageKey);
+    if (reserved) {
+      const stored = await chrome.storage.local.get(conversationKey);
+      if (stored[conversationKey]?.tabId === summaryTab.id) {
+        await chrome.storage.local.remove(conversationKey);
+      }
+    }
     await chrome.tabs.remove(summaryTab.id).catch(() => {});
     throw error;
   }
 }
 
-summarizeButton.addEventListener("click", async () => {
+summarizeButton.addEventListener("click", async (event) => {
   dismissSummaryTooltip();
   summarizeButton.disabled = true;
 
   try {
-    await openChatGPTSummary();
+    await openChatGPTSummary({ freshChat: Boolean(event?.shiftKey) });
   } catch {
     showTemporaryTitle("Could not open ChatGPT");
   } finally {
