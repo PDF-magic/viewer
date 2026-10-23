@@ -7,17 +7,24 @@ function requestIdFromLocation() {
 }
 
 function findComposer() {
-  const composer = (
-    document.querySelector("#prompt-textarea") ||
-    document.querySelector('[contenteditable="true"][data-lexical-editor="true"]') ||
-    document.querySelector('[contenteditable="true"][role="textbox"]') ||
-    document.querySelector("textarea")
-  );
-  if (!composer || !composer.isConnected || !composer.getClientRects().length) return null;
-  if (composer instanceof HTMLTextAreaElement) {
-    return !composer.disabled && !composer.readOnly ? composer : null;
-  }
-  return composer.isContentEditable ? composer : null;
+  const candidates = [
+    document.querySelector("#prompt-textarea"),
+    document.querySelector('[contenteditable="true"][data-lexical-editor="true"]'),
+    document.querySelector('[contenteditable="true"][role="textbox"]'),
+    document.querySelector("textarea"),
+  ].filter((composer) => composer && composer.isConnected && (
+    composer instanceof HTMLTextAreaElement
+      ? !composer.disabled && !composer.readOnly
+      : composer.isContentEditable
+  ));
+  // The active tab has a visible editor. When the tab/window is backgrounded,
+  // layout rects may not be available, but the connected editor is still usable.
+  return candidates.find((composer) => composer.getClientRects().length) || candidates[0] || null;
+}
+
+function composerContainsPrompt(composer, prompt) {
+  const value = composer instanceof HTMLTextAreaElement ? composer.value : composer.textContent;
+  return value === prompt || (composer.innerText || "").replace(/\r\n/g, "\n") === prompt;
 }
 
 function findSendButton() {
@@ -66,18 +73,35 @@ function waitFor(getValue, timeoutMs) {
   return new Promise((resolve) => {
     let observer;
     let timeout;
+    let finished = false;
     const finish = (value) => {
-      observer?.disconnect();
+      if (finished) return;
+      finished = true;
+      observer.disconnect();
       window.clearTimeout(timeout);
+      document.removeEventListener("visibilitychange", check);
+      window.removeEventListener("focus", check);
       resolve(value);
     };
     const check = () => {
+      if (finished) return;
       const value = getValue();
       if (value) finish(value);
     };
+    const expire = () => {
+      // A background tab can be throttled before ChatGPT hydrates. Do not
+      // discard the pending prompt just because the user switched away.
+      if (document.visibilityState === "hidden" || document.hasFocus?.() === false) {
+        timeout = window.setTimeout(expire, timeoutMs);
+      } else {
+        finish(null);
+      }
+    };
     observer = new MutationObserver(check);
     observer.observe(document, { childList: true, subtree: true, attributes: true });
-    timeout = window.setTimeout(() => finish(null), timeoutMs);
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("focus", check);
+    timeout = window.setTimeout(expire, timeoutMs);
     check();
   });
 }
@@ -188,19 +212,17 @@ async function attachPdf(file) {
   data.items.add(file);
   input.files = data.files;
   input.dispatchEvent(new Event("change", { bubbles: true }));
-  // An existing file selection is not enough: wait for ChatGPT's attachment
-  // chip before allowing the summary to be submitted.
-  const acknowledged = await waitFor(() => {
-    const displayed = Array.from(document.querySelectorAll(
-      '[data-testid*="attachment"], [data-testid*="file"], [title], [aria-label]',
-    )).some((element) => (
-      (element.textContent || "").includes(file.name) ||
-      (element.getAttribute("title") || "").includes(file.name) ||
-      (element.getAttribute("aria-label") || "").includes(file.name)
-    ));
-    return displayed && !document.querySelector('[role="progressbar"]');
-  }, 90000);
-  if (!acknowledged) throw new Error("ChatGPT did not confirm the PDF attachment");
+  // Wait only until ChatGPT registers the attachment. Its upload can remain
+  // in progress: ChatGPT queues the message and sends it once the PDF is ready.
+  // Restrict this check to attachment UI, not arbitrary labels or prompt text.
+  const acknowledged = await waitFor(() => Array.from(document.querySelectorAll(
+    '[data-testid*="attachment"], [data-testid*="file"]',
+  )).some((element) => (
+    (element.textContent || "").includes(file.name) ||
+    (element.getAttribute("title") || "").includes(file.name) ||
+    (element.getAttribute("aria-label") || "").includes(file.name)
+  )), 90000);
+  if (!acknowledged) throw new Error("ChatGPT did not register the PDF attachment");
 }
 
 async function submitPendingSummary() {
@@ -210,31 +232,32 @@ async function submitPendingSummary() {
   const stored = await chrome.storage.local.get(storageKey);
   const payload = stored[storageKey];
   if (!payload?.prompt) return;
-  let composer = await waitFor(findComposer, 20000);
-  if (!composer) {
-    await chrome.storage.local.remove(storageKey);
-    clearRequestHash();
-    return;
-  }
+  let composer;
   let port;
   try {
+    composer = await waitFor(findComposer, 90000);
+    if (!composer) throw new Error("ChatGPT composer unavailable");
+    // Compose immediately, before transferring the PDF or waiting for its
+    // upload. A backgrounded or hydrated page must not lose the prompt.
+    setComposerText(composer, payload.prompt);
     if (payload.attachmentRequired) {
       const pdf = await receivePdf(requestId);
       port = pdf.port;
       await attachPdf(pdf.file);
     }
-    setComposerText(composer, payload.prompt);
     const sendButton = await waitFor(() => {
       const current = findComposer();
       if (!current) return null;
-      if (current !== composer) {
+      if (current !== composer || !composerContainsPrompt(current, payload.prompt)) {
         composer = current;
         setComposerText(composer, payload.prompt);
         return null;
       }
       const button = findSendButton();
-      return button && !button.disabled && button.getClientRects().length ? button : null;
-    }, 30000);
+      return button && !button.disabled && button.isConnected !== false &&
+        (button.getClientRects().length || document.visibilityState === "hidden")
+        ? button : null;
+    }, 90000);
     if (!sendButton) throw new Error("ChatGPT send button unavailable");
     sendButton.click();
     if (payload.attachmentRequired && payload.conversationKey) {
@@ -252,7 +275,8 @@ async function submitPendingSummary() {
     // Fail visibly and leave an unsent draft; never summarize just a file path.
     const draft = "PDF not attached automatically (" + error.message +
       "). Attach it manually before sending.\n\n" + payload.prompt;
-    setComposerText(findComposer() || composer, draft);
+    const failedComposer = findComposer() || composer;
+    if (failedComposer) setComposerText(failedComposer, draft);
   } finally {
     port?.disconnect();
     await chrome.storage.local.remove(storageKey);
