@@ -64,3 +64,27 @@ test("reference preference is in More PDF tools and only controls inferred links
   // Embedded PDF links are still handled by PDF.js, not by this preference.
   assert.match(viewer, /new AnnotationLayer\(\{/);
 });
+
+test("generated hyperlinks use the theme accent without restyling native PDF links", () => {
+  const css = readFileSync(new URL("../src/viewer/annotation-layer.css", import.meta.url), "utf8");
+  const hoverRules = [
+    css.match(/\.printed-contents-link:hover\s*\{([^}]*)\}/)?.[1],
+    css.match(/\.clickable-reference-link:hover\s*\{([^}]*)\}/)?.[1],
+  ];
+  const focusRules = [
+    css.match(/\.printed-contents-link:focus-visible\s*\{([^}]*)\}/)?.[1],
+    css.match(/\.clickable-reference-link:focus-visible\s*\{([^}]*)\}/)?.[1],
+  ];
+  for (const hover of hoverRules) {
+    assert.ok(hover, "generated link hover styling must exist");
+    assert.match(hover, /background:\s*color-mix\(in srgb, var\(--accent\) 14%, transparent\)/);
+    assert.match(hover, /outline:\s*1px solid color-mix\(in srgb, var\(--accent\) 32%, transparent\)/);
+  }
+  for (const focus of focusRules) {
+    assert.ok(focus, "generated link keyboard focus styling must exist");
+    assert.match(focus, /outline:\s*2px solid var\(--accent\)/);
+  }
+  // Keep native PDF.js link annotations independent of the accent treatment.
+  const nativeRule = css.match(/\.annotation-layer \.linkAnnotation\s*\{([^}]*)\}/)?.[1] ?? "";
+  assert.doesNotMatch(nativeRule, /--accent|color-mix|background|outline/);
+});
