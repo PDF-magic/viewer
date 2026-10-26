@@ -144,7 +144,7 @@ test("footnote indexing ignores an edge page number in a running footer", () => 
     },
   );
 
-  assert.deepEqual(footnotesForPage(items, viewport, 5), []);
+  assert.equal(footnotesForPage(items, viewport, 5).length, 0);
 });
 
 

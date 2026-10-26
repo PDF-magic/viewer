@@ -136,7 +136,7 @@ test("enhancer setup submits a ZIP request only after explicit form submission",
     preventDefault() { prevented = true; },
   });
   assert.equal(prevented, true);
-  assert.deepEqual(setupDownloads, [{
+  assert.deepEqual(setupDownloads.map((option) => ({ ...option })), [{
     extensionId: "abcdefghijklmnopabcdefghijklmnop",
     repositoryUrl: "https://github.com/example/enhancer",
     checkoutPath: "/tmp/my-enhancer",
