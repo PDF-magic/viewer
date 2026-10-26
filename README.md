@@ -21,6 +21,10 @@ A Chrome Manifest V3 extension that replaces the normal PDF tab with a local PDF
 - Prepares compressed previews of every page in the background for fast scrolling, while keeping sharp rendering and selectable text near the current page.
 - Shows a PDF Enhancer button in the top-left section slot when a document has no section navigator; enhanced local copies retain the original web reference URL for link copying and ChatGPT summaries.
 
+## Continuous integration and tests
+
+GitHub Actions runs individually reported feature suites (rendering, navigation, references, footnotes, search, selection, document metadata, appearance, ChatGPT and security), independent Linux/macOS native-host tests, JavaScript syntax checks and a separate extension packaging check. All JavaScript tests must be assigned to exactly one feature suite. See [testing documentation](docs/testing.md) for commands and coverage limits.
+
 ## Load directly in Chrome
 
 Install dependencies once:
