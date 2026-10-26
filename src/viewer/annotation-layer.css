@@ -18,6 +18,9 @@
 
 .annotation-layer .linkAnnotation {
   pointer-events: auto;
+  /* PDF.js adds inline borders for LaTeX/hyperref links. Keep the hit areas
+     without drawing boxes around citations and footnote markers. */
+  border: 0 !important;
 }
 
 .annotation-layer .linkAnnotation > a {

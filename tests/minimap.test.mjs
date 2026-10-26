@@ -93,48 +93,42 @@ test('switching to local view keeps thumbnails unclipped at the middle and end',
   }
 });
 
-test('short overview documents temporarily use local navigator sizing until the viewport needs compression', () => {
-  const f = fixture(2);
-  assert.ok(!f.classes.has('minimap-local'));
-  assert.ok(f.classes.has('minimap-local-active'));
-  assert.equal(f.storedValues.get('pdf-viewer-minimap-mode'), undefined);
-  assert.equal(parseFloat(f.tiles[0].style.top), 0);
-  assert.equal(parseFloat(f.tiles[0].style.height), 112);
-  assert.ok(parseFloat(f.tiles[1].style.top) + 112 < f.track.clientHeight);
-
-  f.window.innerHeight = 200;
-  f.track.clientHeight = 148;
-  f.sync();
-  assert.ok(!f.classes.has('minimap-local-active'));
-  assert.ok(parseFloat(f.tiles[0].style.height) < 112);
-  assert.ok(Math.abs(
-    parseFloat(f.tiles[1].style.top) + parseFloat(f.tiles[1].style.height) - f.track.clientHeight,
-  ) < 0.00001);
-
-  f.window.innerHeight = 1600;
-  f.track.clientHeight = 1548;
-  f.sync();
-  assert.ok(f.classes.has('minimap-local-active'));
-  assert.equal(parseFloat(f.tiles[0].style.height), 112);
+test('short overview documents fill the track on tall monitors and after resizing', () => {
+  for (const count of [1, 2, 9]) {
+    const f = fixture(count, 1900);
+    for (const height of [1900, 200, 1600]) {
+      f.window.innerHeight = height;
+      f.track.clientHeight = height - 52;
+      f.sync();
+      const last = f.tiles.at(-1);
+      const lastBottom = parseFloat(last.style.top) + parseFloat(last.style.height);
+      assert.ok(Math.abs(lastBottom - f.track.clientHeight) < 0.00001);
+      assert.ok(!f.classes.has('minimap-local'));
+      assert.equal(f.storedValues.get('pdf-viewer-minimap-mode'), undefined);
+      assert.equal(vm.runInContext('mapOffset', f.context), 0);
+      vm.runInContext('scrollFromViewportTop(mapHeight - viewportHeight)', f.context);
+      assert.equal(f.window.scrollY, Math.max(count * 1420 - height, 0));
+    }
+  }
 });
 
-test('short minimaps gradually fade their document-colored tail to half opacity', () => {
-  const f = fixture(2);
+test('explicit local mode keeps natural thumbnail heights and fades the unused tail', () => {
+  const f = fixture(2, 1900, { 'pdf-viewer-minimap-mode': 'local' });
+  assert.ok(f.classes.has('minimap-local'));
   assert.equal(f.track.style['--minimap-content-height'], '224px');
   assert.equal(f.track.style['--minimap-tail-fade-height'], '112px');
   assert.match(styles, /\.minimap::after\s*\{[\s\S]*?top:\s*min\(var\(--minimap-content-height, 100%\), 100%\)/);
-  assert.match(styles, /\.minimap::after\s*\{[\s\S]*?right:\s*8px;[\s\S]*?left:\s*8px;/);
-  assert.match(styles, /\.minimap::after\s*\{[\s\S]*?background:\s*linear-gradient\(\s*to bottom,\s*var\(--page-bg\) 0,\s*color-mix\(in srgb, var\(--page-bg\) 50%, transparent\)\s*max\(100%, var\(--minimap-tail-fade-height, 0px\)\)\s*\)/);
   assert.match(styles, /\.minimap-pages\s*\{[\s\S]*?z-index:\s*1/);
 
   f.window.innerHeight = 200;
   f.track.clientHeight = 148;
   f.sync();
+  assert.equal(parseFloat(f.tiles[0].style.height), 112);
   assert.equal(f.track.style['--minimap-content-height'], '148px');
 });
 
-test('minimap packs page thumbnails without viewer gaps', () => {
-  const f = fixture(3);
+test('local minimap packs page thumbnails without viewer gaps', () => {
+  const f = fixture(3, 900, { 'pdf-viewer-minimap-mode': 'local' });
   assert.equal(parseFloat(f.tiles[0].style.top), 0);
   assert.equal(parseFloat(f.tiles[1].style.top), 112);
   assert.equal(parseFloat(f.tiles[2].style.top), 224);
