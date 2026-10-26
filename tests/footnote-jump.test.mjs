@@ -12,6 +12,7 @@ const styles = readFileSync(new URL("../src/viewer/viewer.css", import.meta.url)
 
 function loadFootnoteHelpers() {
   const context = vm.createContext({
+    window: { addEventListener() {} },
     document: {
       querySelector() {
         return null;

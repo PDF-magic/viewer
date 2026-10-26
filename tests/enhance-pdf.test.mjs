@@ -10,14 +10,16 @@ const markup = readFileSync(new URL("../src/viewer.html", import.meta.url), "utf
 async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new Uint8Array([37, 80, 68, 70, 45]), sourceUrl = "https://example.com/source.pdf", documentOverrides = {}, setupOptions = {}) {
   const elements = new Map();
   const clickHandlers = new Map();
-  for (const id of ["enhance-nav", "enhance-pdf", "section-enhance-pdf", "section-popover", "section-toggle", "install-enhancer", "section-nav", "page-number", "toast", "enhance-progress", "enhance-progress-bar", "enhance-progress-label", "enhance-progress-percentage"]) {
+  for (const id of ["enhance-nav", "enhance-pdf", "section-enhance-pdf", "section-popover", "section-toggle", "install-enhancer", "section-nav", "page-number", "toast", "enhance-progress", "enhance-progress-bar", "enhance-progress-label", "enhance-progress-percentage", "enhancer-setup-dialog", "enhancer-setup-form", "enhancer-setup-close", "enhancer-repository-url", "enhancer-checkout-path", "enhancer-setup-status", "open-enhancer-setup", "tools-menu", "tools-button"]) {
     elements.set(`#${id}`, {
       hidden: id !== "enhance-pdf",
       title: "Enhance PDF",
       value: "1",
       setAttribute() {},
       removeAttribute() {},
-      addEventListener(type, handler) { if (type === "click") clickHandlers.set(id, handler); },
+      addEventListener(type, handler) { if (type === "click") clickHandlers.set(id, handler); if (type === "submit") clickHandlers.set(id + ":submit", handler); },
+      showModal() { this.open = true; },
+      close() { this.open = false; },
       classList: { add() {}, remove() {} },
       style: { setProperty() {} },
     });
@@ -28,6 +30,7 @@ async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new U
   const progressSnapshots = [];
   const setupPrompts = [];
   const clipboardWrites = [];
+  const setupDownloads = [];
   let messageListener;
   let disconnectListener;
   const runtime = {
@@ -62,6 +65,7 @@ async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new U
   const context = vm.createContext({
     document: { querySelector: (selector) => elements.get(selector), documentElement: { classList: { add() {}, remove() {} } } },
     MutationObserver: class { observe() {} },
+    downloadSetupZip: (options) => setupDownloads.push(options),
     setTimeout() {}, clearTimeout() {}, URL,
     btoa: (binary) => Buffer.from(binary, "binary").toString("base64"),
     pdfDocumentSessionReady: Promise.resolve({ document: { getData: async () => data, ...documentOverrides } }),
@@ -83,13 +87,14 @@ async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new U
     resolvePdfSource: async () => ({ originalUrl: new URL(sourceUrl) }),
     resolveDocumentReferenceUrl: async () => "https://example.com/source.pdf",
     chrome: {
+      storage: { local: { get: async () => ({}), set: async () => {} } },
       runtime,
       tabs: { getCurrent: async () => ({ id: 42 }), update: async (_, destination) => destinations.push(destination.url) },
     },
   });
   vm.runInContext(source, context);
   await vm.runInContext("enhanceCurrentPdf()", context);
-  return { elements, clickHandlers, destinations, messages, progressSnapshots, setupPrompts, clipboardWrites };
+  return { elements, clickHandlers, destinations, messages, progressSnapshots, setupPrompts, clipboardWrites, setupDownloads };
 }
 
 test("Enhance appears at the bottom of the sections menu and uses the same action", async () => {
@@ -108,32 +113,34 @@ test("Enhance appears at the bottom of the sections menu and uses the same actio
   assert.equal(elements.get("#section-enhance-pdf").disabled, false);
 });
 
-test("missing native host asks for consent and copies a self-contained setup command", async () => {
+test("missing native host opens the user-controlled setup dialog instead of executing commands", async () => {
   const { elements, setupPrompts, clipboardWrites } = await enhancerFixture(async () => {
     throw new Error("Specified native messaging host not found.");
   });
-  assert.equal(setupPrompts.length, 1);
-  assert.match(setupPrompts[0], /may create or reuse your personal enhancer fork/i);
-  assert.deepEqual(clipboardWrites, [
-    "curl -fsSL https://raw.githubusercontent.com/PDF-magic/viewer/main/native/install-host.sh | PDF_MAGIC_SETUP_APPROVED=1 bash -s -- abcdefghijklmnopabcdefghijklmnop --fork-if-available",
-  ]);
-  assert.equal(elements.get("#enhance-pdf").hidden, false);
-  assert.equal(elements.get("#install-enhancer").hidden, true);
+  assert.equal(elements.get("#enhancer-setup-dialog").open, true);
+  assert.equal(elements.get("#enhancer-repository-url").value, "https://github.com/PDF-magic/enhancer");
+  assert.deepEqual(setupPrompts, [], "Setup never uses the old browser confirmation prompt");
+  assert.deepEqual(clipboardWrites, [], "No shell commands are silently copied");
+  assert.equal(elements.get("#enhance-pdf").disabled, false);
 });
 
-test("declining missing-host setup leaves the documented installer link available", async () => {
-  const { elements, clipboardWrites } = await enhancerFixture(
-    async () => { throw new Error("Specified native messaging host not found."); },
-    "1",
-    undefined,
-    "https://example.com/source.pdf",
-    {},
-    { approveSetup: false },
-  );
-  assert.deepEqual(clipboardWrites, []);
-  assert.equal(elements.get("#enhance-pdf").hidden, true);
-  assert.equal(elements.get("#install-enhancer").hidden, false);
-  assert.match(markup, /<a\s+id="install-enhancer"[\s\S]*?href="https:\/\/github.com\/PDF-magic\/viewer#pdf-enhancer-integration"/);
+test("enhancer setup submits a ZIP request only after explicit form submission", async () => {
+  const { elements, clickHandlers, setupDownloads } = await enhancerFixture(async () => {
+    throw new Error("Specified native messaging host not found.");
+  });
+  assert.deepEqual(setupDownloads, []);
+  elements.get("#enhancer-repository-url").value = "https://github.com/example/enhancer";
+  elements.get("#enhancer-checkout-path").value = "/tmp/my-enhancer";
+  let prevented = false;
+  await clickHandlers.get("enhancer-setup-form:submit")({
+    preventDefault() { prevented = true; },
+  });
+  assert.equal(prevented, true);
+  assert.deepEqual(setupDownloads, [{
+    extensionId: "abcdefghijklmnopabcdefghijklmnop",
+    repositoryUrl: "https://github.com/example/enhancer",
+    checkoutPath: "/tmp/my-enhancer",
+  }]);
 });
 
 test("enhancement errors keep the enhance action available", async () => {
