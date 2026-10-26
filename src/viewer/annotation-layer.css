@@ -47,12 +47,12 @@
 }
 
 .printed-contents-link:hover {
-  background: rgb(100 150 240 / 14%);
-  outline: 1px solid rgb(100 150 240 / 32%);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
 }
 
 .printed-contents-link:focus-visible {
-  outline: 2px solid Highlight;
+  outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
@@ -73,11 +73,11 @@
   pointer-events: auto;
 }
 .clickable-reference-link:hover {
-  background: rgb(100 150 240 / 14%);
-  outline: 1px solid rgb(100 150 240 / 32%);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  outline: 1px solid color-mix(in srgb, var(--accent) 32%, transparent);
 }
 .clickable-reference-link:focus-visible {
-  outline: 2px solid Highlight;
+  outline: 2px solid var(--accent);
 }
 html.clickable-references-disabled .clickable-reference-layer { display: none !important; }
 @media print { .clickable-reference-layer { display: none !important; } }
