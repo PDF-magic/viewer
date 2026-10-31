@@ -185,7 +185,7 @@ function fallbackFootnoteParagraph(items, viewport, markerItem, bodyItem, number
     if (laterLine && (baseline - lastBaseline > height * 1.9 ||
       (entry.x <= marker.x + height &&
         /^\\d{1,3}(?:[.)]|\\s|$)/.test(entry.text)))) break;
-    if (entry !== marker && Math.abs(entry.height - height) > height * 0.2) {
+    if (entry !== marker && Math.abs(entry.height - height) > height * 0.35) {
       if (laterLine) break;
       continue;
     }
@@ -503,10 +503,29 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
         (note.hangingMargin === undefined ? entry.yRatio === note.yRatio :
           entry.text === note.inferredMarker && Math.abs(entry.y - note.baseline) <= note.textHeight * 0.8));
       const highlightedEntries = marker && !textEntries.includes(marker) ? [marker, ...textEntries] : textEntries;
-      if (text.length >= 3) result.push({ ...note, markerItemIndex: marker ? items.indexOf(marker.item) : -1, text, endPageNumber: pageNumber, endColumnIndex: column.index,
-        highlightRegions: highlightRegions(highlightedEntries, viewport, pageNumber),
-        continues: !next && textEntries.at(-1)?.yRatio >= 0.88 &&
-          ((note.hangingMargin === undefined && !note.scannedSmallBlock) || !/[.!?]["')\]]?$/.test(text)) });
+      if (text.length >= 3) {
+      let fullText = text;
+      let regions = highlightRegions(highlightedEntries, viewport, pageNumber);
+      // PDF.js can assign larger text heights to wrapped lines. Repair a
+      // truncated final note without crossing the page counter or next note.
+      if (!next && layout.length === 1 && note.yRatio >= 0.65 && textEntries.length <= 2 && marker) {
+        const body = textEntries.find((entry) => entry !== marker && /[A-Za-z]/.test(entry.text));
+        const recovered = body && fallbackFootnoteParagraph(items, viewport,
+          marker.item, body.item, note.number, pageNumber);
+        if (recovered && recovered.text.length > fullText.length &&
+          recovered.highlightRegions.length > regions.length) {
+          fullText = recovered.text;
+          regions = recovered.highlightRegions;
+        }
+      }
+      const reachedBottom = textEntries.at(-1)?.yRatio >= 0.88 ||
+        (fullText !== text && regions.some((region) => region.top + region.height >= 0.88));
+      result.push({ ...note, markerItemIndex: marker ? items.indexOf(marker.item) : -1,
+        text: fullText, endPageNumber: pageNumber, endColumnIndex: column.index,
+        highlightRegions: regions,
+        continues: !next && reachedBottom &&
+          ((note.hangingMargin === undefined && !note.scannedSmallBlock) || !/[.!?]["')\\]]?$/.test(fullText)) });
+    }
     }
   }
   return result;

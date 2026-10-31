@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { candidateForPage } from "../src/viewer/navigation/footnote-index.js";
+import { candidateForPage, footnotesForPage } from "../src/viewer/navigation/footnote-index.js";
 
 // A condensed text-layer reproduction of NBER w9126, printed page 19:
 // footnote 19 wraps to two hanging lines and a printed page counter follows.
@@ -41,4 +41,21 @@ test("fallback footnote stops before an adjacent numbered note", () => {
   assert.ok(note);
   assert.equal(note.highlightRegions.length, 2);
   assert.doesNotMatch(note.text, /Next footnote/);
+});
+
+test("indexed footnote recovers wrapped lines with different PDF text heights", () => {
+  const items = [
+    line("A representative paragraph above the notes.", 71, 220, 400, 16),
+    line("19", 91, 647, 12, 8),
+    line("Two firms agreed before the annual meeting;", 104, 652, 415, 11),
+    line("the analysis remains unchanged for the sample.", 71, 667, 432, 14),
+    line("The proxy-fight indicator stays one or zero.", 71, 683, 395, 14),
+    line("19", 301, 733, 12, 14),
+  ];
+  const note = footnotesForPage(items, viewport, 19).find((entry) => entry.number === 19);
+  assert.ok(note);
+  assert.match(note.text, /analysis remains unchanged/);
+  assert.match(note.text, /indicator stays one or zero/);
+  assert.ok(note.highlightRegions.length >= 3);
+  assert.doesNotMatch(note.text, /representative paragraph/);
 });
