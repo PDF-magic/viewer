@@ -90,13 +90,18 @@ export function candidateForPage(items, viewport, number, pageNumber, originPage
       continue;
     }
 
+    const paragraph = fallbackFootnoteParagraph(items, viewport, item,
+      adjacentText ? next : item, number, pageNumber);
     const candidate = {
       pageNumber,
       score,
       xRatio: coordinates.xRatio,
       yRatio: coordinates.yRatio,
       label: text,
-      highlightRegions: [{ pageNumber, ...textRegion({ ...coordinates, height: itemHeight, item }, viewport) }],
+      text: paragraph?.text || remainder,
+      highlightRegions: paragraph?.highlightRegions?.length
+        ? paragraph.highlightRegions
+        : [{ pageNumber, ...textRegion({ ...coordinates, height: itemHeight, item }, viewport) }],
     };
 
     if (!best || candidate.score > best.score) {
@@ -152,6 +157,49 @@ function highlightRegions(entries, viewport, pageNumber) {
     }
   }
   return lines.map(({ baseline, ...region }) => ({ pageNumber, ...region }));
+}
+
+// Fallback candidates can contain only the first PDF.js text item of a note.
+// Follow nearby, same-size lines conservatively so wrapped notes are highlighted
+// and copied in full, without crossing a new note or the printed page footer.
+function fallbackFootnoteParagraph(items, viewport, markerItem, bodyItem, number, pageNumber) {
+  const entries = positionedItems(items, viewport).sort(readingOrder);
+  const marker = entries.find((entry) => entry.item === markerItem);
+  const body = entries.find((entry) => entry.item === bodyItem);
+  if (!marker || !body) return null;
+  const height = body.height || marker.height;
+  if (!height) return null;
+  const firstBaseline = readingBaseline(body);
+  const minX = Math.max(0, Math.min(marker.x, body.x) - height * 4);
+  const maxX = Math.min(viewport.width * 0.96,
+    Math.max(viewport.width * 0.5, body.x + Math.abs(body.item.width || 0) + height * 3));
+  const selected = [];
+  let lastBaseline = firstBaseline;
+
+  for (const entry of entries) {
+    const baseline = readingBaseline(entry);
+    if (baseline < firstBaseline - Math.max(2, height * 0.4)) continue;
+    if (entry.yRatio >= 0.94) break;
+    if (entry.x < minX || entry.x > maxX) continue;
+    const laterLine = baseline > lastBaseline + Math.max(2, height * 0.25);
+    if (laterLine && (baseline - lastBaseline > height * 1.9 ||
+      (entry.x <= marker.x + height &&
+        /^\\d{1,3}(?:[.)]|\\s|$)/.test(entry.text)))) break;
+    if (entry !== marker && Math.abs(entry.height - height) > height * 0.2) {
+      if (laterLine) break;
+      continue;
+    }
+    if (baseline > firstBaseline + 2 && /^\\d+$/.test(entry.text) &&
+      entry.yRatio >= 0.9) break;
+    if (baseline <= firstBaseline + 2 && entry.x < marker.x - 2) continue;
+    selected.push(entry);
+    lastBaseline = Math.max(lastBaseline, baseline);
+  }
+
+  if (!selected.includes(marker)) selected.unshift(marker);
+  const text = joinNoteEntries(selected.filter((entry) => entry !== marker || marker === body))
+    .replace(marker === body ? markerPattern(number) : /^(?!)$/, "").trim();
+  return { text, highlightRegions: highlightRegions(selected, viewport, pageNumber) };
 }
 
 function readingBaseline(entry) {
