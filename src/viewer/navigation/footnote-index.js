@@ -184,12 +184,12 @@ function fallbackFootnoteParagraph(items, viewport, markerItem, bodyItem, number
     const laterLine = baseline > lastBaseline + Math.max(2, height * 0.25);
     if (laterLine && (baseline - lastBaseline > height * 1.9 ||
       (entry.x <= marker.x + height &&
-        /^\\d{1,3}(?:[.)]|\\s|$)/.test(entry.text)))) break;
+        /^\d{1,3}(?:[.)]|\s|$)/.test(entry.text)))) break;
     if (entry !== marker && Math.abs(entry.height - height) > height * 0.35) {
       if (laterLine) break;
       continue;
     }
-    if (baseline > firstBaseline + 2 && /^\\d+$/.test(entry.text) &&
+    if (baseline > firstBaseline + 2 && /^\d+$/.test(entry.text) &&
       entry.yRatio >= 0.9) break;
     if (baseline <= firstBaseline + 2 && entry.x < marker.x - 2) continue;
     selected.push(entry);
@@ -197,8 +197,8 @@ function fallbackFootnoteParagraph(items, viewport, markerItem, bodyItem, number
   }
 
   if (!selected.includes(marker)) selected.unshift(marker);
-  const text = joinNoteEntries(selected.filter((entry) => entry !== marker || marker === body))
-    .replace(marker === body ? markerPattern(number) : /^(?!)$/, "").trim();
+  const rawText = joinNoteEntries(selected.filter((entry) => entry !== marker || marker === body));
+  const text = (marker === body ? rawText.replace(markerPattern(number), "") : rawText).trim();
   return { text, highlightRegions: highlightRegions(selected, viewport, pageNumber) };
 }
 
