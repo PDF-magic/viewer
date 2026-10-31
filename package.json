@@ -6,7 +6,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "check": "node scripts/check-extension.mjs",
-    "test": "node --test tests/enhancer-setup.test.mjs tests/document-title.test.mjs tests/metadata-doi.test.mjs tests/local-file-favicon.test.mjs tests/page-tab-labels.test.mjs tests/minimap.test.mjs tests/clickable-reference-links.test.mjs tests/printed-page-jump.test.mjs tests/markdown-copy.test.mjs tests/terminal-punctuation-selection.test.mjs tests/footnote-click-copy.test.mjs tests/chatgpt-summary-popup.test.mjs tests/chatgpt-pdf-relay.test.mjs tests/selection-gaps.test.mjs"
+    "test": "node --test tests/enhancer-setup.test.mjs tests/document-title.test.mjs tests/metadata-doi.test.mjs tests/local-file-favicon.test.mjs tests/page-tab-labels.test.mjs tests/minimap.test.mjs tests/clickable-reference-links.test.mjs tests/printed-page-jump.test.mjs tests/markdown-copy.test.mjs tests/terminal-punctuation-selection.test.mjs tests/footnote-click-copy.test.mjs tests/footnote-fallback-wrap.test.mjs tests/chatgpt-summary-popup.test.mjs tests/chatgpt-pdf-relay.test.mjs tests/selection-gaps.test.mjs"
   },
   "dependencies": {
     "pdfjs-dist": "6.3.289",
