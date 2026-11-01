@@ -13,7 +13,8 @@
   const SWEETIE_BOT_PATH = sourcePrefix + "assets/sweetie-bot.png";
   const isSecHost = /(^|\.)sec\.gov$/i.test(window.location.hostname);
   const isCommentPage = isSecHost && /^\/comments\/.+\.html?$/i.test(window.location.pathname);
-  const isBasicHtml = isCommentPage || globalThis.pdfMagicIsPlainHtmlDocument?.(document);
+  const isRawEdgarPage = globalThis.pdfMagicIsRawEdgarHtmlDocument?.(document, window.location.href) === true;
+  const isBasicHtml = isCommentPage || isRawEdgarPage || globalThis.pdfMagicIsPlainHtmlDocument?.(document);
 
   const selectionStyles = `
     ::selection {
@@ -93,6 +94,22 @@
     select,
     textarea {
       color-scheme: dark !important;
+    }
+  `;
+
+  const rawEdgarDarkStyles = `
+    /* Legacy EDGAR HTML often uses <font color>, bgcolor and inline white
+       backgrounds. Override only those colors, not table sizing or images. */
+    body *:not(svg):not(svg *):not(canvas) {
+      color: inherit !important;
+      background-color: transparent !important;
+    }
+
+    body a,
+    body a:link,
+    body a:visited,
+    body a * {
+      color: var(--pdf-viewer-sec-link) !important;
     }
   `;
 
@@ -238,7 +255,7 @@
 
     const style = document.createElement("style");
     style.id = STYLE_ID;
-    style.textContent = darkStyles;
+    style.textContent = darkStyles + (isRawEdgarPage ? rawEdgarDarkStyles : "");
     (document.head || document.documentElement).append(style);
   }
 
