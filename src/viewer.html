@@ -146,6 +146,15 @@
           <input id="custom-loading-image" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
           <button id="section-cross-reference-notes" class="tool-button" type="button" role="menuitem">§ <span>Section cross-references</span></button>
           <button id="cross-reference-notes" class="tool-button" type="button" role="menuitem">↗ <span>Footnote cross-references</span></button>
+          <label class="tool-toggle" title="Show two PDF pages side by side">
+            <span>Two-page view</span>
+            <input id="two-page-view" class="checkbox-input" type="checkbox" />
+          </label>
+          <label class="tool-toggle" title="Show page 1 alone on the right, then pair pages 2–3, 4–5, and so on">
+            <span>Offset cover</span>
+            <input id="offset-cover" class="checkbox-input" type="checkbox" />
+          </label>
+          <div class="menu-separator" role="separator"></div>
           <label class="tool-toggle" title="Show a separate printed-page search field in the toolbar (off by default; you can always type 181* in the regular page field)">
             <span>Show printed-page search</span>
             <input id="printed-page-jump-opt-in" class="checkbox-input" type="checkbox" />
