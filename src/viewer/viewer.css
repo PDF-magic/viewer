@@ -1277,3 +1277,30 @@ input {
   font-size: 25px;
   cursor: pointer;
 }
+
+/* Raw source-level PDF metadata, kept independent of Sections. */
+#view-raw-metadata[hidden] { display: none; }
+.raw-metadata-dialog {
+  width: min(800px, calc(100vw - 28px));
+  max-height: 86dvh; padding: 0;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--toolbar-bg); color: var(--text);
+  box-shadow: 0 18px 60px rgb(0 0 0 / 40%);
+}
+.raw-metadata-dialog::backdrop { background: rgb(0 0 0 / 60%); }
+.raw-metadata-card { padding: 18px; }
+.raw-metadata-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.raw-metadata-header h2 { margin: 0; font-size: 19px; }
+#raw-metadata-close { border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 26px; }
+.raw-metadata-card > p { color: var(--muted); font-size: 13px; }
+.raw-metadata-content { overflow: auto; max-height: 65dvh; }
+.raw-metadata-section { margin: 16px 0; }
+.raw-metadata-section h3 { margin: 0 0 7px; font-size: 13px; }
+.raw-metadata-section pre {
+  margin: 0; max-height: 40dvh; overflow: auto;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  border: 1px solid var(--border); border-radius: 7px;
+  padding: 12px; background: var(--control-bg); color: var(--text);
+  user-select: text;
+}

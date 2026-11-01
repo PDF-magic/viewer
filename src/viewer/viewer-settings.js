@@ -50,10 +50,10 @@ async function addSecCommentSetting() {
 
   const label = document.createElement("label");
   label.className = "tool-button tool-toggle";
-  label.title = "Darken SEC HTML comments when the viewer uses dark mode";
+  label.title = "Darken basic plaintext-style HTML pages (including SEC comments) when the viewer uses dark mode";
 
   const text = document.createElement("span");
-  text.textContent = "Darken SEC HTML comments";
+  text.textContent = "Darken basic HTML pages";
 
   const input = document.createElement("input");
   input.id = "sec-comment-dark-mode";
