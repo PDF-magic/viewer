@@ -7,6 +7,7 @@
     <link rel="icon" type="image/png" href="assets/luna-mark.png" />
     <link rel="stylesheet" href="viewer/viewer.css" />
     <link rel="stylesheet" href="viewer/selection/text-selection.css" />
+    <link rel="stylesheet" href="viewer/selection/selection-notes.css" />
     <link rel="stylesheet" href="viewer/search/search-highlight-cues.css" />
     <link rel="stylesheet" href="viewer/navigation/toolbar-layout.css" />
     <link rel="stylesheet" href="viewer/navigation/minimap.css" />
@@ -193,6 +194,22 @@
       <div id="status" class="status">Loading PDF…</div>
     </main>
 
+    <div id="selection-note-actions" class="selection-note-actions" hidden>
+      <button id="selection-note-add" type="button" aria-label="Add note to selected text">＋ Note</button>
+    </div>
+    <section id="selection-note-editor" class="selection-note-editor" role="dialog" aria-modal="false" aria-labelledby="selection-note-heading" hidden>
+      <h2 id="selection-note-heading">Note on selected text</h2>
+      <p id="selection-note-quote" class="selection-note-quote"></p>
+      <label for="selection-note-text">Your note</label>
+      <textarea id="selection-note-text" maxlength="5000" rows="4"></textarea>
+      <div class="selection-note-buttons">
+        <button id="selection-note-cancel" type="button">Cancel</button>
+        <button id="selection-note-delete" type="button" hidden>Delete</button>
+        <button id="selection-note-save" type="button">Save note</button>
+      </div>
+      <p id="selection-note-status" class="selection-note-status" role="status" aria-live="polite"></p>
+    </section>
+
     <aside id="minimap-shell" class="minimap-shell" aria-label="Document minimap">
       <div
         id="minimap"
@@ -211,6 +228,7 @@
       </div>
       <nav id="page-tabs" class="page-tabs" aria-label="Document pages" aria-hidden="true"></nav>
       <div id="minimap-controls" class="minimap-controls" role="group" aria-label="Page navigation controls">
+        <button id="export-selection-notes" class="minimap-control" type="button" aria-label="Export notes as plain text" title="No notes to export" disabled>⇩</button>
         <button
           id="minimap-swap-side"
           class="minimap-control minimap-swap-side"
@@ -329,6 +347,7 @@
     <script type="module" src="viewer/viewer.js"></script>
     <script type="module" src="viewer/navigation/rapid-page-navigation.js"></script>
     <script type="module" src="viewer/selection/text-selection.js"></script>
+    <script type="module" src="viewer/selection/selection-notes.js"></script>
     <script type="module" src="viewer/search/search-highlight-cues.js"></script>
     <script type="module" src="viewer/navigation/minimap.js"></script>
     <script type="module" src="viewer/navigation/page-tabs.js"></script>
