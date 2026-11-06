@@ -12,6 +12,7 @@ A Chrome Manifest V3 extension that replaces the normal PDF tab with a local PDF
 - Renders PDFs locally with bundled PDF.js assets; no remotely hosted executable code is used.
 - Supports dark and light viewing modes, remembers the selected theme, and shows Celestia in dark mode and Luna in light mode.
 - Tracks the page currently centered in the viewport.
+- Remembers the last text clicked or selected on a PDF page; switching away shows a blue text highlight and a left-pointing marker on the right page edge, retained on return until the next page click. The cue follows zoom and page rerenders without saving document text.
 - Copies the original document URL as `#page=<current page>` silently when the mark is clicked.
 - Honors an existing `#page=N` fragment when opening a document.
 - Places Download beside the page-link icon and keeps rotate left/right and print in the **More tools** menu.
