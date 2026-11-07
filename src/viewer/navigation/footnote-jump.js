@@ -1,10 +1,9 @@
-import { appendFootnotesForPage, candidateForPage } from "./footnote-index.js";
+import { appendFootnotesForPage, candidateForPage, footnoteRulesForPage } from "./footnote-index.js";
 import { pdfDocumentSessionReady } from "../pdf-document-session.js";
 import { footnoteToMarkdown } from "../selection/markdown-copy.js";
 
 const pageNumberInput = document.querySelector("#page-number");
 
-const pageCache = new Map();
 let lookupRequestId = 0;
 
 function currentPageNumber() {
@@ -15,28 +14,30 @@ function reportFootnoteError(message) {
   window.dispatchEvent(new CustomEvent("pdf-viewer-toast", { detail: { message } }));
 }
 
-async function pageData(pdfDocument, pageNumber) {
-  if (pageCache.has(pageNumber)) {
-    return pageCache.get(pageNumber);
-  }
-
+async function pageData(pdfDocument, pageNumber, operators) {
   const page = await pdfDocument.getPage(pageNumber);
-  const [textContent, viewport, operatorList] = await Promise.all([
-    page.getTextContent(),
-    Promise.resolve(page.getViewport({ scale: 1 })),
-    page.getOperatorList(),
-  ]);
-  const data = { items: textContent.items, viewport, operatorList };
-  pageCache.set(pageNumber, data);
-  page.cleanup();
-  return data;
+  try {
+    const textContent = await page.getTextContent();
+    const viewport = page.getViewport({ scale: 1 });
+    const operatorList = await page.getOperatorList();
+    // Retain only text and separator geometry, never drawing instructions or
+    // their embedded image buffers. A lookup streams through one page at a time.
+    return { items: textContent.items, viewport, rules: footnoteRulesForPage(operatorList, viewport, operators) };
+  } finally {
+    page.cleanup();
+  }
 }
 
 async function findFootnoteTarget(pdfDocument, number, originPage, requestId, operators) {
   // A complete, confidently indexed note on the current page is already the
   // closest match. Avoid decoding every scanned page just to find it again.
   const origin = await pdfDocument.getPage(originPage);
-  const { items: originItems } = await origin.getTextContent();
+  let originItems;
+  try {
+    ({ items: originItems } = await origin.getTextContent());
+  } finally {
+    origin.cleanup();
+  }
   if (requestId !== lookupRequestId) return null;
   const originNotes = [];
   appendFootnotesForPage(originNotes, originItems, origin.getViewport({ scale: 1 }), originPage, null, operators);
@@ -52,8 +53,8 @@ async function findFootnoteTarget(pdfDocument, number, originPage, requestId, op
       return null;
     }
 
-    const { items, viewport, operatorList } = await pageData(pdfDocument, pageNumber);
-    appendFootnotesForPage(notes, items, viewport, pageNumber, operatorList, operators, previous);
+    const { items, viewport, rules } = await pageData(pdfDocument, pageNumber, operators);
+    appendFootnotesForPage(notes, items, viewport, pageNumber, null, operators, previous, rules);
     previous = { items, viewport };
     const candidate = candidateForPage(items, viewport, number, pageNumber, originPage);
     if (candidate && (!best || candidate.score > best.score)) {

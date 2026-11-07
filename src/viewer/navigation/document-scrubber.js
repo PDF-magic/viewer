@@ -291,8 +291,9 @@ async function initializeScrubber() {
     const index = [];
     let previousPageText;
     for (let pageNumber = 1; pageNumber <= session.document.numPages; pageNumber += 1) {
+      let page;
       try {
-        const page = await session.document.getPage(pageNumber);
+        page = await session.document.getPage(pageNumber);
         const content = await page.getTextContent();
         const viewport = page.getViewport({ scale: 1 });
         const operators = includeOperators ? await page.getOperatorList().catch(() => null) : null;
@@ -303,6 +304,10 @@ async function initializeScrubber() {
       } catch (error) {
         previousPageText = undefined;
         console.warn(`Could not index footnotes on page ${pageNumber}`, error);
+      } finally {
+        // getOperatorList can decode full scanned images even though the index
+        // only needs separator rules. Release those resources after each page.
+        page?.cleanup();
       }
       await new Promise((resolve) => setTimeout(resolve, 0));
     }

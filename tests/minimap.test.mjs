@@ -494,7 +494,7 @@ test('legacy disabled minimap preference migrates to re-expandable collapse', ()
 
 test('the document becomes ready before the minimap finishes in the background', () => {
   assert.match(source, /MINIMAP_RENDER_CONCURRENCY\s*=\s*4/);
-  assert.match(source, /await Promise\.all\(/);
+  assert.match(source, /await Promise\.allSettled\(/);
   assert.match(source, /requestIdleCallback\(start, \{ timeout: 1200 \}\)/);
   assert.match(source, /window\.addEventListener\("pdf-viewer-document-ready", scheduleThumbnailPreparation\)/);
   assert.match(source, /void loadThumbnailDocument\(loadGeneration\)[\s\S]*?\.finally\(finishMinimapPreparation\)/);

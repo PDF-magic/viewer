@@ -481,8 +481,8 @@ export function footnoteContinuationForPage(items, viewport, operatorList, previ
   return continuationInColumn(pageLayout(items, viewport, rules)[0], viewport, previousNote, pageNotes);
 }
 
-export function appendFootnotesForPage(index, items, viewport, pageNumber, operatorList, operatorIds, referenceContext) {
-  const rules = footnoteRulesForPage(operatorList, viewport, operatorIds);
+export function appendFootnotesForPage(index, items, viewport, pageNumber, operatorList, operatorIds, referenceContext, cachedRules) {
+  const rules = cachedRules ?? footnoteRulesForPage(operatorList, viewport, operatorIds);
   const previousNumber = [...index].reverse().find((note) => Number.isSafeInteger(note.number))?.number;
   const expectedNumber = Number.isSafeInteger(previousNumber) ? previousNumber + 1 : undefined;
   const pageNotes = footnotesForPage(items, viewport, pageNumber, rules, referenceContext, expectedNumber);
