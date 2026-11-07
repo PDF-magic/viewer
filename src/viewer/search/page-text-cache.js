@@ -1,7 +1,7 @@
 // Budget includes UTF-16 strings, geometry, and estimated object overhead.
 // Oversized pages remain searchable but are not retained between queries.
 export class PageTextCache {
-  constructor(maxBytes = 4 * 1024 * 1024) {
+  constructor(maxBytes = 25 * 1024 * 1024) {
     this.maxBytes = maxBytes;
     this.entries = new Map();
     this.bytes = 0;
