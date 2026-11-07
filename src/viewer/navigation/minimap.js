@@ -526,7 +526,11 @@ async function renderThumbnail(pageNumber, generation, renderWidth = MINIMAP_THU
   }
 
   page.cleanup();
-  return generation === thumbnailGeneration ? canvas : null;
+  if (generation !== thumbnailGeneration) {
+    canvas.width = canvas.height = 0;
+    return null;
+  }
+  return canvas;
 }
 
 function cacheKey() {
@@ -650,6 +654,7 @@ async function renderAllThumbnails(preparedGeneration, preparedCachedStrip) {
       nextPageNumber += 1;
       const canvas = await renderThumbnail(pageNumber, generation);
       if (!canvas || generation !== thumbnailGeneration) {
+        if (canvas) canvas.width = canvas.height = 0;
         return;
       }
 
@@ -658,21 +663,28 @@ async function renderAllThumbnails(preparedGeneration, preparedCachedStrip) {
     }
   }
 
-  await Promise.all(
-    Array.from(
-      { length: Math.min(MINIMAP_RENDER_CONCURRENCY, thumbnailDocument.numPages) },
-      () => renderNextThumbnail(),
-    ),
-  );
+  try {
+    // Wait for every worker before releasing its temporary surfaces, including
+    // when one page fails while other thumbnail renders are still in flight.
+    const results = await Promise.allSettled(
+      Array.from(
+        { length: Math.min(MINIMAP_RENDER_CONCURRENCY, thumbnailDocument.numPages) },
+        () => renderNextThumbnail(),
+      ),
+    );
+    const failure = results.find((result) => result.status === "rejected");
+    if (failure) throw failure.reason;
+    if (generation !== thumbnailGeneration) return;
 
-  if (generation !== thumbnailGeneration) {
-    return;
+    const strip = composeThumbnailStrip(thumbnails);
+    attachThumbnailStrip(strip);
+    scheduleSync();
+    void cacheThumbnailStrip(strip);
+  } finally {
+    for (const canvas of thumbnails) {
+      if (canvas) canvas.width = canvas.height = 0;
+    }
   }
-
-  const strip = composeThumbnailStrip(thumbnails);
-  attachThumbnailStrip(strip);
-  scheduleSync();
-  void cacheThumbnailStrip(strip);
 }
 
 function cancelScheduledThumbnailPreparation() {

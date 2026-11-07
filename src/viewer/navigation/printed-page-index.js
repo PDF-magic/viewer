@@ -66,8 +66,9 @@ export function createPageLabelIndex(pdf) {
       const pending = (async () => {
         while (nextToScan < count && shouldContinue()) {
           const index = nextToScan++;
+          let page;
           try {
-            const page = await pdf.getPage(index + 1);
+            page = await pdf.getPage(index + 1);
             const [content, viewport] = await Promise.all([
               page.getTextContent(),
               Promise.resolve(page.getViewport({ scale: 1 })),
@@ -75,6 +76,8 @@ export function createPageLabelIndex(pdf) {
             counters[index] = findPrintedPageCounter(content.items, viewport);
           } catch {
             // Scanned or unreadable pages keep null, not a guessed page label.
+          } finally {
+            page?.cleanup();
           }
           if (nextToScan % 8 === 0 || nextToScan === count) {
             publish();

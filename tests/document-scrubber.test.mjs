@@ -112,12 +112,14 @@ async function loadScrubber(pages, operators, options = {}) {
   }
   const context = vm.createContext({
     document: { createElement: () => element(Symbol()), querySelector: element, documentElement: element("root"), elementFromPoint: () => null },
-    window: { addEventListener() {}, matchMedia: () => motionPreference, innerHeight: 800, innerWidth: 1000 },
+    window: { addEventListener() {}, dispatchEvent() {}, matchMedia: () => motionPreference, innerHeight: 800, innerWidth: 1000 },
+    CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
     pdfDocumentSessionReady: Promise.resolve({ operators, document: {
       numPages: pages.length,
       getPage: async (number) => {
         const page = pages[number - 1];
         return {
+          cleanup() {},
           getTextContent: async () => ({ items: page.items || page }),
           getViewport: () => page.items ? { width: page.width, height: page.height,
             convertToViewportPoint: (x, y) => [x, page.height - y] } : viewport,
