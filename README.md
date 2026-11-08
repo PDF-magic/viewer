@@ -12,11 +12,13 @@ A Chrome Manifest V3 extension that replaces the normal PDF tab with a local PDF
 - Renders PDFs locally with bundled PDF.js assets; no remotely hosted executable code is used.
 - Supports dark and light viewing modes, remembers the selected theme, and shows Celestia in dark mode and Luna in light mode.
 - Tracks the page currently centered in the viewport.
+- Remembers the last text clicked or selected on a PDF page; switching away shows a blue text highlight and a left-pointing marker on the right page edge, retained on return until the next page click. The cue follows zoom and page rerenders without saving document text.
 - Copies the original document URL as `#page=<current page>` silently when the mark is clicked.
 - Honors an existing `#page=N` fragment when opening a document.
 - Places Download beside the page-link icon and keeps rotate left/right and print in the **More tools** menu.
 - Keeps the More tools menu open across repeated rotate actions.
 - Offers a default-on **More PDF tools → Join tagged paragraph lines on copy** setting. This uses PDF.js's exposed structure-tree paragraph tags and MCIDs to join soft printed line breaks and respect tagged block reading order in the clipboard; turning it off restores the original line breaks. Plain text copy works without enabling Markdown. PDFs lacking reliable tags retain their native copy behavior. Note: PDF.js does not currently expose /ActualText values stored only in content-stream BDC properties, so this reflows tagged text rather than reading that replacement string verbatim.
+- Offers an opt-in **More PDF tools → Automatically copy selected text** setting. When enabled, finishing a mouse/trackpad text selection in the PDF copies it immediately while leaving the highlight visible. Copy uses the same Markdown and tagged-paragraph preferences as Ctrl/Cmd+C; when disabled, selecting text never changes the clipboard.
 - Offers an opt-in **More PDF tools → Copy selection as Markdown** setting. When enabled, normal Copy on selected PDF text writes Markdown to the clipboard: detected italics use `_underscores_`, bold uses `**asterisks**`, and line/page boundaries are retained. The preference persists across PDFs; copying outside PDF text stays unchanged. Font identification is best-effort (not all PDFs disclose readable font metadata), and image-only scans need OCR text before they can be copied.
 - Prepares compressed previews of every page in the background for fast scrolling, while keeping sharp rendering and selectable text near the current page.
 - Shows a PDF Enhancer button in the top-left section slot when a document has no section navigator; enhanced local copies retain the original web reference URL for link copying and ChatGPT summaries.

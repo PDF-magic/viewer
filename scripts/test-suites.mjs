@@ -20,6 +20,7 @@ export const suites = Object.freeze({
     "pdf-source.test.mjs",
     "print-renderer.test.mjs",
     "render-window.test.mjs",
+    "two-page-layout.test.mjs",
     "zoom-position.test.mjs"
   ],
   "navigation": [
@@ -27,12 +28,14 @@ export const suites = Object.freeze({
     "minimap-cache.test.mjs",
     "minimap-position.test.mjs",
     "minimap.test.mjs",
+    "outline-filter.test.mjs",
     "page-jump.test.mjs",
     "page-number-input.test.mjs",
     "page-tab-labels.test.mjs",
     "printed-contents.test.mjs",
     "printed-page-jump.test.mjs",
-    "rapid-page-navigation.test.mjs"
+    "rapid-page-navigation.test.mjs",
+    "reading-return-cue.test.mjs"
   ],
   "references": [
     "clickable-reference-links.test.mjs",
@@ -56,6 +59,7 @@ export const suites = Object.freeze({
     "search-url-wrapping.test.mjs"
   ],
   "selection": [
+    "auto-copy-selection.test.mjs",
     "clipboard-fallback.test.mjs",
     "markdown-copy.test.mjs",
     "selection-gaps.test.mjs",
