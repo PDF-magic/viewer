@@ -320,8 +320,8 @@ html.minimap-disabled body::-webkit-scrollbar-thumb {
 
 .minimap-collapsed .minimap-shell {
   top: auto;
-  /* Fixed-position insets exclude the native scrollbar gutter. */
-  right: calc(100% - 100vw);
+  /* Stay on the layout side of the native scrollbar, not underneath it. */
+  right: 0;
   width: 36px;
   height: 36px;
   min-height: 36px;
@@ -333,6 +333,14 @@ html.minimap-disabled body::-webkit-scrollbar-thumb {
 
 .minimap-collapsed .minimap-controls {
   flex: 1 1 auto;
+  box-sizing: border-box;
+  /* Unlike the expanded strip, the standalone button needs every edge. */
+  border: 1px solid var(--border);
+}
+
+.minimap-collapsed.minimap-left .minimap-shell {
+  right: auto;
+  left: 0;
 }
 
 .minimap-collapsed .minimap-control:not(.minimap-collapse) {
@@ -344,10 +352,10 @@ html.minimap-disabled body::-webkit-scrollbar-thumb {
   flex: 1 1 auto;
 }
 
-/* The bottom-right corner of a split pane may be occupied by host chrome.
-   Raise both expanded and collapsed minimap controls out of that hit area. */
+/* Only the footnote scrubber needs clearance for the split-pane host chrome.
+   In documents without footnotes, anchor the controls at the viewport bottom. */
 @media (max-width: 1200px) {
-  :root {
+  :root:has(#document-scrubber:not([hidden])) {
     --split-view-bottom-clearance: 48px;
   }
 }
