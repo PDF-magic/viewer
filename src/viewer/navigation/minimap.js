@@ -86,13 +86,8 @@ function minimapMode() {
   return document.documentElement.classList.contains("minimap-local") ? "local" : "overview";
 }
 
-function displayedMinimapMode(widthScaledHeight, trackHeight) {
-  return minimapMode() === "local" || widthScaledHeight <= trackHeight ? "local" : "overview";
-}
-
 function localMinimapActive() {
-  return minimapMode() === "local" ||
-    document.documentElement.classList.contains("minimap-local-active");
+  return minimapMode() === "local";
 }
 
 function setMinimapAccessibility() {
@@ -295,13 +290,11 @@ function syncMinimap() {
   const widthScale = thumbnailWidth / pageWidth;
   const widthScaledHeights = pages.map((page) => page.getBoundingClientRect().height * widthScale);
   const widthScaledHeight = widthScaledHeights.reduce((total, height) => total + height, 0);
-  const displayMode = displayedMinimapMode(widthScaledHeight, trackHeight);
-  document.documentElement.classList.toggle(
-    "minimap-local-active",
-    displayMode === "local" && minimapMode() !== "local",
-  );
+  const displayMode = minimapMode();
+  // Overview spans the full track, including short PDFs on tall monitors.
+  // Local mode retains thumbnails at their natural width-scaled height.
   const heightCompression =
-    displayMode === "overview" && widthScaledHeight > trackHeight
+    displayMode === "overview" && widthScaledHeight > 0
       ? trackHeight / widthScaledHeight
       : 1;
   const scale = widthScale * heightCompression;
