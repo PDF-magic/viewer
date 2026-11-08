@@ -939,6 +939,25 @@ input {
   padding: calc(52px + var(--page-top-gap)) 16px calc(20px + var(--document-scrubber-height));
 }
 
+.viewer[data-page-layout="two-up"] {
+  display: grid;
+  grid-template-columns: repeat(2, var(--zoom-page-width, min(550px, calc((100vw - 48px) / 2))));
+  column-gap: 16px;
+  row-gap: 20px;
+  justify-content: center;
+  align-content: start;
+  align-items: start;
+}
+
+/* Offset the cover into the right column before forming facing-page spreads. */
+.viewer[data-page-layout="two-up"][data-offset-cover="true"] .page[data-page="1"] {
+  grid-column: 2;
+}
+
+.viewer[data-page-layout="two-up"] .status {
+  grid-column: 1 / -1;
+}
+
 .page {
   position: relative;
   isolation: isolate;
@@ -1155,6 +1174,10 @@ input {
   .viewer {
     display: block;
     padding: 0;
+  }
+
+  .viewer[data-page-layout="two-up"] {
+    display: block;
   }
 
   .page {
