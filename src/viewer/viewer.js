@@ -231,6 +231,10 @@ function recordCurrentPage() {
   if (!pdfDocument || !originalUrl) return;
   try {
     saveResumedPage(window.sessionStorage, originalUrl, initialViewerHash, currentPage);
+    void chrome.runtime.sendMessage({
+      type: "pdf-viewer:page", sourceUrl: originalUrl.href,
+      page: currentPage, mimeHandlerActive,
+    }).catch(() => {});
   } catch {
     // Storage may be unavailable in a restricted viewer context.
   }
@@ -1479,6 +1483,11 @@ async function initialize() {
     // Fall back to the incoming page link when storage is unavailable.
   }
   const requestedPage = resumedPage ?? getInitialPage(window.location, originalUrl);
+  // Record the original PDF URL before streaming or rendering can fail.
+  void chrome.runtime.sendMessage({
+    type: "pdf-viewer:opened", sourceUrl: originalUrl.href,
+    page: requestedPage, mimeHandlerActive,
+  }).catch(() => {});
   requestUrl = new URL(originalUrl.href);
   requestUrl.hash = "";
 

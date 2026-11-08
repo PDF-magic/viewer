@@ -133,3 +133,8 @@ chrome.runtime.onConnect.addListener((port) => {
     transfer.source.postMessage({ type: "start" });
   }
 });
+
+// The recovery helper is a classic worker script in both source and built layouts.
+if (typeof importScripts === "function") {
+  importScripts(chrome.runtime.getURL(sourcePrefix + "background/pdf-tab-recovery.js"));
+}

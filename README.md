@@ -118,3 +118,9 @@ Page previews load progressively without delaying the first readable pages. The 
 ### ChatGPT PDF attachment handoff
 
 Clicking **Summarize with ChatGPT** now passes the already-loaded PDF bytes as an attachment, including for local `file://` and authenticated PDFs. The service worker relays acknowledged chunks in memory; it does not save PDF bytes to extension storage. ChatGPT's upload UI can change: if the attachment is not confirmed, the extension leaves an unsent draft asking for manual attachment rather than submitting a URL-only summary. Full local filesystem paths are not copied into the prompt.
+
+## Keeping PDF tabs open when reloading the extension
+
+The viewer remembers the original URL and physical page of each open PDF in extension-local storage. Reloading an unpacked extension from `chrome://extensions` attempts to reopen extension-owned tabs that Chrome removed, or refreshes surviving tabs in place, including PDFs opened from the local filesystem. The recovered document is fetched from its original source; PDF contents are never stored in the recovery registry. Intentionally closed tabs are removed from the registry. The first reload after adding this feature can only restore tabs that were registered by the updated viewer.
+
+For `file://` PDFs, turn on **Allow access to file URLs** in the extension's Chrome details page. Chrome 118+ forbids extensions from reopening local file URLs without this permission. Files that were moved, deleted, or whose permissions changed cannot be restored. Incognito tabs are not persisted.
