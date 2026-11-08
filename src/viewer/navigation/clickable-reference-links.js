@@ -32,16 +32,105 @@ function superscriptMarker(items, index, viewport) {
     kind: "footnote", number: Number(item.str.trim()) };
 }
 
+// Visible web addresses in a PDF are not always annotated as hyperlinks.
+// Detect only HTTP(S) URLs; never execute schemes embedded in document text.
+const WRITTEN_URL = /https?:\/\/[^\s<>"“”‘’]+/gi;
+
+function trimWrittenUrl(value) {
+  let result = value;
+  while (result.length) {
+    const last = result.at(-1);
+    if (/[.,;:!?'"\u2019\u201d}]/.test(last)) {
+      result = result.slice(0, -1);
+    } else if (last === ")" || last === "]") {
+      const opening = last === ")" ? "(" : "[";
+      const opens = [...result].filter(char => char === opening).length;
+      const closes = [...result].filter(char => char === last).length;
+      if (closes <= opens) break; // Keep balanced parentheses in URL paths.
+      result = result.slice(0, -1);
+    } else {
+      break;
+    }
+  }
+  return result;
+}
+
+function separateTextRuns(previous, current) {
+  if (!Array.isArray(previous?.transform) || !Array.isArray(current?.transform)) return false;
+  const size = Math.max(Math.abs(previous.height || 0), Math.abs(current.height || 0), 2);
+  if (Math.abs(previous.transform[5] - current.transform[5]) > size * 0.6) return true;
+  // PDF.js sometimes omits an intervening space from adjacent text items.
+  // Do not combine a URL with a visually separated word or column.
+  return typeof previous.width === "number" &&
+    current.transform[4] - (previous.transform[4] + previous.width) > Math.max(2, size * 0.4);
+}
+
+export function findWrittenUrlReferences(items = []) {
+  const references = [];
+  let run = "";
+  let pieces = [];
+  let urlId = 0;
+
+  function flush() {
+    for (const match of run.matchAll(WRITTEN_URL)) {
+      // Reject embedded scheme-like substrings within an ordinary word.
+      if (match.index > 0 && /[\p{L}\p{N}_@]/u.test(run[match.index - 1])) continue;
+      const text = trimWrittenUrl(match[0]);
+      if (!text || text.length > 2048) continue;
+      let url;
+      try {
+        const parsed = new URL(text);
+        if (!["http:", "https:"].includes(parsed.protocol) || !parsed.hostname) continue;
+        url = parsed.href;
+      } catch {
+        continue;
+      }
+      const end = match.index + text.length;
+      const id = urlId++;
+      for (const piece of pieces) {
+        const start = Math.max(match.index, piece.start);
+        const stop = Math.min(end, piece.end);
+        if (start < stop) references.push({
+          kind: "url", url, urlId: id, itemIndex: piece.itemIndex,
+          start: start - piece.start, end: stop - piece.start,
+        });
+      }
+    }
+    run = "";
+    pieces = [];
+  }
+
+  for (const [itemIndex, item] of (items || []).entries()) {
+    if (typeof item?.str !== "string") {
+      flush();
+      continue;
+    }
+    const previous = pieces.length ? items[pieces.at(-1).itemIndex] : null;
+    if (previous && (previous.hasEOL || separateTextRuns(previous, item))) flush();
+    const start = run.length;
+    run += item.str;
+    pieces.push({ itemIndex, start, end: run.length });
+    if (item.hasEOL || run.length > 16384) flush();
+  }
+  flush();
+  return references;
+}
+
 export function findClickableReferences(items, { pageCount, sectionTargets = new Map(), viewport } = {}) {
   const matches = [];
   // Index confirmed note labels so ordinary body numbers remain selectable.
   const labels = new Map((viewport ? footnotesForPage(items || [], viewport, 1) : [])
     .filter(note => note.markerItemIndex >= 0)
     .map(note => [note.markerItemIndex, note]));
+  const urlReferencesByItem = new Map();
+  for (const url of findWrittenUrlReferences(items)) {
+    if (!urlReferencesByItem.has(url.itemIndex)) urlReferencesByItem.set(url.itemIndex, []);
+    urlReferencesByItem.get(url.itemIndex).push(url);
+  }
   for (const [itemIndex, item] of (items || []).entries()) {
     const content = item?.str;
     if (typeof content !== "string") continue;
-    const candidates = [];
+    const candidates = [...(urlReferencesByItem.get(itemIndex) || [])];
     const note = labels.get(itemIndex);
     const label = note && content.match(/^\s*(?:\[\s*\d+\s*\]|\(\s*\d+\s*\)|\d+[.)]?)(?=\s|$)/);
     if (label) candidates.push({ itemIndex, start: 0, end: label[0].length,
@@ -132,31 +221,50 @@ export function createClickableReferenceLayer({
   const nativeLinks = Array.from(annotationsLayer.querySelectorAll(".linkAnnotation a"))
     .flatMap((anchor) => Array.from(anchor.getClientRects()));
   const references = findClickableReferences(items, { pageCount, sectionTargets, viewport });
+  const placements = [];
+  const nativeUrlIds = new Set();
   for (const ref of references) {
     const span = textDivs[ref.itemIndex];
     if (!span || span.textContent.length !== items[ref.itemIndex].str.length) continue;
     const range = textRange(span, ref.start, ref.end);
     if (!range) continue;
-    const title = ref.kind === "section" ? "Jump to section " + ref.label :
+    const rects = Array.from(range.getClientRects());
+    // If even part of a written URL already has an embedded PDF link,
+    // leave the entire URL to the native annotation, including split spans.
+    if (ref.kind === "url" && rects.some(rect => nativeLinks.some(link => overlap(rect, link)))) {
+      nativeUrlIds.add(ref.urlId);
+    }
+    placements.push({ ref, rects });
+  }
+  for (const { ref, rects } of placements) {
+    if (ref.kind === "url" && nativeUrlIds.has(ref.urlId)) continue;
+    const title = ref.kind === "url" ? "Open " + ref.url :
+      ref.kind === "section" ? "Jump to section " + ref.label :
       "Jump to " + (ref.kind === "page" ? "page " : "footnote ") + ref.number;
-    for (const rect of range.getClientRects()) {
-      if (rect.width <= 0 || rect.height <= 0 || nativeLinks.some((link) => overlap(rect, link))) continue;
+    for (const rect of rects) {
+      if (rect.width <= 0 || rect.height <= 0 || nativeLinks.some(link => overlap(rect, link))) continue;
       const left = Math.max(0, rect.left - pageRect.left);
       const top = Math.max(0, rect.top - pageRect.top);
       const width = Math.min(rect.width, pageRect.width - left);
       const height = Math.min(rect.height, pageRect.height - top);
       if (width <= 0 || height <= 0) continue;
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "clickable-reference-link";
-      button.style.left = (left / pageRect.width * 100) + "%";
-      button.style.top = (top / pageRect.height * 100) + "%";
-      button.style.width = (width / pageRect.width * 100) + "%";
-      button.style.height = (height / pageRect.height * 100) + "%";
-      button.title = title;
-      button.setAttribute("aria-label", title);
-      button.addEventListener("click", () => onNavigate(ref));
-      layer.append(button);
+      const link = document.createElement(ref.kind === "url" ? "a" : "button");
+      if (ref.kind === "url") {
+        link.href = ref.url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+      } else {
+        link.type = "button";
+        link.addEventListener("click", () => onNavigate(ref));
+      }
+      link.className = "clickable-reference-link";
+      link.style.left = (left / pageRect.width * 100) + "%";
+      link.style.top = (top / pageRect.height * 100) + "%";
+      link.style.width = (width / pageRect.width * 100) + "%";
+      link.style.height = (height / pageRect.height * 100) + "%";
+      link.title = title;
+      link.setAttribute("aria-label", title);
+      layer.append(link);
     }
   }
   return layer;
