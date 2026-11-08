@@ -383,6 +383,10 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
           other.x < adjacent.x && Math.abs(other.height - adjacent.height) < adjacent.height * 0.1 &&
           /[A-Za-z]/.test(other.text)).length >= 2;
       if (column.rules.length && !rule) continue;
+      // Superscript references beside numeric table cells are not footnote
+      // definitions. Without a separator or wide note block, require prose.
+      if (!inlineText && adjacent && !/\p{L}/u.test(adjacent.text) &&
+        !rule && !wideNoteBlock) continue;
       if (!reference && !wideNoteBlock && !(superscript && rule) && !smallerBlock && !scannedSmallBlock) continue;
       notes.push({ pageNumber, number, xRatio: entry.xRatio, yRatio: entry.yRatio, label: entry.text,
         baseline, scannedSmallBlock, readingY: readingBaseline(inlineText ? entry : adjacent),
