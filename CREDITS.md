@@ -20,4 +20,4 @@ The copy-action artwork (`src/assets/pinkie-mirror.png`) depicts Pinkie Pie look
 
 https://youtu.be/t8PNXM7MoQM?t=597
 
-The ChatGPT button artwork (`src/assets/sweetie-bot.png`) depicts Sweetie Bot, a robot interpretation of Sweetie Belle. Both button images were created using OpenAI image generation. The linked video and original show artwork remain subject to their respective rights; this attribution does not grant or imply a license.
+The ChatGPT button artwork (`src/assets/sweetiebot.png`) depicts Sweetie Bot, a robot interpretation of Sweetie Belle. Both button images were created using OpenAI image generation. The linked video and original show artwork remain subject to their respective rights; this attribution does not grant or imply a license.
