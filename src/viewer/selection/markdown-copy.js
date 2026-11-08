@@ -414,7 +414,8 @@ export function selectionToMarkdown(root, selection, doc = document,
   return output.filter(Boolean).join('\n\n');
 }
 
-export function installMarkdownCopy(root, markdownToggle, doc = document, paragraphToggle = null) {
+export function installMarkdownCopy(root, markdownToggle, doc = document,
+    paragraphToggle = null, autoCopyToggle = null) {
   if (!root || !markdownToggle) return;
   let indexedFootnotes = [];
   doc.defaultView?.addEventListener('pdf-viewer-footnotes-indexed', event => {
@@ -430,5 +431,56 @@ export function installMarkdownCopy(root, markdownToggle, doc = document, paragr
     event.clipboardData.setData('text/plain', copied);
     if (markdown) event.clipboardData.setData('text/markdown', copied);
     event.preventDefault();
+  });
+
+  if (!autoCopyToggle) return;
+
+  let startedInPdf = false;
+  doc.addEventListener('pointerdown', event => {
+    // Only deliberate primary-button selections originating in the PDF text
+    // layer can trigger automatic copying, never links or toolbar controls.
+    startedInPdf = event.button === 0 && inPdfTextLayer(event.target, root);
+  });
+  doc.addEventListener('pointercancel', () => { startedInPdf = false; });
+  doc.defaultView?.addEventListener('blur', () => { startedInPdf = false; });
+  doc.addEventListener('pointerup', () => {
+    const fromPdf = startedInPdf;
+    startedInPdf = false;
+    if (!fromPdf || !autoCopyToggle.checked) return;
+
+    // The selection module finishes settling endpoints (including trailing
+    // punctuation) in its own pointerup handler. Copy after all handlers run.
+    queueMicrotask(() => {
+      const selection = doc.getSelection();
+      if (!selection || selection.isCollapsed || !selection.rangeCount ||
+          !inPdfTextLayer(selection.anchorNode, root) ||
+          !inPdfTextLayer(selection.focusNode, root) ||
+          !selection.toString().trim()) return;
+
+      // Trigger the same 'copy' event as Ctrl/Cmd+C: existing Markdown,
+      // paragraph reflow, and footnote logic all remain authoritative.
+      try {
+        if (doc.execCommand('copy')) return;
+      } catch {
+        // Some embedded viewers deny execCommand; try clipboardWrite instead.
+      }
+
+      const markdown = markdownToggle.checked;
+      const reflow = paragraphToggle?.checked !== false;
+      const text = selectionToMarkdown(root, selection, doc,
+        { markdown, reflow, footnotes: indexedFootnotes }) || selection.toString();
+      const clipboard = doc.defaultView?.navigator?.clipboard;
+      if (clipboard?.writeText) {
+        void clipboard.writeText(text).catch(() => {
+          doc.defaultView?.dispatchEvent(new CustomEvent('pdf-viewer-toast', {
+            detail: { message: 'Unable to copy selected text' },
+          }));
+        });
+      } else {
+        doc.defaultView?.dispatchEvent(new CustomEvent('pdf-viewer-toast', {
+          detail: { message: 'Unable to copy selected text' },
+        }));
+      }
+    });
   });
 }

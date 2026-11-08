@@ -7,6 +7,7 @@ const MARKDOWN_COPY_STORAGE_KEY = "pdf-viewer-copy-as-markdown";
 const TAGGED_PARAGRAPH_COPY_STORAGE_KEY = "pdf-viewer-copy-tagged-paragraphs";
 const TWO_PAGE_STORAGE_KEY = "pdf-viewer-two-page-view";
 const OFFSET_COVER_STORAGE_KEY = "pdf-viewer-offset-cover";
+const AUTO_COPY_SELECTION_STORAGE_KEY = "pdf-viewer-copy-on-select";
 const STUDIO_GREEN = "#43af49";
 
 const toolsMenu = document.querySelector("#tools-menu");
@@ -143,10 +144,21 @@ function installTaggedParagraphCopySetting() {
   });
 }
 
+function installAutoCopySelectionSetting() {
+  const toggle = document.querySelector("#copy-on-select");
+  if (!toggle) return;
+  styleSettingCheckbox(toggle);
+  toggle.checked = localStorage.getItem(AUTO_COPY_SELECTION_STORAGE_KEY) === "true";
+  toggle.addEventListener("change", () => {
+    localStorage.setItem(AUTO_COPY_SELECTION_STORAGE_KEY, String(toggle.checked));
+  });
+}
+
 installClickableReferencesSetting();
 installPrintedPageJumpSetting();
 installMarkdownCopySetting();
 installTaggedParagraphCopySetting();
+installAutoCopySelectionSetting();
 syncThemePreference();
 void addSecCommentSetting();
 
@@ -677,7 +689,6 @@ if (zoomControls) {
   applyZoomLayout();
   syncZoomControls();
 }
-
 function installPageLayoutSettings() {
   const viewer = document.querySelector("#viewer");
   const twoPageToggle = document.querySelector("#two-page-view");
