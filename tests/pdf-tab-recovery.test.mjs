@@ -75,8 +75,7 @@ test("a local redirected PDF returns in the same window with its physical page",
   };
   await fixture.opened(tab, source, 19, false);
   fixture.openTabs.delete(12); // Chrome closed the extension-owned tab while reloading.
-  fixture.events.install({ reason: "update" });
-  await fixture.tick();
+  await fixture.events.install({ reason: "update" });
 
   assert.equal(fixture.calls.create.length, 1);
   const restored = fixture.calls.create[0];
@@ -94,8 +93,7 @@ test("MIME-handler local PDFs reopen with file URLs, not ephemeral blob streams"
   const source = "file:///tmp/local.pdf";
   await fixture.opened({ id: 7, url: source, windowId: 1, index: 0 }, source, 8, true);
   fixture.openTabs.delete(7);
-  fixture.events.install({ reason: "update" });
-  await fixture.tick();
+  await fixture.events.install({ reason: "update" });
   assert.equal(fixture.calls.create.length, 1);
   assert.equal(fixture.calls.create[0].url, "file:///tmp/local.pdf#page=8");
 });
@@ -105,8 +103,7 @@ test("local files cannot be reopened without Chrome file-scheme permission", asy
   const source = "file:///tmp/restricted.pdf";
   await fixture.opened({ id: 7, url: source, windowId: 1, index: 0 }, source, 8, true);
   fixture.openTabs.delete(7);
-  fixture.events.install({ reason: "update" });
-  await fixture.tick();
+  await fixture.events.install({ reason: "update" });
   assert.equal(fixture.calls.create.length, 0);
   assert.equal(Object.keys(fixture.stored["pdf-viewer-open-tabs-v1"]).length, 1);
 });
@@ -115,8 +112,7 @@ test("web PDFs reload in the existing tab instead of duplicating it", async () =
   const fixture = setup();
   const source = "https://example.org/document.pdf";
   await fixture.opened({ id: 7, url: source, windowId: 1, index: 0 }, source, 8, true);
-  fixture.events.install({ reason: "update" });
-  await fixture.tick();
+  await fixture.events.install({ reason: "update" });
   assert.equal(fixture.calls.create.length, 0);
   assert.deepEqual(fixture.calls.update, [{ id: 7, url: source + "#page=8" }]);
 });
@@ -128,8 +124,7 @@ test("intentionally closed PDFs do not return on a later extension reload", asyn
   fixture.openTabs.delete(7);
   fixture.events.removed(7);
   await fixture.tick(); // Allow the close cleanup to finish before the reload.
-  fixture.events.install({ reason: "update" });
-  await fixture.tick();
+  await fixture.events.install({ reason: "update" });
   assert.equal(fixture.calls.create.length, 0);
 });
 
@@ -138,8 +133,7 @@ test("unrelated browser tabs are never overwritten with old PDFs", async () => {
   const source = "https://example.org/document.pdf";
   await fixture.opened({ id: 7, url: source, windowId: 1, index: 0 }, source, 8, true);
   fixture.openTabs.set(7, { id: 7, url: "https://example.org/home", windowId: 1, index: 0 });
-  fixture.events.install({ reason: "update" });
-  await fixture.tick();
+  await fixture.events.install({ reason: "update" });
   assert.equal(fixture.calls.create.length, 0);
   assert.equal(fixture.calls.update.length, 0);
   assert.equal(Object.keys(fixture.stored["pdf-viewer-open-tabs-v1"]).length, 0);

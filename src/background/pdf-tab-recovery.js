@@ -199,7 +199,8 @@
     if (reason === "update") {
       // Unpacked extension Reload is an update. A second pass covers tabs
       // removed just after the new worker starts without recreating duplicates.
-      void recover().then(() => new Promise((resolve) => setTimeout(resolve, 1200)))
+      // Return completion so regression tests can await both recovery passes.
+      return recover().then(() => new Promise((resolve) => setTimeout(resolve, 1200)))
         .then(() => recover(true)).catch((error) => console.warn("PDF tab recovery failed", error));
     }
   });
