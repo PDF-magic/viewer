@@ -71,8 +71,15 @@ function registerPdfTransfer(requestId, filename) {
   let awaitingAck;
   const expire = setTimeout(() => port.disconnect(), 120000);
   port.onDisconnect.addListener(() => {
+    // Chrome reports a missing receiver through lastError on disconnect.
+    // Reading it here also prevents an "Unchecked runtime.lastError" warning.
+    const disconnectError = chrome.runtime.lastError?.message;
     stopped = true;
-    if (awaitingAck) awaitingAck.reject(new Error("PDF transfer disconnected"));
+    clearTimeout(expire);
+    if (awaitingAck) {
+      awaitingAck.reject(new Error(disconnectError || "PDF transfer disconnected"));
+      awaitingAck = null;
+    }
   });
   port.onMessage.addListener((message) => {
     if (message?.type === "ack" && awaitingAck) {
