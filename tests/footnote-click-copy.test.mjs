@@ -133,8 +133,8 @@ test("SEC November 2007 TIC footnotes separate arithmetic-only note 13 from note
   ];
   const notes = footnotesForPage(items, viewport, 173, [{ x: 74, y: 367, width: 300 }]);
   assert.deepEqual(notes.map(({ number }) => number), [12, 13]);
-  assert.match(notes[0].text, /others would do so seven times a year\\.$/);
-  assert.doesNotMatch(notes[0].text, /6\\.63|5,304/);
+  assert.match(notes[0].text, /others would do so seven times a year\.$/);
+  assert.doesNotMatch(notes[0].text, /6\.63|5,304/);
   assert.equal(notes[1].text, "6.63 X 800 = 5,304.");
   assert.ok(notes[0].highlightRegions.every(region => region.top + region.height < 687 / height));
   assert.ok(notes[1].highlightRegions.every(region => region.top > 680 / height));
