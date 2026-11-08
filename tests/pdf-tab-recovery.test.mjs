@@ -77,7 +77,11 @@ test("a local redirected PDF returns in the same window with its physical page",
   fixture.openTabs.delete(12); // Chrome closed the extension-owned tab while reloading.
   await fixture.events.install({ reason: "update" });
 
-  assert.equal(fixture.calls.create.length, 1);
+  assert.equal(fixture.calls.create.length, 1, JSON.stringify({
+    recorded: fixture.stored["pdf-viewer-open-tabs-v1"],
+    openTabs: [...fixture.openTabs.keys()],
+    calls: fixture.calls,
+  }));
   const restored = fixture.calls.create[0];
   assert.equal(restored.windowId, 6);
   assert.equal(restored.index, 4);

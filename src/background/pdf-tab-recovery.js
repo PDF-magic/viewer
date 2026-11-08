@@ -20,7 +20,7 @@
   function viewerSource(value) {
     try {
       const url = new URL(value);
-      if (!VIEWERS.some((viewer) => url.origin + url.pathname === viewer)) return null;
+      if (!VIEWERS.some((viewer) => url.protocol + "//" + url.host + url.pathname === viewer)) return null;
       return validSource(url.searchParams.get("url"));
     } catch {
       return null;
