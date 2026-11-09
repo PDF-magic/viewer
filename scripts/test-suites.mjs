@@ -50,6 +50,7 @@ export const suites = Object.freeze({
     "footnote-scanned-petition.test.mjs"
   ],
   "search": [
+    "text-fragment-link.test.mjs",
     "search-empty-state.test.mjs",
     "search-highlight-cues.test.mjs",
     "search-matches.test.mjs",
