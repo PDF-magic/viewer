@@ -17,6 +17,7 @@ import { highlightFootnote, renderFootnoteHighlight } from "./navigation/footnot
 import { findPrintedContentsEntries, resolvePrintedContentsPage, contentsEntryHasEmbeddedLink } from "./navigation/printed-contents.js";
 import { createClickableReferenceLayer } from "./navigation/clickable-reference-links.js";
 import { outlinedSectionHeadings } from "./navigation/section-cross-references.js";
+import { filterOutlineHeadings } from "./navigation/outline-filter.js";
 import { printedPageShortcutQuery } from "./navigation/printed-page-shortcut.js";
 
 const sourceMode = window.location.pathname.includes("/src/");
@@ -50,6 +51,7 @@ const sectionToggle = document.querySelector("#section-toggle");
 const sectionPopover = document.querySelector("#section-popover");
 const sectionDocumentTitle = document.querySelector("#section-document-title");
 const sectionList = document.querySelector("#section-list");
+const sectionBookmarkToggle = document.querySelector("#section-bookmark-toggle");
 const sectionMetadata = document.querySelector("#section-metadata");
 const sectionMetadataList = document.querySelector("#section-metadata-list");
 const themeButton = document.querySelector("#theme-toggle");
@@ -107,6 +109,10 @@ let completedSearchQuery = "";
 let searchMatches = [];
 let activeSearchIndex = -1;
 let sectionEntries = [];
+let sectionOriginalOutline = [];
+let sectionFilteredOutline = [];
+let hiddenBookmarkCount = 0;
+let showAllBookmarks = false;
 let contentsPageLabels = null;
 let contentsOutlineItems = [];
 let clickableSectionTargetsPromise;
@@ -518,7 +524,7 @@ function createOutlineList(items, parentReference = "") {
     const hasExplicitReference = Boolean(localReference);
     const sectionReference = hasExplicitReference
       ? fullSectionReference(parentReference, localReference)
-      : fallbackSectionReference(parentReference, visiblePosition);
+      : fallbackSectionReference(parentReference, item.pdfMagicSourcePosition || visiblePosition);
     const copyText = hasExplicitReference
       ? sectionReference
       : fallbackSectionCopyText(sectionReference, title);
@@ -571,6 +577,24 @@ function createOutlineList(items, parentReference = "") {
 
   return list;
 }
+
+function renderSectionOutline() {
+  sectionEntries = [];
+  const outline = showAllBookmarks ? sectionOriginalOutline : sectionFilteredOutline;
+  sectionList.replaceChildren(createOutlineList(outline));
+  if (hiddenBookmarkCount) {
+    sectionBookmarkToggle.textContent = showAllBookmarks
+      ? "Show sections"
+      : `Show all bookmarks (${hiddenBookmarkCount} hidden)`;
+    sectionBookmarkToggle.setAttribute("aria-pressed", String(showAllBookmarks));
+  }
+  void updateCurrentSectionHighlight();
+}
+
+sectionBookmarkToggle?.addEventListener("click", () => {
+  showAllBookmarks = !showAllBookmarks;
+  renderSectionOutline();
+});
 
 function renderPdfMetadata(entries) {
   const fragment = document.createDocumentFragment();
@@ -640,11 +664,13 @@ async function initializeSectionNavigation() {
     return;
   }
 
-  sectionEntries = [];
-  const outlineList = createOutlineList(outline);
-  if (!outlineList.childElementCount) {
-    return;
-  }
+  const filtered = filterOutlineHeadings(outline);
+  sectionOriginalOutline = outline;
+  sectionFilteredOutline = filtered.outline;
+  hiddenBookmarkCount = filtered.hidden;
+  showAllBookmarks = false;
+  sectionBookmarkToggle.hidden = hiddenBookmarkCount === 0;
+  if (!sectionFilteredOutline.length) return;
 
   const { title: metadataTitle, entries: metadataEntries } = await getPdfMetadataDetails();
   if (metadataTitle) {
@@ -653,7 +679,7 @@ async function initializeSectionNavigation() {
   }
   renderPdfMetadata(metadataEntries);
 
-  sectionList.replaceChildren(outlineList);
+  renderSectionOutline();
   sectionNav.hidden = false;
 }
 
@@ -1399,7 +1425,8 @@ async function downloadPdf() {
 }
 
 function bindControls() {
-  installMarkdownCopy(viewer, document.querySelector("#copy-as-markdown"), document, document.querySelector("#copy-tagged-paragraphs"));
+  installMarkdownCopy(viewer, document.querySelector("#copy-as-markdown"), document,
+    document.querySelector("#copy-tagged-paragraphs"), document.querySelector("#copy-on-select"));
   window.addEventListener("pdf-viewer-toast", (event) => {
     if (typeof event.detail?.message === "string") showToast(event.detail.message);
   });

@@ -7,6 +7,7 @@
     <link rel="icon" type="image/png" href="assets/luna-mark.png" />
     <link rel="stylesheet" href="viewer/viewer.css" />
     <link rel="stylesheet" href="viewer/selection/text-selection.css" />
+    <link rel="stylesheet" href="viewer/selection/reading-return-cue.css" />
     <link rel="stylesheet" href="viewer/search/search-highlight-cues.css" />
     <link rel="stylesheet" href="viewer/navigation/toolbar-layout.css" />
     <link rel="stylesheet" href="viewer/navigation/minimap.css" />
@@ -52,6 +53,7 @@
           <div id="section-document-title" class="section-document-title" hidden></div>
           <div class="section-popover-title">Sections</div>
           <nav id="section-list" class="section-list" aria-label="Document sections"></nav>
+          <button id="section-bookmark-toggle" class="section-bookmark-toggle" type="button" aria-pressed="false" hidden></button>
           <section id="section-metadata" class="section-metadata" hidden>
             <div class="section-metadata-title">Metadata</div>
             <dl id="section-metadata-list" class="section-metadata-list"></dl>
@@ -104,7 +106,7 @@
       </div>
       <div class="search-actions" role="group" aria-label="Actions">
         <button id="summarize-chatgpt" class="mark-button" type="button" aria-label="Summarize with ChatGPT" title="Summarize with ChatGPT">
-          <img src="assets/sweetie-bot.png" alt="" aria-hidden="true" />
+          <img src="assets/sweetiebot.png" alt="" aria-hidden="true" />
         </button>
       </div>
       <div class="spacer"></div>
@@ -147,6 +149,15 @@
           <input id="custom-loading-image" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
           <button id="section-cross-reference-notes" class="tool-button" type="button" role="menuitem">§ <span>Section cross-references</span></button>
           <button id="cross-reference-notes" class="tool-button" type="button" role="menuitem">↗ <span>Footnote cross-references</span></button>
+          <label class="tool-toggle" title="Show two PDF pages side by side">
+            <span>Two-page view</span>
+            <input id="two-page-view" class="checkbox-input" type="checkbox" />
+          </label>
+          <label class="tool-toggle" title="Show page 1 alone on the right, then pair pages 2–3, 4–5, and so on">
+            <span>Offset cover</span>
+            <input id="offset-cover" class="checkbox-input" type="checkbox" />
+          </label>
+          <div class="menu-separator" role="separator"></div>
           <label class="tool-toggle" title="Show a separate printed-page search field in the toolbar (off by default; you can always type 181* in the regular page field)">
             <span>Show printed-page search</span>
             <input id="printed-page-jump-opt-in" class="checkbox-input" type="checkbox" />
@@ -159,6 +170,10 @@
           <label class="tool-toggle" title="When copying selected PDF text, preserve detected italics as _underscores_ and bold as **stars**. Clicking a footnote reference also copies the complete recovered note as a Markdown footnote. Off by default.">
             <span>Copy selection as Markdown</span>
             <input id="copy-as-markdown" class="checkbox-input" type="checkbox" />
+          </label>
+          <label class="tool-toggle" title="When you finish selecting PDF text with the pointer, copy it to the clipboard automatically. Keep the selection highlighted and use the current Markdown and paragraph-copy preferences. Off by default.">
+            <span>Automatically copy selected text</span>
+            <input id="copy-on-select" class="checkbox-input" type="checkbox" />
           </label>
           <label class="tool-toggle" title="Make explicit footnote, page, and outlined section references in PDF text clickable">
             <span>Click to jump to references</span>
@@ -330,6 +345,7 @@
     <script type="module" src="viewer/viewer.js"></script>
     <script type="module" src="viewer/navigation/rapid-page-navigation.js"></script>
     <script type="module" src="viewer/selection/text-selection.js"></script>
+    <script type="module" src="viewer/selection/reading-return-cue.js"></script>
     <script type="module" src="viewer/search/search-highlight-cues.js"></script>
     <script type="module" src="viewer/navigation/minimap.js"></script>
     <script type="module" src="viewer/navigation/page-tabs.js"></script>

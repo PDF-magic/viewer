@@ -16,4 +16,8 @@ All upstream artwork remains subject to its original rights and licensing terms.
 
 ## Pinkie Pie and Sweetie Bot
 
-The copy-action artwork (`src/assets/pinkie-mirror.png`) depicts Pinkie Pie looking into a mirror. The ChatGPT button artwork (`src/assets/sweetie-bot.png`) depicts Sweetie Bot, a robot interpretation of Sweetie Belle. Both images were generated with OpenAI image generation for this extension.
+The copy-action artwork (`src/assets/pinkie-mirror.png`) depicts Pinkie Pie looking at her reflection, with a transparent background. It is a generated adaptation of the scene shown at 9:57 in this video:
+
+https://youtu.be/t8PNXM7MoQM?t=597
+
+The ChatGPT button artwork (`src/assets/sweetiebot.png`) depicts Sweetie Bot, a robot interpretation of Sweetie Belle. Both button images were created using OpenAI image generation. The linked video and original show artwork remain subject to their respective rights; this attribution does not grant or imply a license.
