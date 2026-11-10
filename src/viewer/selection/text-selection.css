@@ -74,7 +74,7 @@
 
 .text-selection-overlay > svg {
   fill: none;
-  stroke: #4d9aff;
+  stroke: var(--accent);
   stroke-width: 1.5px;
 }
 

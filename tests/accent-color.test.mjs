@@ -27,3 +27,14 @@ test('accent variable drives the viewer green treatment', () => {
   assert.match(accentStyles, /search-highlight[\s\S]*?var\(--accent\)/);
   assert.match(accentStyles, /accent-color:\s*var\(--accent\)\s*!important/);
 });
+
+const selectionStyles = readFileSync(new URL('../src/viewer/selection/text-selection.css', import.meta.url), 'utf8');
+const viewerStyles = readFileSync(new URL('../src/viewer/viewer.css', import.meta.url), 'utf8');
+
+test('selected text and highlight outlines follow the theme color', () => {
+  assert.match(accentStyles, /--selection-bg:\s*color-mix\(in srgb, var\(--accent\) 45%, transparent\)/);
+  assert.match(accentStyles, /--highlight-outline:\s*color-mix\(in srgb, var\(--accent\) 95%, transparent\)/);
+  assert.match(selectionStyles, /\.text-selection-overlay > svg\s*\{[^}]*stroke:\s*var\(--accent\)/);
+  assert.match(viewerStyles, /\.text-layer ::selection\s*\{[^}]*background:\s*var\(--selection-bg\)/);
+  assert.match(viewerStyles, /\.highlight-region-outline\s*\{[^}]*stroke:\s*var\(--highlight-outline\)/);
+});
