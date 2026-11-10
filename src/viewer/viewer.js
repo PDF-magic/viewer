@@ -12,6 +12,7 @@ import { installMarkdownCopy, markPdfTextStyles, markPdfTextStructure } from "./
 import { highlightTextLayer, registerSearchText } from "./search/search-highlight.js";
 import { normalizeSearchText } from "./search/search-text.js";
 import { PagePreviews } from "./page-previews.js";
+import { hasPageSizedImage } from "./theme/scanned-page-images.js";
 import { preparePrintDocument } from "./print-renderer.js";
 import { highlightFootnote, renderFootnoteHighlight } from "./navigation/footnote-highlight.js";
 import { findPrintedContentsEntries, resolvePrintedContentsPage, contentsEntryHasEmbeddedLink } from "./navigation/printed-contents.js";
@@ -77,7 +78,6 @@ const LIGHT_MODE_SHARE_ICON = extensionAssetUrl(
   "src/assets/copy-page-icon-light.png",
   "assets/copy-page-icon-light.png",
 );
-const SCANNED_PAGE_IMAGE_AREA_THRESHOLD = 0.8;
 const RENDER_WINDOW_RADIUS = 3;
 const PDF_METADATA_FIELDS = [
   ["Title", "Title", "dc:title"],
@@ -143,31 +143,6 @@ const renderedPages = new Set();
 // Keep the previous bitmap on screen until a render at the new size is ready.
 const staleRenderedPages = new Set();
 const pageTextCache = new Map();
-
-function imageAreaFraction(imageCoordinates, offset) {
-  const topLeftX = imageCoordinates[offset];
-  const topLeftY = imageCoordinates[offset + 1];
-  const bottomLeftX = imageCoordinates[offset + 2];
-  const bottomLeftY = imageCoordinates[offset + 3];
-  const topRightX = imageCoordinates[offset + 4];
-  const topRightY = imageCoordinates[offset + 5];
-  const leftX = bottomLeftX - topLeftX;
-  const leftY = bottomLeftY - topLeftY;
-  const topX = topRightX - topLeftX;
-  const topY = topRightY - topLeftY;
-
-  return Math.abs(leftX * topY - leftY * topX);
-}
-
-function hasPageSizedImage(imageCoordinates) {
-  for (let offset = 0; offset + 5 < imageCoordinates.length; offset += 6) {
-    if (imageAreaFraction(imageCoordinates, offset) >= SCANNED_PAGE_IMAGE_AREA_THRESHOLD) {
-      return true;
-    }
-  }
-
-  return false;
-}
 
 function clampUnit(value) {
   return Math.min(1, Math.max(0, value));
