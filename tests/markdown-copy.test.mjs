@@ -114,6 +114,38 @@ test("recovers whitespace before italic runs from PDF text geometry", () => {
   ]), "investing is _much too complex_ or requires a _full-time commitment,_");
 });
 
+test("restores missing word spaces at tight Federal Register column wraps", () => {
+  // 50 FR 15913, PDF page 65: the OCR text layer emits one item per
+  // printed line without hasEOL or trailing spaces.
+  const lines = [
+    "Exempt transfer",
+    "agents would only be required to",
+    "provide identifying information and",
+    "provide responses to two basic",
+    "questions",
+  ];
+  const items = lines.map((str, index) => ({
+    str, fontName: "bold", width: str.length * 4.5, height: 10, dir: "ltr",
+    transform: [10, 0, 0, 10, 80, 200 - index * 12],
+  }));
+  const spans = items.map(() => ({ dataset: {} }));
+  markPdfTextStyles({ commonObjs: { get: () => ({ name: "Times-Bold" }) } },
+    { items, styles: {} }, spans);
+  assert.deepEqual(spans.slice(1).map(span => span.dataset.markdownSpaceBefore),
+    ["true", "true", "true", "true"]);
+  assert.equal(markdownFromRuns(items.map((item, index) => ({
+    text: item.str, bold: true,
+    spaceBefore: spans[index].dataset.markdownSpaceBefore === "true",
+  }))), "**Exempt transfer agents would only be required to provide identifying information and provide responses to two basic questions**");
+
+  // A second column on the right is not a continuation of the left.
+  const columnItems = [items[0], { ...items[1], transform: [10, 0, 0, 10, 280, 188] }];
+  const columnSpans = columnItems.map(() => ({ dataset: {} }));
+  markPdfTextStyles({ commonObjs: { get: () => ({ name: "Times-Bold" }) } },
+    { items: columnItems, styles: {} }, columnSpans);
+  assert.equal(columnSpans[1].dataset.markdownSpaceBefore, undefined);
+});
+
 test("does not add spaces within words, before punctuation, or over existing whitespace", () => {
   const item = (str, x, width, options = {}) => ({
     str, width, height: 10, dir: "ltr", transform: [10, 0, 0, 10, x, 100], ...options,
