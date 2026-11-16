@@ -93,9 +93,13 @@ export function markPdfTextStyles(page, textContent, textDivs) {
     }
     const previousText = textItems.slice(0, index).reverse().find(candidate =>
       candidate.str.trim() && candidate.transform?.length >= 6);
+    // Tight newspaper-style leading can move a line by only one text-height.
+    // Only join within the same column; moving right into another column is
+    // not a wrapped continuation of the previous line.
     const wrappedLine = previousText && item.transform?.length >= 6 &&
-      previousText.transform[5] - item.transform[5] > typicalHeight * 1.3 &&
+      previousText.transform[5] - item.transform[5] > typicalHeight * 0.8 &&
       previousText.transform[5] - item.transform[5] < typicalHeight * 3.5 &&
+      item.transform[4] - previousText.transform[4] < typicalHeight * 6 &&
       !span.dataset.markdownParagraphStart && !/[-\s]$/.test(previousText.str) &&
       !/^\s/.test(item.str);
     if (hasPdfWordGap(textItems[index - 1], item) || wrappedLine) {
