@@ -77,7 +77,8 @@ export const suites = Object.freeze({
   ],
   "appearance": [
     "accent-color.test.mjs",
-    "narrow-viewer-layout.test.mjs"
+    "narrow-viewer-layout.test.mjs",
+    "scanned-page-images.test.mjs"
   ],
   "chatgpt": [
     "chatgpt-pdf-relay.test.mjs",
