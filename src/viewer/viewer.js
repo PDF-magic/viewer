@@ -2,6 +2,7 @@ import { AnnotationLayer, createValidAbsoluteUrl, getDocument, GlobalWorkerOptio
 import { EventBus, PDFLinkService } from "../../node_modules/pdfjs-dist/web/pdf_viewer.mjs";
 import { abandonPdfDocumentSession, publishPdfDocument } from "./pdf-document-session.js";
 import { referenceUrlFromPdfMetadata, resolveDocumentReferenceUrl } from "./document-reference-url.js";
+import { pdfTextFragmentFromUrl, pdfTextFragmentUrl } from "./sharing/text-fragment.js";
 import { metadataField, pdfMetadataTitle } from "./pdf-metadata-title.js";
 import { doiFromPdfMetadata, doiResolverUrl } from "./metadata-doi.js";
 import { resolvePdfSource } from "./pdf-source.js";
@@ -12,11 +13,13 @@ import { installMarkdownCopy, markPdfTextStyles, markPdfTextStructure } from "./
 import { highlightTextLayer, registerSearchText } from "./search/search-highlight.js";
 import { normalizeSearchText } from "./search/search-text.js";
 import { PagePreviews } from "./page-previews.js";
+import { hasPageSizedImage } from "./theme/scanned-page-images.js";
 import { preparePrintDocument } from "./print-renderer.js";
 import { highlightFootnote, renderFootnoteHighlight } from "./navigation/footnote-highlight.js";
 import { findPrintedContentsEntries, resolvePrintedContentsPage, contentsEntryHasEmbeddedLink } from "./navigation/printed-contents.js";
 import { createClickableReferenceLayer } from "./navigation/clickable-reference-links.js";
 import { outlinedSectionHeadings } from "./navigation/section-cross-references.js";
+import { filterOutlineHeadings } from "./navigation/outline-filter.js";
 import { printedPageShortcutQuery } from "./navigation/printed-page-shortcut.js";
 
 const sourceMode = window.location.pathname.includes("/src/");
@@ -43,12 +46,14 @@ const searchFirstButton = document.querySelector("#search-first");
 const searchPreviousButton = document.querySelector("#search-previous");
 const searchNextButton = document.querySelector("#search-next");
 const shareButton = document.querySelector("#share-page");
+const copyTextFragmentButton = document.querySelector("#copy-text-fragment");
 const shareIcon = document.querySelector("#share-icon");
 const sectionNav = document.querySelector("#section-nav");
 const sectionToggle = document.querySelector("#section-toggle");
 const sectionPopover = document.querySelector("#section-popover");
 const sectionDocumentTitle = document.querySelector("#section-document-title");
 const sectionList = document.querySelector("#section-list");
+const sectionBookmarkToggle = document.querySelector("#section-bookmark-toggle");
 const sectionMetadata = document.querySelector("#section-metadata");
 const sectionMetadataList = document.querySelector("#section-metadata-list");
 const themeButton = document.querySelector("#theme-toggle");
@@ -74,7 +79,6 @@ const LIGHT_MODE_SHARE_ICON = extensionAssetUrl(
   "src/assets/copy-page-icon-light.png",
   "assets/copy-page-icon-light.png",
 );
-const SCANNED_PAGE_IMAGE_AREA_THRESHOLD = 0.8;
 const RENDER_WINDOW_RADIUS = 3;
 const PDF_METADATA_FIELDS = [
   ["Title", "Title", "dc:title"],
@@ -106,6 +110,10 @@ let completedSearchQuery = "";
 let searchMatches = [];
 let activeSearchIndex = -1;
 let sectionEntries = [];
+let sectionOriginalOutline = [];
+let sectionFilteredOutline = [];
+let hiddenBookmarkCount = 0;
+let showAllBookmarks = false;
 let contentsPageLabels = null;
 let contentsOutlineItems = [];
 let clickableSectionTargetsPromise;
@@ -136,31 +144,6 @@ const renderedPages = new Set();
 // Keep the previous bitmap on screen until a render at the new size is ready.
 const staleRenderedPages = new Set();
 const pageTextCache = new PageTextCache();
-
-function imageAreaFraction(imageCoordinates, offset) {
-  const topLeftX = imageCoordinates[offset];
-  const topLeftY = imageCoordinates[offset + 1];
-  const bottomLeftX = imageCoordinates[offset + 2];
-  const bottomLeftY = imageCoordinates[offset + 3];
-  const topRightX = imageCoordinates[offset + 4];
-  const topRightY = imageCoordinates[offset + 5];
-  const leftX = bottomLeftX - topLeftX;
-  const leftY = bottomLeftY - topLeftY;
-  const topX = topRightX - topLeftX;
-  const topY = topRightY - topLeftY;
-
-  return Math.abs(leftX * topY - leftY * topX);
-}
-
-function hasPageSizedImage(imageCoordinates) {
-  for (let offset = 0; offset + 5 < imageCoordinates.length; offset += 6) {
-    if (imageAreaFraction(imageCoordinates, offset) >= SCANNED_PAGE_IMAGE_AREA_THRESHOLD) {
-      return true;
-    }
-  }
-
-  return false;
-}
 
 function clampUnit(value) {
   return Math.min(1, Math.max(0, value));
@@ -517,7 +500,7 @@ function createOutlineList(items, parentReference = "") {
     const hasExplicitReference = Boolean(localReference);
     const sectionReference = hasExplicitReference
       ? fullSectionReference(parentReference, localReference)
-      : fallbackSectionReference(parentReference, visiblePosition);
+      : fallbackSectionReference(parentReference, item.pdfMagicSourcePosition || visiblePosition);
     const copyText = hasExplicitReference
       ? sectionReference
       : fallbackSectionCopyText(sectionReference, title);
@@ -570,6 +553,24 @@ function createOutlineList(items, parentReference = "") {
 
   return list;
 }
+
+function renderSectionOutline() {
+  sectionEntries = [];
+  const outline = showAllBookmarks ? sectionOriginalOutline : sectionFilteredOutline;
+  sectionList.replaceChildren(createOutlineList(outline));
+  if (hiddenBookmarkCount) {
+    sectionBookmarkToggle.textContent = showAllBookmarks
+      ? "Show sections"
+      : `Show all bookmarks (${hiddenBookmarkCount} hidden)`;
+    sectionBookmarkToggle.setAttribute("aria-pressed", String(showAllBookmarks));
+  }
+  void updateCurrentSectionHighlight();
+}
+
+sectionBookmarkToggle?.addEventListener("click", () => {
+  showAllBookmarks = !showAllBookmarks;
+  renderSectionOutline();
+});
 
 function renderPdfMetadata(entries) {
   const fragment = document.createDocumentFragment();
@@ -639,11 +640,13 @@ async function initializeSectionNavigation() {
     return;
   }
 
-  sectionEntries = [];
-  const outlineList = createOutlineList(outline);
-  if (!outlineList.childElementCount) {
-    return;
-  }
+  const filtered = filterOutlineHeadings(outline);
+  sectionOriginalOutline = outline;
+  sectionFilteredOutline = filtered.outline;
+  hiddenBookmarkCount = filtered.hidden;
+  showAllBookmarks = false;
+  sectionBookmarkToggle.hidden = hiddenBookmarkCount === 0;
+  if (!sectionFilteredOutline.length) return;
 
   const { title: metadataTitle, entries: metadataEntries } = await getPdfMetadataDetails();
   if (metadataTitle) {
@@ -652,7 +655,7 @@ async function initializeSectionNavigation() {
   }
   renderPdfMetadata(metadataEntries);
 
-  sectionList.replaceChildren(outlineList);
+  renderSectionOutline();
   sectionNav.hidden = false;
 }
 
@@ -1223,6 +1226,24 @@ function getSelectedPdfText() {
   return selection.toString().replace(/\s+/g, " ").trim();
 }
 
+let lastSelectedPdfPassage = null;
+
+function selectedPdfPassage() {
+  const selection = window.getSelection();
+  const text = getSelectedPdfText();
+  if (!text || !selection) return null;
+  const anchor = selection.anchorNode instanceof Element
+    ? selection.anchorNode : selection.anchorNode?.parentElement;
+  const focus = selection.focusNode instanceof Element
+    ? selection.focusNode : selection.focusNode?.parentElement;
+  const anchorLayer = anchor?.closest(".text-layer");
+  const focusLayer = focus?.closest(".text-layer");
+  if (!anchorLayer || !focusLayer) return null;
+  const pageNumber = Number(anchorLayer.closest(".page")?.dataset.page);
+  if (!Number.isSafeInteger(pageNumber) || pageNumber < 1) return null;
+  return { text, pageNumber };
+}
+
 function focusSearch() {
   searchInput.focus();
   searchInput.select();
@@ -1275,6 +1296,50 @@ async function rotatePages(delta) {
   pagePreviews?.start(rotation, currentPage);
   await refreshPageRendering();
   pageElements[currentPage - 1]?.scrollIntoView({ behavior: "auto", block: "center" });
+}
+
+async function copyTextFragmentLink() {
+  const passage = selectedPdfPassage() || lastSelectedPdfPassage;
+  setToolsMenuOpen(false);
+  if (!passage) {
+    showToast("Select text in the PDF to copy its link");
+    return;
+  }
+  const referenceUrl = await resolveDocumentReferenceUrl();
+  const url = referenceUrl && pdfTextFragmentUrl(referenceUrl, passage.text, passage.pageNumber);
+  if (!url) {
+    showToast("No linkable PDF URL is available");
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    showToast("Copied link to highlighted PDF text");
+  } catch {
+    showToast("Could not copy highlighted text link");
+  }
+}
+
+async function navigateToTextFragment(fragment) {
+  searchInput.value = fragment.text;
+  await runSearch(fragment.text);
+  if (!searchMatches.length) {
+    showToast("Linked passage not found in this PDF");
+    return;
+  }
+  if (fragment.pageNumber) {
+    const preferred = searchMatches.findIndex(match => match.pageNumber === fragment.pageNumber);
+    if (preferred >= 0) showSearchMatch(preferred, "auto");
+  }
+  const match = searchMatches[activeSearchIndex];
+  if (!match) return;
+  await queuePageRender(match.pageNumber, true);
+  refreshSearchHighlights();
+  const target = [...pageElements[match.pageNumber - 1].querySelectorAll(".search-highlight")]
+    .find(mark => mark.dataset.searchOrdinals.split(" ").includes(String(match.ordinal)));
+  if (!target) return;
+  const toolbarHeight = document.querySelector(".toolbar")?.getBoundingClientRect().height || 52;
+  const targetTop = window.scrollY + target.getBoundingClientRect().top;
+  window.scrollTo({ top: Math.max(0, targetTop - toolbarHeight - 80), behavior: "instant" });
 }
 
 async function shareCurrentPage() {
@@ -1341,7 +1406,8 @@ async function downloadPdf() {
 }
 
 function bindControls() {
-  installMarkdownCopy(viewer, document.querySelector("#copy-as-markdown"), document, document.querySelector("#copy-tagged-paragraphs"));
+  installMarkdownCopy(viewer, document.querySelector("#copy-as-markdown"), document,
+    document.querySelector("#copy-tagged-paragraphs"), document.querySelector("#copy-on-select"));
   window.addEventListener("pdf-viewer-toast", (event) => {
     if (typeof event.detail?.message === "string") showToast(event.detail.message);
   });
@@ -1353,6 +1419,12 @@ function bindControls() {
   previousButton.addEventListener("click", () => goToPage(currentPage - 1));
   nextButton.addEventListener("click", () => goToPage(currentPage + 1));
   shareButton.addEventListener("click", () => void shareCurrentPage());
+  copyTextFragmentButton.addEventListener("click", () => void copyTextFragmentLink());
+  viewer.addEventListener("pointerdown", () => { lastSelectedPdfPassage = null; }, true);
+  document.addEventListener("selectionchange", () => {
+    const passage = selectedPdfPassage();
+    if (passage) lastSelectedPdfPassage = passage;
+  });
   sectionToggle.addEventListener("click", toggleSectionPopover);
 
   document.addEventListener("pointerdown", (event) => {
@@ -1484,7 +1556,8 @@ async function initialize() {
   } catch {
     // Fall back to the incoming page link when storage is unavailable.
   }
-  const requestedPage = resumedPage ?? getInitialPage(window.location, originalUrl);
+  const incomingTextFragment = pdfTextFragmentFromUrl(originalUrl.href) || pdfTextFragmentFromUrl(window.location.href);
+  const requestedPage = incomingTextFragment?.pageNumber ?? resumedPage ?? getInitialPage(window.location, originalUrl);
   requestUrl = new URL(originalUrl.href);
   requestUrl.hash = "";
 
@@ -1548,6 +1621,7 @@ async function initialize() {
   goToPage(currentPage, "auto");
   keepRenderWindow(currentPage);
   pagePreviews.start(rotation, currentPage);
+  if (incomingTextFragment) await navigateToTextFragment(incomingTextFragment);
 }
 
 window.addEventListener("pagehide", () => {

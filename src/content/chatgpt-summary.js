@@ -1,6 +1,46 @@
 const STORAGE_PREFIX = "pdf-viewer-chatgpt-summary:";
 const HASH_PARAMETER = "pdf-viewer-summary";
 
+const HANDOFF_STATUS_ID = "pdf-viewer-handoff-status";
+let pendingStatus = null;
+let statusReadyListenerAdded = false;
+
+function showHandoffStatus(label, isError = false) {
+  pendingStatus = { label, isError };
+  if (!document.body) {
+    if (!statusReadyListenerAdded) {
+      statusReadyListenerAdded = true;
+      document.addEventListener("DOMContentLoaded", () => {
+        statusReadyListenerAdded = false;
+        if (pendingStatus) showHandoffStatus(pendingStatus.label, pendingStatus.isError);
+      }, { once: true });
+    }
+    return;
+  }
+  let status = document.getElementById(HANDOFF_STATUS_ID);
+  if (!status) {
+    status = document.createElement("div");
+    status.id = HANDOFF_STATUS_ID;
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    status.style.cssText = [
+      "position:fixed", "top:16px", "right:16px", "max-width:min(340px,calc(100vw - 32px))",
+      "z-index:2147483647", "padding:12px 16px", "border-radius:12px",
+      "font:500 13px/1.5 ui-sans-serif,system-ui,sans-serif",
+      "background:#242428", "color:#f6f6f8", "border:1px solid #66666c",
+      "box-shadow:0 6px 24px #0005", "pointer-events:none",
+    ].join(";");
+    document.body.appendChild(status);
+  }
+  status.textContent = label;
+  status.style.borderColor = isError ? "#f59e9e" : "#66666c";
+}
+
+function clearHandoffStatus() {
+  pendingStatus = null;
+  document.getElementById(HANDOFF_STATUS_ID)?.remove();
+}
+
 function requestIdFromLocation() {
   const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
   return new URLSearchParams(hash).get(HASH_PARAMETER);
@@ -96,12 +136,13 @@ function findPdfInput() {
   });
 }
 
-function receivePdf(requestId) {
+function receivePdf(requestId, onProgress) {
   const port = chrome.runtime.connect({ name: "pdf-summary-target:" + requestId });
   return new Promise((resolve, reject) => {
     const chunks = [];
     let expected = -1;
     let received = 0;
+    let lastPercent = -1;
     let filename = "document.pdf";
     let done = false;
     const fail = (error) => {
@@ -118,6 +159,7 @@ function receivePdf(requestId) {
           if (!Number.isSafeInteger(message.byteLength) || message.byteLength < 1 ||
               message.byteLength > 512 * 1024 * 1024) throw new Error("Invalid PDF transfer size");
           expected = message.byteLength;
+          onProgress?.("Transferring PDF into ChatGPT · 0%");
           filename = typeof message.filename === "string" && /\.pdf$/i.test(message.filename)
             ? message.filename.replace(/[\\/]/g, "_") : "document.pdf";
         } else if (message?.type === "chunk") {
@@ -126,6 +168,11 @@ function receivePdf(requestId) {
           received += bytes.length;
           if (received > expected) throw new Error("PDF transfer exceeded declared size");
           chunks.push(bytes);
+          const percent = Math.floor(100 * received / expected);
+          if (percent !== lastPercent) {
+            lastPercent = percent;
+            onProgress?.(`Transferring PDF into ChatGPT · ${percent}%`);
+          }
           port.postMessage({ type: "ack" });
         } else if (message?.type === "end") {
           if (received !== expected || chunks[0]?.[0] !== 37 ||
@@ -145,12 +192,14 @@ function receivePdf(requestId) {
 }
 
 async function attachPdf(file) {
+  showHandoffStatus("Waiting for ChatGPT attachment control…");
   const input = await waitFor(findPdfInput, 20000);
   if (!input) throw new Error("ChatGPT attachment input unavailable");
   const data = new DataTransfer();
   data.items.add(file);
   input.files = data.files;
   input.dispatchEvent(new Event("change", { bubbles: true }));
+  showHandoffStatus("Uploading PDF in ChatGPT…");
   // An existing file selection is not enough: wait for ChatGPT's attachment
   // chip before allowing the summary to be submitted.
   const acknowledged = await waitFor(() => {
@@ -169,23 +218,31 @@ async function attachPdf(file) {
 async function submitPendingSummary() {
   const requestId = requestIdFromLocation();
   if (!requestId) return;
+  showHandoffStatus("Preparing PDF for ChatGPT…");
   const storageKey = STORAGE_PREFIX + requestId;
   const stored = await chrome.storage.local.get(storageKey);
   const payload = stored[storageKey];
-  if (!payload?.prompt) return;
+  if (!payload?.prompt) {
+    clearHandoffStatus();
+    return;
+  }
   let composer = await waitFor(findComposer, 20000);
   if (!composer) {
+    showHandoffStatus("Could not find ChatGPT composer.", true);
+    window.setTimeout(clearHandoffStatus, 12000);
     await chrome.storage.local.remove(storageKey);
     clearRequestHash();
     return;
   }
   let port;
+  let submitted = false;
   try {
     if (payload.attachmentRequired) {
-      const pdf = await receivePdf(requestId);
+      const pdf = await receivePdf(requestId, (message) => showHandoffStatus(message));
       port = pdf.port;
       await attachPdf(pdf.file);
     }
+    showHandoffStatus("PDF attached. Preparing summary…");
     setComposerText(composer, payload.prompt);
     const sendButton = await waitFor(() => {
       const current = findComposer();
@@ -200,8 +257,10 @@ async function submitPendingSummary() {
     }, 30000);
     if (!sendButton) throw new Error("ChatGPT send button unavailable");
     sendButton.click();
+    submitted = true;
     port?.postMessage({ type: "finish" });
   } catch (error) {
+    showHandoffStatus("Automatic attachment failed; attach the PDF manually.", true);
     port?.postMessage({ type: "cancel" });
     // Fail visibly and leave an unsent draft; never summarize just a file path.
     const draft = "PDF not attached automatically (" + error.message +
@@ -211,6 +270,8 @@ async function submitPendingSummary() {
     port?.disconnect();
     await chrome.storage.local.remove(storageKey);
     clearRequestHash();
+    if (submitted) clearHandoffStatus();
+    else window.setTimeout(clearHandoffStatus, 12000);
   }
 }
 
