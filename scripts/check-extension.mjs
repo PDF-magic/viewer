@@ -54,6 +54,25 @@ async function validateManifest(path, expected) {
     }
   }
 
+  // Manifest resources must survive rebasing from src/ to dist/.
+  for (const icon of Object.values(manifest.icons || {})) {
+    await requireFile(join(root, icon), "extension icon");
+  }
+  if (manifest.action?.default_icon) {
+    await requireFile(join(root, manifest.action.default_icon), "toolbar icon");
+  }
+  for (const group of manifest.web_accessible_resources || []) {
+    for (const resource of group.resources || []) {
+      if (resource.includes("*")) fail(path + ": unexpected web-accessible resource wildcard: " + resource);
+      await requireFile(join(root, resource), "web-accessible resource");
+    }
+  }
+  for (const script of manifest.content_scripts || []) {
+    if (!script.matches?.every((pattern) => pattern.startsWith("https://"))) {
+      fail(path + ": content scripts must be HTTPS scoped");
+    }
+  }
+
   return manifest;
 }
 

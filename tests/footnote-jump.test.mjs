@@ -12,6 +12,7 @@ const styles = readFileSync(new URL("../src/viewer/viewer.css", import.meta.url)
 
 function loadFootnoteHelpers() {
   const context = vm.createContext({
+    window: { addEventListener() {} },
     document: {
       querySelector() {
         return null;
@@ -143,7 +144,7 @@ test("footnote indexing ignores an edge page number in a running footer", () => 
     },
   );
 
-  assert.deepEqual(footnotesForPage(items, viewport, 5), []);
+  assert.equal(footnotesForPage(items, viewport, 5).length, 0);
 });
 
 
