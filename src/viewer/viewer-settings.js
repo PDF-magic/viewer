@@ -5,6 +5,9 @@ const CLICKABLE_REFERENCES_STORAGE_KEY = "pdf-viewer-clickable-references";
 const PRINTED_PAGE_JUMP_STORAGE_KEY = "pdf-viewer-printed-page-jump";
 const MARKDOWN_COPY_STORAGE_KEY = "pdf-viewer-copy-as-markdown";
 const TAGGED_PARAGRAPH_COPY_STORAGE_KEY = "pdf-viewer-copy-tagged-paragraphs";
+const TWO_PAGE_STORAGE_KEY = "pdf-viewer-two-page-view";
+const OFFSET_COVER_STORAGE_KEY = "pdf-viewer-offset-cover";
+const AUTO_COPY_SELECTION_STORAGE_KEY = "pdf-viewer-copy-on-select";
 const STUDIO_GREEN = "#43af49";
 
 const toolsMenu = document.querySelector("#tools-menu");
@@ -141,10 +144,21 @@ function installTaggedParagraphCopySetting() {
   });
 }
 
+function installAutoCopySelectionSetting() {
+  const toggle = document.querySelector("#copy-on-select");
+  if (!toggle) return;
+  styleSettingCheckbox(toggle);
+  toggle.checked = localStorage.getItem(AUTO_COPY_SELECTION_STORAGE_KEY) === "true";
+  toggle.addEventListener("change", () => {
+    localStorage.setItem(AUTO_COPY_SELECTION_STORAGE_KEY, String(toggle.checked));
+  });
+}
+
 installClickableReferencesSetting();
 installPrintedPageJumpSetting();
 installMarkdownCopySetting();
 installTaggedParagraphCopySetting();
+installAutoCopySelectionSetting();
 syncThemePreference();
 void addSecCommentSetting();
 
@@ -385,6 +399,9 @@ function createZoomControls() {
 }
 
 function fitWidthBase() {
+  if (document.querySelector("#viewer")?.dataset.pageLayout === "two-up") {
+    return viewportPageWidth();
+  }
   return Math.max(
     160,
     Math.min(DEFAULT_MAX_PAGE_WIDTH, window.innerWidth - PAGE_HORIZONTAL_GUTTER),
@@ -405,7 +422,11 @@ function viewportPageWidth() {
       ? root.classList.contains("minimap-collapsed") ? 2 : PAGE_HORIZONTAL_GUTTER / 2 + 1
       : PAGE_HORIZONTAL_GUTTER;
   const availableWidth = root.clientWidth || window.innerWidth;
-  return Math.max(160, availableWidth - minimapWidth - horizontalGutter);
+  const usableWidth = availableWidth - minimapWidth - horizontalGutter;
+  if (document.querySelector("#viewer")?.dataset.pageLayout === "two-up") {
+    return Math.max(100, (usableWidth - 16) / 2);
+  }
+  return Math.max(160, usableWidth);
 }
 
 function viewportPageTop() {
@@ -443,7 +464,7 @@ function applyZoomLayout() {
   const pageWidth = zoomMode === "custom"
     ? fitWidthBase() * zoomScale
     : viewportPageWidth();
-  viewer.style.setProperty("--zoom-page-width", `${Math.max(160, pageWidth)}px`);
+  viewer.style.setProperty("--zoom-page-width", `${Math.max(viewer.dataset.pageLayout === "two-up" ? 100 : 160, pageWidth)}px`);
 }
 
 function captureZoomAnchor() {
@@ -668,3 +689,37 @@ if (zoomControls) {
   applyZoomLayout();
   syncZoomControls();
 }
+function installPageLayoutSettings() {
+  const viewer = document.querySelector("#viewer");
+  const twoPageToggle = document.querySelector("#two-page-view");
+  const offsetCoverToggle = document.querySelector("#offset-cover");
+  if (!viewer || !twoPageToggle || !offsetCoverToggle) return;
+
+  styleSettingCheckbox(twoPageToggle);
+  styleSettingCheckbox(offsetCoverToggle);
+  twoPageToggle.checked = localStorage.getItem(TWO_PAGE_STORAGE_KEY) === "true";
+  offsetCoverToggle.checked = localStorage.getItem(OFFSET_COVER_STORAGE_KEY) === "true";
+
+  const apply = (persist = false) => {
+    const anchor = persist ? captureZoomAnchor() : null;
+    viewer.dataset.pageLayout = twoPageToggle.checked ? "two-up" : "single";
+    viewer.dataset.offsetCover = String(offsetCoverToggle.checked);
+    offsetCoverToggle.disabled = !twoPageToggle.checked;
+    offsetCoverToggle.closest(".tool-toggle").style.opacity = twoPageToggle.checked ? "1" : "0.5";
+
+    applyZoomLayout();
+    restoreZoomAnchor(anchor);
+    syncZoomControls();
+    if (persist) {
+      localStorage.setItem(TWO_PAGE_STORAGE_KEY, String(twoPageToggle.checked));
+      localStorage.setItem(OFFSET_COVER_STORAGE_KEY, String(offsetCoverToggle.checked));
+      scheduleViewerRerender();
+    }
+  };
+
+  twoPageToggle.addEventListener("change", () => apply(true));
+  offsetCoverToggle.addEventListener("change", () => apply(true));
+  apply();
+}
+
+installPageLayoutSettings();

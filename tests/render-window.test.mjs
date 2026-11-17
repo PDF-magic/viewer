@@ -28,7 +28,7 @@ test("sharp rendering uses fractional CSS widths and oversamples without fixed d
     clientWidth: 160,
     getBoundingClientRect: () => ({ width: 160.5 }),
     style: { setProperty() {} },
-    classList: { add() {} }, replaceChildren(...nodes) { children = nodes; },
+    classList: { add() {} }, contains() { return false; }, replaceChildren(...nodes) { children = nodes; },
   };
   const context = vm.createContext({
     renderedPages: new Set(), staleRenderedPages: new Set([1]),
@@ -38,11 +38,14 @@ test("sharp rendering uses fractional CSS widths and oversamples without fixed d
     document: { createElement: () => ({ style: {}, getContext: () => ({}) }) },
     TextLayer: class { textDivs = []; async render() {} },
     pageIsInRenderWindow: () => true,
+    findPrintedContentsEntries: () => [],
+    markPdfTextStyles() {}, clickableSectionTargets: async () => new Map(),
     registerSearchText() {}, highlightTextLayer() {}, renderFootnoteHighlight() {}, markDocumentReady() {},
     pagePreviews: { hide() {} },
     pdfDocument: { async getPage() { return {
       getViewport: ({ scale }) => ({ width: 600 * scale, height: 800 * scale, scale, clone() { return this; } }),
       async getTextContent() { return { items: [] }; },
+      async getStructTree() { return null; },
       async getAnnotations() { return []; },
       render({ viewport, transform }) {
         renderedViewport = viewport;
@@ -150,6 +153,8 @@ test("scrolling shows cached previews immediately and defers sharp rendering unt
     renderingAllPages: false,
     priorityRenderQueue: new Set([1]), backgroundRenderQueue: new Set([2]),
     sharpRenderTimer: undefined,
+    recordCurrentPage() {},
+    window: { dispatchEvent() {} }, CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
     clearTimeout() {}, setTimeout(callback, delay) { timers.push({ callback, delay }); return timers.length; },
     pagePreviews: { update: (number) => events.push(["preview", number]) },
     queuePageRender: (number) => events.push(["sharp", number]),

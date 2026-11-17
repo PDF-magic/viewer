@@ -93,9 +93,13 @@ export function markPdfTextStyles(page, textContent, textDivs) {
     }
     const previousText = textItems.slice(0, index).reverse().find(candidate =>
       candidate.str.trim() && candidate.transform?.length >= 6);
+    // Tight newspaper-style leading can move a line by only one text-height.
+    // Only join within the same column; moving right into another column is
+    // not a wrapped continuation of the previous line.
     const wrappedLine = previousText && item.transform?.length >= 6 &&
-      previousText.transform[5] - item.transform[5] > typicalHeight * 1.3 &&
+      previousText.transform[5] - item.transform[5] > typicalHeight * 0.8 &&
       previousText.transform[5] - item.transform[5] < typicalHeight * 3.5 &&
+      item.transform[4] - previousText.transform[4] < typicalHeight * 6 &&
       !span.dataset.markdownParagraphStart && !/[-\s]$/.test(previousText.str) &&
       !/^\s/.test(item.str);
     if (hasPdfWordGap(textItems[index - 1], item) || wrappedLine) {
@@ -414,7 +418,8 @@ export function selectionToMarkdown(root, selection, doc = document,
   return output.filter(Boolean).join('\n\n');
 }
 
-export function installMarkdownCopy(root, markdownToggle, doc = document, paragraphToggle = null) {
+export function installMarkdownCopy(root, markdownToggle, doc = document,
+    paragraphToggle = null, autoCopyToggle = null) {
   if (!root || !markdownToggle) return;
   let indexedFootnotes = [];
   doc.defaultView?.addEventListener('pdf-viewer-footnotes-indexed', event => {
@@ -430,5 +435,56 @@ export function installMarkdownCopy(root, markdownToggle, doc = document, paragr
     event.clipboardData.setData('text/plain', copied);
     if (markdown) event.clipboardData.setData('text/markdown', copied);
     event.preventDefault();
+  });
+
+  if (!autoCopyToggle) return;
+
+  let startedInPdf = false;
+  doc.addEventListener('pointerdown', event => {
+    // Only deliberate primary-button selections originating in the PDF text
+    // layer can trigger automatic copying, never links or toolbar controls.
+    startedInPdf = event.button === 0 && inPdfTextLayer(event.target, root);
+  });
+  doc.addEventListener('pointercancel', () => { startedInPdf = false; });
+  doc.defaultView?.addEventListener('blur', () => { startedInPdf = false; });
+  doc.addEventListener('pointerup', () => {
+    const fromPdf = startedInPdf;
+    startedInPdf = false;
+    if (!fromPdf || !autoCopyToggle.checked) return;
+
+    // The selection module finishes settling endpoints (including trailing
+    // punctuation) in its own pointerup handler. Copy after all handlers run.
+    queueMicrotask(() => {
+      const selection = doc.getSelection();
+      if (!selection || selection.isCollapsed || !selection.rangeCount ||
+          !inPdfTextLayer(selection.anchorNode, root) ||
+          !inPdfTextLayer(selection.focusNode, root) ||
+          !selection.toString().trim()) return;
+
+      // Trigger the same 'copy' event as Ctrl/Cmd+C: existing Markdown,
+      // paragraph reflow, and footnote logic all remain authoritative.
+      try {
+        if (doc.execCommand('copy')) return;
+      } catch {
+        // Some embedded viewers deny execCommand; try clipboardWrite instead.
+      }
+
+      const markdown = markdownToggle.checked;
+      const reflow = paragraphToggle?.checked !== false;
+      const text = selectionToMarkdown(root, selection, doc,
+        { markdown, reflow, footnotes: indexedFootnotes }) || selection.toString();
+      const clipboard = doc.defaultView?.navigator?.clipboard;
+      if (clipboard?.writeText) {
+        void clipboard.writeText(text).catch(() => {
+          doc.defaultView?.dispatchEvent(new CustomEvent('pdf-viewer-toast', {
+            detail: { message: 'Unable to copy selected text' },
+          }));
+        });
+      } else {
+        doc.defaultView?.dispatchEvent(new CustomEvent('pdf-viewer-toast', {
+          detail: { message: 'Unable to copy selected text' },
+        }));
+      }
+    });
   });
 }

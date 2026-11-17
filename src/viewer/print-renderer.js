@@ -2,13 +2,21 @@ const POINTS_PER_INCH = 72;
 
 export const PRINT_DPI = 300;
 
+function printPixels(points, scale) {
+  const pixels = points * scale;
+  const nearestInteger = Math.round(pixels);
+  // Floating point multiplication can produce 3300.0000000000005 for an
+  // exact 11-inch page at 300 DPI. Avoid inventing a surplus raster pixel.
+  return Math.max(1, Math.abs(pixels - nearestInteger) < 1e-9 ? nearestInteger : Math.ceil(pixels));
+}
+
 export function printPageMetrics(baseViewport, dpi = PRINT_DPI) {
   const scale = dpi / POINTS_PER_INCH;
 
   return {
     scale,
-    pixelWidth: Math.max(1, Math.ceil(baseViewport.width * scale)),
-    pixelHeight: Math.max(1, Math.ceil(baseViewport.height * scale)),
+    pixelWidth: printPixels(baseViewport.width, scale),
+    pixelHeight: printPixels(baseViewport.height, scale),
     cssWidth: `${baseViewport.width}pt`,
   };
 }

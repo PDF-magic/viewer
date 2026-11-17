@@ -334,6 +334,23 @@ input {
   padding-left: 14px;
 }
 
+.section-bookmark-toggle {
+  display: block;
+  margin: 4px 12px 10px;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: #c3bddb;
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.section-bookmark-toggle[hidden] {
+  display: none;
+}
+
 .section-entry {
   min-width: 0;
 }
@@ -922,6 +939,25 @@ input {
   padding: calc(52px + var(--page-top-gap)) 16px calc(20px + var(--document-scrubber-height));
 }
 
+.viewer[data-page-layout="two-up"] {
+  display: grid;
+  grid-template-columns: repeat(2, var(--zoom-page-width, min(550px, calc((100vw - 48px) / 2))));
+  column-gap: 16px;
+  row-gap: 20px;
+  justify-content: center;
+  align-content: start;
+  align-items: start;
+}
+
+/* Offset the cover into the right column before forming facing-page spreads. */
+.viewer[data-page-layout="two-up"][data-offset-cover="true"] .page[data-page="1"] {
+  grid-column: 2;
+}
+
+.viewer[data-page-layout="two-up"] .status {
+  grid-column: 1 / -1;
+}
+
 .page {
   position: relative;
   isolation: isolate;
@@ -1086,13 +1122,9 @@ input {
 }
 
 @media (max-width: 720px) {
+  /* Preserve the page outline and rounded corners in narrow split views. */
   .viewer {
-    padding-inline: 0;
-  }
-
-  .page {
-    width: 100%;
-    border-radius: 0;
+    padding-inline: 8px;
   }
 
   .toolbar {
@@ -1142,6 +1174,10 @@ input {
   .viewer {
     display: block;
     padding: 0;
+  }
+
+  .viewer[data-page-layout="two-up"] {
+    display: block;
   }
 
   .page {
