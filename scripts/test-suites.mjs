@@ -64,6 +64,7 @@ export const suites = Object.freeze({
     "auto-copy-selection.test.mjs",
     "clipboard-fallback.test.mjs",
     "markdown-copy.test.mjs",
+    "paragraph-double-click.test.mjs",
     "selection-gaps.test.mjs",
     "selection-lines.test.mjs",
     "tagged-paragraph-copy.test.mjs",

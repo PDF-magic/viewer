@@ -9,7 +9,8 @@
     "test": "node scripts/test-suites.mjs all",
     "test:feature": "node scripts/test-suites.mjs",
     "check:suites": "node scripts/test-suites.mjs --list",
-    "check:syntax": "node scripts/check-javascript.mjs"
+    "check:syntax": "node scripts/check-javascript.mjs",
+    "test:paragraph-double-click": "node --test tests/paragraph-double-click.test.mjs"
   },
   "dependencies": {
     "pdfjs-dist": "6.3.289",
