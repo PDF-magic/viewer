@@ -16,7 +16,7 @@ function setup({ width = 1080, height = 1920, popupFails = false } = {}) {
     title: "Summarize with ChatGPT",
     attributes: {},
     setAttribute(name, value) { this.attributes[name] = value; },
-    removeAttribute(name) { if (name === "title") this.title = ""; },
+    removeAttribute(name) { if (name === "title") this.title = ""; else delete this.attributes[name]; },
     blur() { this.blurred = true; },
     addEventListener(event, listener) { listeners.set(event, listener); },
   };
@@ -28,6 +28,8 @@ function setup({ width = 1080, height = 1920, popupFails = false } = {}) {
     resolveDocumentReferenceUrl: () => new Promise((resolve) => { resolveUrl = resolve; }),
     chrome: {
       runtime: {
+        getManifest() { return { background: { service_worker: "src/background.js" } }; },
+        getURL(path) { return "chrome-extension://test-extension/" + path; },
         get lastError() {
           lastErrorReads += 1;
           return { message: "Could not establish connection. Receiving end does not exist." };
@@ -74,6 +76,8 @@ test("opens the portrait popup before PDF metadata resolves, then stores the pro
   const pendingClick = fixture.click();
   assert.equal(fixture.calls[0][0], "popup");
   assert.equal(fixture.button.disabled, true);
+  assert.equal(fixture.button.attributes["aria-busy"], "true");
+  assert.equal(fixture.calls[0][1].url, "chrome-extension://test-extension/src/chatgpt-preparing.html");
   const { width, height } = fixture.calls[0][1];
   assert.ok(width > 700 && width < 1080);
   assert.ok(height / width <= 1.2 && height < 1000);
@@ -82,6 +86,7 @@ test("opens the portrait popup before PDF metadata resolves, then stores the pro
   assert.deepEqual(fixture.calls.map(([name]) => name), ["popup", "store", "connect", "navigate"]);
   assert.ok(fixture.calls[1][1]["pdf-viewer-chatgpt-summary:request"].prompt.includes("Source URL: https://example.com/original.pdf"));
   assert.equal(fixture.button.disabled, false);
+  assert.equal(fixture.button.attributes["aria-busy"], undefined);
 });
 
 test("clears the native tooltip during popup launch and restores it only on a new hover", async () => {
@@ -117,6 +122,7 @@ test("falls back to a tab when popup creation fails", async () => {
   fixture.resolveUrl("https://example.com/original.pdf");
   await pendingClick;
   assert.deepEqual(fixture.calls.map(([name]) => name), ["popup", "tab", "store", "connect", "navigate"]);
+  assert.equal(fixture.calls[1][1].url, "chrome-extension://test-extension/src/chatgpt-preparing.html");
 });
 
 test("keeps the popup within a small screen", async () => {
