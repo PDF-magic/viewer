@@ -33,6 +33,7 @@ export const suites = Object.freeze({
     "page-jump.test.mjs",
     "page-number-input.test.mjs",
     "page-tab-labels.test.mjs",
+    "pdf-tab-recovery.test.mjs",
     "printed-contents.test.mjs",
     "printed-page-jump.test.mjs",
     "rapid-page-navigation.test.mjs",
