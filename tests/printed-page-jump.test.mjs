@@ -7,6 +7,7 @@ import { createPageLabelIndex, matchingDocumentPageLabels } from "../src/viewer/
 import { printedPageShortcutQuery } from "../src/viewer/navigation/printed-page-shortcut.js";
 
 const fixturePage = (footer) => ({
+  cleanup() {},
   getViewport() {
     return { width: 612, height: 792, convertToViewportPoint: (x, y) => [x, 792 - y] };
   },

@@ -20,6 +20,7 @@ function makeViewer({ enabled = true, noteText = "A [citation] with *emphasis*."
     text: noteText, highlightRegions: [], continues: false,
   };
   const page = {
+    cleanup() {},
     async getTextContent() { return { items: [] }; },
     getViewport() { return { width: 612, height: 792 }; },
   };

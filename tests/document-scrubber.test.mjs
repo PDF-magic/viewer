@@ -119,6 +119,7 @@ async function loadScrubber(pages, operators, options = {}) {
       getPage: async (number) => {
         const page = pages[number - 1];
         return {
+          cleanup() {},
           getTextContent: async () => ({ items: page.items || page }),
           getViewport: () => page.items ? { width: page.width, height: page.height,
             convertToViewportPoint: (x, y) => [x, page.height - y] } : viewport,
