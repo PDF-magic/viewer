@@ -8,6 +8,7 @@ import { doiFromPdfMetadata, doiResolverUrl } from "./metadata-doi.js";
 import { resolvePdfSource } from "./pdf-source.js";
 import { readResumedPage, saveResumedPage } from "./page-resume.js";
 import { findSearchMatches } from "./search/search-matches.js";
+import { PageTextCache } from "./search/page-text-cache.js";
 import { installMarkdownCopy, markPdfTextStyles, markPdfTextStructure } from "./selection/markdown-copy.js";
 import { installParagraphDoubleClick } from "./selection/paragraph-double-click.js";
 import { highlightTextLayer, registerSearchText } from "./search/search-highlight.js";
@@ -143,7 +144,7 @@ const backgroundRenderQueue = new Set();
 const renderedPages = new Set();
 // Keep the previous bitmap on screen until a render at the new size is ready.
 const staleRenderedPages = new Set();
-const pageTextCache = new Map();
+const pageTextCache = new PageTextCache();
 
 function clampUnit(value) {
   return Math.min(1, Math.max(0, value));
@@ -1059,12 +1060,17 @@ function createPagePlaceholders(sampleViewport) {
 }
 
 async function getPageSearchItems(pageNumber) {
-  if (pageTextCache.has(pageNumber)) return pageTextCache.get(pageNumber);
+  const cached = pageTextCache.get(pageNumber);
+  if (cached) return cached;
   const page = await pdfDocument.getPage(pageNumber);
-  const content = await page.getTextContent({ includeMarkedContent: true, disableNormalization: true });
-  const items = content.items.filter(item => "str" in item);
-  pageTextCache.set(pageNumber, items);
-  return items;
+  try {
+    const content = await page.getTextContent({ includeMarkedContent: true, disableNormalization: true });
+    const items = content.items.filter(item => "str" in item);
+    pageTextCache.set(pageNumber, items);
+    return items;
+  } finally {
+    page.cleanup();
+  }
 }
 
 function clearSearchPageMarker() {

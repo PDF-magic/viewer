@@ -8,6 +8,7 @@ const testDirectory = fileURLToPath(testDirectoryUrl);
 // Explicit feature ownership: unlisted or multiply assigned tests fail CI.
 export const suites = Object.freeze({
   "rendering": [
+    "document-memory.test.mjs",
     "enhance-pdf.test.mjs",
     "enhancer-setup.test.mjs",
     "first-page-position.test.mjs",
@@ -63,6 +64,7 @@ export const suites = Object.freeze({
     "auto-copy-selection.test.mjs",
     "clipboard-fallback.test.mjs",
     "markdown-copy.test.mjs",
+    "paragraph-double-click.test.mjs",
     "selection-gaps.test.mjs",
     "selection-lines.test.mjs",
     "tagged-paragraph-copy.test.mjs",
