@@ -10,6 +10,8 @@ function setup({ width = 1080, height = 1920, popupFails = false } = {}) {
   let resolveUrl;
   const listeners = new Map();
   const calls = [];
+  let onDisconnect;
+  let lastErrorReads = 0;
   const button = {
     title: "Summarize with ChatGPT",
     attributes: {},
@@ -28,10 +30,19 @@ function setup({ width = 1080, height = 1920, popupFails = false } = {}) {
       runtime: {
         getManifest() { return { background: { service_worker: "src/background.js" } }; },
         getURL(path) { return "chrome-extension://test-extension/" + path; },
+        get lastError() {
+          lastErrorReads += 1;
+          return { message: "Could not establish connection. Receiving end does not exist." };
+        },
         connect(options) {
-        calls.push(["connect", options]);
-        return { onMessage: { addListener() {} }, onDisconnect: { addListener() {} }, disconnect() {} };
-      } },
+          calls.push(["connect", options]);
+          return {
+            onMessage: { addListener() {} },
+            onDisconnect: { addListener(listener) { onDisconnect = listener; } },
+            disconnect() {},
+          };
+        },
+      },
       windows: { async create(options) {
         calls.push(["popup", options]);
         if (popupFails) throw new Error("Popup unavailable");
@@ -49,7 +60,15 @@ function setup({ width = 1080, height = 1920, popupFails = false } = {}) {
     },
   };
   vm.runInNewContext(source, context);
-  return { click: () => listeners.get("click")(), dispatch: (event) => listeners.get(event)(), resolveUrl, calls, button };
+  return {
+    click: () => listeners.get("click")(),
+    dispatch: (event) => listeners.get(event)(),
+    resolveUrl,
+    calls,
+    button,
+    disconnect: () => onDisconnect?.(),
+    get lastErrorReads() { return lastErrorReads; },
+  };
 }
 
 test("opens the portrait popup before PDF metadata resolves, then stores the prompt before navigation", async () => {
@@ -126,4 +145,15 @@ test("local file URLs are not substituted for PDF attachments", async () => {
   assert.ok(data.prompt.includes("Attached local PDF: Short Term Securities - 1918.pdf"));
   assert.ok(!data.prompt.includes("file:///Users/"));
   assert.equal(fixture.calls.find(([action]) => action === "connect")[1].name, "pdf-summary-source:request");
+});
+
+test("consumes Chrome's missing-receiver error on PDF summary disconnection", async () => {
+  const fixture = setup();
+  const pendingClick = fixture.click();
+  fixture.resolveUrl("https://www.sec.gov/files/rules/other/34-16900.pdf");
+  await pendingClick;
+
+  assert.equal(fixture.lastErrorReads, 0);
+  fixture.disconnect();
+  assert.equal(fixture.lastErrorReads, 1);
 });
