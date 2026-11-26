@@ -24,9 +24,14 @@ const progressContainer = document.querySelector("#enhance-progress");
 const progressBar = document.querySelector("#enhance-progress-bar");
 const progressLabel = document.querySelector("#enhance-progress-label");
 const progressPercentage = document.querySelector("#enhance-progress-percentage");
+const errorNotice = document.querySelector("#enhance-error-notice");
+const errorMessage = document.querySelector("#enhance-error-message");
+const copyErrorButton = document.querySelector("#enhance-copy-error");
+const dismissErrorButton = document.querySelector("#enhance-dismiss-error");
 const defaultTitle = enhanceButton.title;
 let titleResetTimer;
 let toastTimer;
+let lastEnhancementStage = "preparing";
 
 function isMissingNativeHost(message) {
   return /native.*(?:host|messag)|host.*(?:not found|not configured)|enhancer script not found|enhancer-host[.]json|native.*exited/i.test(message);
@@ -72,6 +77,7 @@ setupForm.addEventListener("submit", async (event) => {
 
 
 function updateEnhancementProgress(stage, completed, total) {
+  lastEnhancementStage = stage;
   progressContainer.hidden = false;
   document.documentElement.classList.add("enhancement-active");
   const labels = {
@@ -176,6 +182,33 @@ function showToast(message) {
   toastTimer = setTimeout(() => toast.classList.remove("visible"), 2600);
 }
 
+function showEnhancementFailure(message) {
+  const stageLabels = {
+    preparing: "Preparing the document",
+    queued: "Waiting for the enhancer",
+    upload: "Sending PDF bytes",
+    ocr: "Running OCR",
+    review: "Reviewing text",
+    finalizing: "Saving the enhanced PDF",
+  };
+  const stage = stageLabels[lastEnhancementStage] || "Enhancing PDF";
+  errorMessage.textContent = `${stage}: ${message}`;
+  errorNotice.hidden = false;
+}
+
+copyErrorButton.addEventListener("click", async () => {
+  try {
+    await navigator.clipboard.writeText(errorMessage.textContent || "PDF enhancement failed");
+    showToast("Enhancement error copied");
+  } catch {
+    showToast("Could not copy enhancement error");
+  }
+});
+
+dismissErrorButton.addEventListener("click", () => {
+  errorNotice.hidden = true;
+});
+
 function setEnhanceTitle(title) {
   for (const button of enhanceButtons) {
     button.title = title;
@@ -190,9 +223,9 @@ function showTemporaryTitle(title) {
 }
 
 async function replaceCurrentTab(outputUrl) {
-  const destination = new URL(window.location.href);
-  destination.search = "";
-  destination.hash = "";
+  // MIME-handler tabs retain the original HTTPS URL in the address bar;
+  // appending ?url= to that URL would re-request the source from the site.
+  const destination = new URL(chrome.runtime.getURL("src/viewer.html"));
   destination.searchParams.set("url", outputUrl);
   const pageNumber = Number.parseInt(pageNumberInput?.value || "", 10);
   if (Number.isFinite(pageNumber) && pageNumber > 1) {
@@ -209,6 +242,7 @@ async function replaceCurrentTab(outputUrl) {
 }
 
 async function enhanceCurrentPdf() {
+  errorNotice.hidden = true;
   for (const button of enhanceButtons) button.disabled = true;
   setEnhanceTitle("Enhancing PDF…");
   showToast("Enhancing PDF…");
@@ -235,7 +269,8 @@ async function enhanceCurrentPdf() {
     await replaceCurrentTab(response.outputUrl);
   } catch (error) {
     const message = error?.message || "Could not enhance PDF";
-    showToast(message);
+    showEnhancementFailure(message);
+    showToast("PDF enhancement failed");
     if (isMissingNativeHost(message)) {
       await offerEnhancerSetup();
     } else {

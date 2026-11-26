@@ -9,6 +9,7 @@ const testDirectory = fileURLToPath(testDirectoryUrl);
 export const suites = Object.freeze({
   "rendering": [
     "document-memory.test.mjs",
+    "enhance-failure.test.mjs",
     "enhance-pdf.test.mjs",
     "enhancer-setup.test.mjs",
     "first-page-position.test.mjs",
