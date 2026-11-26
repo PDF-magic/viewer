@@ -1014,10 +1014,13 @@ if (leftScrollbar) {
   const scrollbarResizeObserver = new ResizeObserver(syncLeftScrollbar);
   scrollbarResizeObserver.observe(viewer);
   scrollbarResizeObserver.observe(leftScrollbar);
-  window.addEventListener("scroll", syncLeftScrollbar, { passive: true });
+  window.addEventListener("scroll", () => {
+    if (window.scrollY !== syncedScrollbarTop) syncLeftScrollbar();
+  }, { passive: true });
   leftScrollbar.addEventListener("scroll", () => {
     const top = leftScrollbar.scrollTop;
     if (leftScrollbar.offsetWidth && top !== syncedScrollbarTop) {
+      syncedScrollbarTop = top;
       window.scrollTo({ top, behavior: "instant" });
     }
   }, { passive: true });

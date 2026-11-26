@@ -104,8 +104,10 @@
     --left-scrollbar-width: 10px;
   }
 
-  html.scrollbar-follows-minimap.minimap-left::-webkit-scrollbar:vertical {
+  html.scrollbar-follows-minimap.minimap-left::-webkit-scrollbar:vertical,
+  html.scrollbar-follows-minimap.minimap-left body::-webkit-scrollbar:vertical {
     display: none;
+    width: 0;
   }
 
   .scrollbar-follows-minimap.minimap-left body {
