@@ -24,6 +24,13 @@ async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new U
       style: { setProperty() {} },
     });
   }
+  for (const id of ["enhance-save-notice", "enhance-save-message", "enhance-save-copy"]) {
+    elements.set(`#${id}`, {
+      hidden: true,
+      focus() {},
+      addEventListener(type, handler) { if (type === "click") clickHandlers.set(id, handler); },
+    });
+  }
   elements.get("#page-number").value = pageNumber;
   const destinations = [];
   const messages = [];
@@ -93,6 +100,7 @@ async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new U
     chrome: {
       storage: { local: { get: async () => ({}), set: async () => {} } },
       runtime,
+      downloads: setupOptions.downloads,
       tabs: { getCurrent: async () => ({ id: 42 }), update: async (_, destination) => destinations.push(destination.url) },
     },
   });
@@ -219,23 +227,34 @@ test("progress events update the bar without consuming the final response", asyn
 });
 
 test("local PDFs use a persistent native connection for progress", async () => {
-  const { messages, progressSnapshots } = await enhancerFixture(async () => ({ ok: true, outputUrl: "file:///tmp/enhanced.pdf" }), "1", undefined, "file:///tmp/source.pdf");
+  const { messages, progressSnapshots, destinations } = await enhancerFixture(async () => ({ ok: true, outputUrl: "file:///tmp/enhanced.pdf" }), "1", undefined, "file:///tmp/source.pdf");
   assert.equal(messages.length, 1);
   assert.equal(messages[0].action, "enhance-pdf");
   assert.equal(messages[0].progress, true);
   assert.equal(messages[0].enhancementMode, "light");
   assert.equal(progressSnapshots[0].value, 50);
+  assert.deepEqual(destinations, ["chrome-extension://viewer/src/viewer.html?url=file%3A%2F%2F%2Ftmp%2Fenhanced.pdf"]);
 });
 
-test("a denied local path retries with the loaded PDF and opens the enhanced copy", async () => {
+test("a denied local path retries with the loaded PDF and opens the copy saved beside it", async () => {
   const sourceUrl = "file:///Users/example/Desktop/local%20source.pdf";
   const data = new Uint8Array([37, 80, 68, 70, 45]);
-  const { messages, destinations } = await enhancerFixture(async ({ action }) => {
+  const downloads = [];
+  const listeners = new Set();
+  const { messages, elements, clickHandlers, destinations } = await enhancerFixture(async ({ action }) => {
     if (action === "enhance-pdf") {
       return { ok: false, error: "[Errno 1] Operation not permitted: '/Users/example/Desktop/local source.pdf'" };
     }
     return { ok: true, outputUrl: "file:///tmp/enhanced.pdf" };
-  }, "2", data, sourceUrl);
+  }, "2", data, sourceUrl, {}, {
+    downloads: {
+      download: async (options) => downloads.push({ ...options }),
+      search: async ({ id }) => id === 1
+        ? [{ state: "interrupted", error: "USER_CANCELED" }]
+        : [{ state: "complete", filename: "/Users/example/Desktop/enhanced #1.pdf" }],
+      onChanged: { addListener: (listener) => listeners.add(listener), removeListener: (listener) => listeners.delete(listener) },
+    },
+  });
 
   assert.deepEqual(messages.map(({ action }) => action), [
     "enhance-pdf", "enhance-pdf-start", "enhance-pdf-chunk", "enhance-pdf-finish",
@@ -244,5 +263,15 @@ test("a denied local path retries with the loaded PDF and opens the enhanced cop
   assert.equal(messages[1].referenceUrl, messages[0].referenceUrl);
   assert.equal(messages[1].byteLength, data.length);
   assert.deepEqual(Buffer.from(messages[2].data, "base64"), Buffer.from(data));
-  assert.deepEqual(destinations, ["chrome-extension://viewer/src/viewer.html?url=file%3A%2F%2F%2Ftmp%2Fenhanced.pdf#page=2"]);
+  assert.match(elements.get("#enhance-save-message").textContent, /\/Users\/example\/Desktop\//);
+  assert.equal(elements.get("#enhance-save-notice").hidden, false);
+  assert.deepEqual(destinations, []);
+  await clickHandlers.get("enhance-save-copy")();
+  assert.deepEqual(destinations, []);
+  assert.equal(elements.get("#enhance-save-notice").hidden, false);
+  await clickHandlers.get("enhance-save-copy")();
+  assert.deepEqual(downloads[1], { url: "file:///tmp/enhanced.pdf", filename: "enhanced.pdf", saveAs: true });
+  assert.deepEqual(destinations, ["chrome-extension://viewer/src/viewer.html?url=file%3A%2F%2F%2FUsers%2Fexample%2FDesktop%2Fenhanced%2520%25231.pdf#page=2"]);
+  assert.equal(elements.get("#enhance-save-notice").hidden, true);
+  assert.equal(listeners.size, 0);
 });

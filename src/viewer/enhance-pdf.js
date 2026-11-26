@@ -28,10 +28,14 @@ const errorNotice = document.querySelector("#enhance-error-notice");
 const errorMessage = document.querySelector("#enhance-error-message");
 const copyErrorButton = document.querySelector("#enhance-copy-error");
 const dismissErrorButton = document.querySelector("#enhance-dismiss-error");
+const saveNotice = document.querySelector("#enhance-save-notice");
+const saveMessage = document.querySelector("#enhance-save-message");
+const saveCopyButton = document.querySelector("#enhance-save-copy");
 const defaultTitle = enhanceButton.title;
 let titleResetTimer;
 let toastTimer;
 let lastEnhancementStage = "preparing";
+let pendingSave;
 
 function isMissingNativeHost(message) {
   return /native.*(?:host|messag)|host.*(?:not found|not configured)|enhancer script not found|enhancer-host[.]json|native.*exited/i.test(message);
@@ -256,7 +260,62 @@ async function replaceCurrentTab(outputUrl) {
   window.location.replace(destination.href);
 }
 
+function waitForSavedCopy(id) {
+  return new Promise((resolve, reject) => {
+    async function check() {
+      try {
+        const [item] = await chrome.downloads.search({ id });
+        if (!item || item.state === "interrupted") {
+          if (item?.error === "USER_CANCELED") resolve(null);
+          else reject(new Error(item?.error || "The browser could not save the file"));
+        } else if (item.state === "complete") {
+          resolve(item.filename);
+        } else {
+          return;
+        }
+      } catch (error) {
+        reject(error);
+      }
+      chrome.downloads.onChanged.removeListener(onChanged);
+    }
+    function onChanged(change) {
+      if (change.id === id && change.state) void check();
+    }
+    chrome.downloads.onChanged.addListener(onChanged);
+    void check();
+  });
+}
+
+saveCopyButton.addEventListener("click", async () => {
+  if (!pendingSave || saveCopyButton.disabled) return;
+  const { outputUrl, prompt } = pendingSave;
+  saveCopyButton.disabled = true;
+  saveMessage.textContent = prompt;
+  try {
+    const filename = decodeURIComponent(new URL(outputUrl).pathname.split("/").pop());
+    const id = await chrome.downloads.download({ url: outputUrl, filename, saveAs: true });
+    const savedPath = await waitForSavedCopy(id);
+    if (!savedPath) return;
+    const savedUrl = `file://${savedPath.split("/").map(encodeURIComponent).join("/")}`;
+    pendingSave = undefined;
+    saveNotice.hidden = true;
+    await replaceCurrentTab(savedUrl);
+  } catch (error) {
+    if (pendingSave) {
+      saveMessage.textContent = `${error.message}. ${prompt}`;
+    } else {
+      showToast("Enhanced copy saved. Open it from the browser’s downloads.");
+    }
+  } finally {
+    saveCopyButton.disabled = false;
+  }
+});
+
 async function enhanceCurrentPdf() {
+  if (pendingSave) {
+    saveCopyButton.focus();
+    return;
+  }
   errorNotice.hidden = true;
   for (const button of enhanceButtons) button.disabled = true;
   setEnhanceTitle("Enhancing PDF…");
@@ -273,10 +332,24 @@ async function enhanceCurrentPdf() {
       throw new Error("PDF source URL unavailable");
     }
 
-    const response = await enhanceLoadedPdf(source.originalUrl.href, referenceUrl);
+    const original = source.originalUrl;
+    const response = await enhanceLoadedPdf(original.href, referenceUrl);
 
     if (!response?.ok || !response.outputUrl) {
       throw new Error(response?.error || "PDF enhancer did not return a local copy");
+    }
+
+    if (original.protocol === "file:") {
+      const sourceDirectory = new URL(".", original);
+      const outputDirectory = new URL(".", response.outputUrl);
+      if (decodeURIComponent(sourceDirectory.href) !== decodeURIComponent(outputDirectory.href)) {
+        const folder = decodeURIComponent(sourceDirectory.pathname);
+        const prompt = `Choose the original PDF’s folder (${folder}) to save the enhanced copy beside it.`;
+        pendingSave = { outputUrl: response.outputUrl, prompt };
+        saveMessage.textContent = prompt;
+        saveNotice.hidden = false;
+        return;
+      }
     }
 
     showToast("Enhanced PDF ready");
