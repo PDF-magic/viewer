@@ -291,6 +291,7 @@ html.minimap-disabled body::-webkit-scrollbar-thumb {
 
 .minimap-left .minimap-controls {
   flex-direction: row-reverse;
+  border-radius: 0 9px 0 0;
 }
 
 .minimap-control {
@@ -316,6 +317,21 @@ html.minimap-disabled body::-webkit-scrollbar-thumb {
 
 .minimap-mode[aria-pressed="true"] {
   color: var(--minimap-accent);
+}
+
+.minimap-collapse::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-top: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  transform: translateX(-1px) rotate(45deg);
+}
+
+/* Collapse toward the edge and expand toward the document. */
+.minimap-collapsed:not(.minimap-left) .minimap-collapse::before,
+.minimap-left:not(.minimap-collapsed) .minimap-collapse::before {
+  transform: translateX(1px) rotate(-135deg);
 }
 
 .minimap-collapsed .minimap-shell {
