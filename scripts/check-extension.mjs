@@ -54,6 +54,36 @@ async function validateManifest(path, expected) {
     }
   }
 
+  // Manifest resources must survive rebasing from src/ to dist/.
+  for (const icon of Object.values(manifest.icons || {})) {
+    await requireFile(join(root, icon), "extension icon");
+  }
+  if (manifest.action?.default_icon) {
+    await requireFile(join(root, manifest.action.default_icon), "toolbar icon");
+  }
+  for (const group of manifest.web_accessible_resources || []) {
+    for (const resource of group.resources || []) {
+      if (resource.includes("*")) fail(path + ": unexpected web-accessible resource wildcard: " + resource);
+      await requireFile(join(root, resource), "web-accessible resource");
+    }
+  }
+  for (const script of manifest.content_scripts || []) {
+    // Only the conservative HTML darkening integration may run on HTTP.
+    const plainHtmlScripts = [
+      "content/plain-html-detection.js",
+      "content/sec-comment.js",
+    ];
+    const scripts = (script.js || []).map((asset) => asset.replace(/^src\//, ""));
+    const isPlainHtmlIntegration =
+      JSON.stringify(scripts) === JSON.stringify(plainHtmlScripts) &&
+      JSON.stringify(script.matches) === JSON.stringify(["http://*/*", "https://*/*"]) &&
+      !script.css?.length;
+    if (!isPlainHtmlIntegration &&
+        !script.matches?.every((pattern) => pattern.startsWith("https://"))) {
+      fail(path + ": only basic HTML darkening may use HTTP content-script matches");
+    }
+  }
+
   return manifest;
 }
 

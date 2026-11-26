@@ -48,3 +48,54 @@ test("separate normalized matches can refer to the same original ligature", () =
   assert.equal(matches.length, 2);
   assert.deepEqual(matches[0].ranges, matches[1].ranges);
 });
+
+test("finds a word split by a printed hyphen and highlights both pieces", () => {
+  const items = [
+    { str: "Review the account.", hasEOL: true },
+    { str: "Please review the ac-", hasEOL: true },
+    { str: "count statements.", hasEOL: true },
+  ];
+  const matches = findSearchMatches(items, "account");
+
+  assert.equal(matches.length, 2);
+  assert.deepEqual(matches[1].ranges, [
+    { itemIndex: 1, start: 18, end: 21 },
+    { itemIndex: 2, start: 0, end: 5 },
+  ]);
+  assert.deepEqual(matches[1].ranges.map(range =>
+    items[range.itemIndex].str.slice(range.start, range.end)), ["ac-", "count"]);
+});
+
+test("preserves literal hyphen searches across a printed line break", () => {
+  const items = [{ str: "risk-", hasEOL: true }, { str: "based" }];
+  assert.equal(findSearchMatches(items, "risk-based").length, 1);
+  assert.equal(findSearchMatches(items, "riskbased").length, 1);
+});
+
+test("does not join genuine in-line hyphens or unrelated text fragments", () => {
+  assert.equal(findSearchMatches([{ str: "ac-count" }], "account").length, 0);
+  assert.equal(findSearchMatches([
+    { str: "ac-", hasEOL: false }, { str: "count" },
+  ], "account").length, 0);
+  assert.equal(findSearchMatches([
+    { str: "one", hasEOL: true }, { str: "another" },
+  ], "oneanother").length, 0);
+});
+
+test("keeps URL punctuation intact when a URL is wrapped after a hyphen", () => {
+  const items = [
+    { str: "https://example.com/ac-", hasEOL: true },
+    { str: "count.pdf" },
+  ];
+  assert.equal(findSearchMatches(items, "https://example.com/ac-count.pdf").length, 1);
+  assert.equal(findSearchMatches(items, "https://example.com/account.pdf").length, 0);
+});
+
+test("recognizes discretionary soft hyphens while preserving their source offsets", () => {
+  const items = [{ str: "recom\u00AD", hasEOL: true }, { str: "mend" }];
+  const [match] = findSearchMatches(items, "recommend");
+  assert.deepEqual(match.ranges, [
+    { itemIndex: 0, start: 0, end: 6 },
+    { itemIndex: 1, start: 0, end: 4 },
+  ]);
+});

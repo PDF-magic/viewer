@@ -367,7 +367,20 @@ def input_from_url(source_url: str, temporary_directory: Path) -> tuple[Path, bo
 
 
 def pikepdf_python() -> list[str]:
-    candidates: list[list[str]] = [[sys.executable], ["python3"]]
+    candidates: list[list[str]] = []
+    # Use the same Enhancer-owned environment for metadata stamping as OCR.
+    # The host itself may run on an OS Python without the PDF dependencies.
+    if HOST_CONFIG.is_file():
+        try:
+            config = json.loads(HOST_CONFIG.read_text())
+            enhancer_dir = config.get("enhancer_dir")
+            if isinstance(enhancer_dir, str) and enhancer_dir.strip():
+                venv_python = Path(enhancer_dir).expanduser() / ".venv" / "bin" / "python"
+                if venv_python.is_file():
+                    candidates.append([str(venv_python)])
+        except (OSError, ValueError, TypeError):
+            pass
+    candidates.extend([[sys.executable], ["python3"]])
     ocrmypdf = shutil.which("ocrmypdf")
     if ocrmypdf:
         first_line = Path(ocrmypdf).read_text(errors="ignore").splitlines()[0]

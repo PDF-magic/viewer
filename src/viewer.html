@@ -7,6 +7,8 @@
     <link rel="icon" type="image/png" href="assets/luna-mark.png" />
     <link rel="stylesheet" href="viewer/viewer.css" />
     <link rel="stylesheet" href="viewer/selection/text-selection.css" />
+    <link rel="stylesheet" href="viewer/selection/selection-notes.css" />
+    <link rel="stylesheet" href="viewer/selection/reading-return-cue.css" />
     <link rel="stylesheet" href="viewer/search/search-highlight-cues.css" />
     <link rel="stylesheet" href="viewer/navigation/toolbar-layout.css" />
     <link rel="stylesheet" href="viewer/navigation/minimap.css" />
@@ -14,6 +16,7 @@
     <link rel="stylesheet" href="viewer/theme/image-color-toggle.css" />
     <link rel="stylesheet" href="viewer/sharing/qr-file-url.css" />
     <link rel="stylesheet" href="viewer/annotation-layer.css" />
+    <link rel="stylesheet" href="viewer/images/image-gallery.css" />
     <link rel="stylesheet" href="viewer/navigation/section-cross-reference-panel.css" />
     <link rel="stylesheet" href="viewer/navigation/footnote-cross-reference-panel.css" />
   </head>
@@ -52,6 +55,7 @@
           <div id="section-document-title" class="section-document-title" hidden></div>
           <div class="section-popover-title">Sections</div>
           <nav id="section-list" class="section-list" aria-label="Document sections"></nav>
+          <button id="section-bookmark-toggle" class="section-bookmark-toggle" type="button" aria-pressed="false" hidden></button>
           <section id="section-metadata" class="section-metadata" hidden>
             <div class="section-metadata-title">Metadata</div>
             <dl id="section-metadata-list" class="section-metadata-list"></dl>
@@ -104,7 +108,7 @@
       </div>
       <div class="search-actions" role="group" aria-label="Actions">
         <button id="summarize-chatgpt" class="mark-button" type="button" aria-label="Summarize with ChatGPT" title="Summarize with ChatGPT">
-          <img src="assets/sweetie-bot.png" alt="" aria-hidden="true" />
+          <img src="assets/sweetiebot.png" alt="" aria-hidden="true" />
         </button>
       </div>
       <div class="spacer"></div>
@@ -140,6 +144,7 @@
             <span>Print</span>
           </button>
           <button id="qr-file-url" class="tool-button" type="button" role="menuitem">▦ <span>QR file URL</span></button>
+          <button id="copy-text-fragment" class="tool-button" type="button" role="menuitem" title="Copy a link to the selected text in the original PDF">🔗 <span>Copy link to highlighted text</span></button>
           <button id="open-enhancer-setup" class="tool-button" type="button" role="menuitem">✦ <span>Set up PDF Enhancer</span></button>
           <div class="menu-separator" role="separator"></div>
           <button id="choose-loading-image" class="tool-button" type="button" role="menuitem">▧ <span>Custom loading image…</span></button>
@@ -147,6 +152,15 @@
           <input id="custom-loading-image" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden />
           <button id="section-cross-reference-notes" class="tool-button" type="button" role="menuitem">§ <span>Section cross-references</span></button>
           <button id="cross-reference-notes" class="tool-button" type="button" role="menuitem">↗ <span>Footnote cross-references</span></button>
+          <label class="tool-toggle" title="Show two PDF pages side by side">
+            <span>Two-page view</span>
+            <input id="two-page-view" class="checkbox-input" type="checkbox" />
+          </label>
+          <label class="tool-toggle" title="Show page 1 alone on the right, then pair pages 2–3, 4–5, and so on">
+            <span>Offset cover</span>
+            <input id="offset-cover" class="checkbox-input" type="checkbox" />
+          </label>
+          <div class="menu-separator" role="separator"></div>
           <label class="tool-toggle" title="Show a separate printed-page search field in the toolbar (off by default; you can always type 181* in the regular page field)">
             <span>Show printed-page search</span>
             <input id="printed-page-jump-opt-in" class="checkbox-input" type="checkbox" />
@@ -160,6 +174,10 @@
             <span>Copy selection as Markdown</span>
             <input id="copy-as-markdown" class="checkbox-input" type="checkbox" />
           </label>
+          <label class="tool-toggle" title="When you finish selecting PDF text with the pointer, copy it to the clipboard automatically. Keep the selection highlighted and use the current Markdown and paragraph-copy preferences. Off by default.">
+            <span>Automatically copy selected text</span>
+            <input id="copy-on-select" class="checkbox-input" type="checkbox" />
+          </label>
           <label class="tool-toggle" title="Make explicit footnote, page, and outlined section references in PDF text clickable">
             <span>Click to jump to references</span>
             <input id="clickable-references" class="checkbox-input" type="checkbox" checked />
@@ -167,6 +185,10 @@
           <label class="tool-toggle" title="Opt in to numbered page tabs in the side navigation (off by default)">
             <span>Enable numbered page tabs</span>
             <input id="page-tabs-opt-in" class="checkbox-input" type="checkbox" />
+          </label>
+          <label class="tool-toggle" title="Put the native scrollbar on the same side as the minimap when it is collapsed">
+            <span>Scrollbar follows minimap</span>
+            <input id="scrollbar-follows-minimap" class="checkbox-input" type="checkbox" />
           </label>
           <div class="menu-separator" role="separator"></div>
           <label class="tool-toggle" title="Show created and modified dates as elapsed time; hover over a date for its UTC timestamp">
@@ -190,9 +212,36 @@
       </div>
     </div>
 
+    <div id="enhance-error-notice" class="enhance-error-notice" role="alert" hidden>
+      <strong>Could not enhance PDF</strong>
+      <p id="enhance-error-message"></p>
+      <div class="enhance-error-actions">
+        <button id="enhance-copy-error" type="button">Copy error</button>
+        <button id="enhance-dismiss-error" type="button">Dismiss</button>
+      </div>
+    </div>
+
     <main id="viewer" class="viewer" aria-live="polite">
       <div id="status" class="status">Loading PDF…</div>
     </main>
+
+    <div id="selection-note-actions" class="selection-note-actions" hidden>
+      <button id="selection-note-add" type="button" aria-label="Add note to selected text">＋ Note</button>
+    </div>
+    <section id="selection-note-editor" class="selection-note-editor" role="dialog" aria-modal="false" aria-labelledby="selection-note-heading" hidden>
+      <h2 id="selection-note-heading">Note on selected text</h2>
+      <p id="selection-note-quote" class="selection-note-quote"></p>
+      <label for="selection-note-text">Your note</label>
+      <textarea id="selection-note-text" maxlength="5000" rows="4"></textarea>
+      <div class="selection-note-buttons">
+        <button id="selection-note-cancel" type="button">Cancel</button>
+        <button id="selection-note-delete" type="button" hidden>Delete</button>
+        <button id="selection-note-save" type="button">Save note</button>
+      </div>
+      <p id="selection-note-status" class="selection-note-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <div id="left-scrollbar" class="left-scrollbar" tabindex="-1" aria-hidden="true"></div>
 
     <aside id="minimap-shell" class="minimap-shell" aria-label="Document minimap">
       <div
@@ -212,6 +261,7 @@
       </div>
       <nav id="page-tabs" class="page-tabs" aria-label="Document pages" aria-hidden="true"></nav>
       <div id="minimap-controls" class="minimap-controls" role="group" aria-label="Page navigation controls">
+        <button id="export-selection-notes" class="minimap-control" type="button" aria-label="Export notes as plain text" title="No notes to export" disabled>⇩</button>
         <button
           id="minimap-swap-side"
           class="minimap-control minimap-swap-side"
@@ -243,7 +293,7 @@
           aria-label="Collapse minimap"
           aria-expanded="true"
           title="Collapse minimap"
-        >☰</button>
+        ></button>
       </div>
     </aside>
 
@@ -336,8 +386,11 @@
     <script type="module" src="viewer/document-identity.js"></script>
     <script type="module" src="viewer/enhance-pdf.js"></script>
     <script type="module" src="viewer/viewer.js"></script>
+    <script type="module" src="viewer/images/image-gallery.js"></script>
     <script type="module" src="viewer/navigation/rapid-page-navigation.js"></script>
     <script type="module" src="viewer/selection/text-selection.js"></script>
+    <script type="module" src="viewer/selection/selection-notes.js"></script>
+    <script type="module" src="viewer/selection/reading-return-cue.js"></script>
     <script type="module" src="viewer/search/search-highlight-cues.js"></script>
     <script type="module" src="viewer/navigation/minimap.js"></script>
     <script type="module" src="viewer/navigation/page-tabs.js"></script>

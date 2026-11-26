@@ -1,0 +1,108 @@
+/* Notes remain tied to PDF text, even when the text layer is rerendered. */
+::highlight(pdf-selection-notes) {
+  background-color: color-mix(in srgb, var(--accent, #43af49) 35%, transparent);
+  text-decoration: underline;
+  text-decoration-color: var(--accent, #43af49);
+}
+
+.selection-note-actions,
+.selection-note-editor {
+  position: fixed;
+  z-index: 30;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--toolbar-bg);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 30%);
+}
+
+.selection-note-actions button {
+  display: block;
+  padding: 8px 12px;
+  border: 0;
+  color: var(--text);
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.selection-note-actions button:hover,
+.selection-note-actions button:focus-visible {
+  background: var(--control-hover);
+}
+
+.selection-note-editor {
+  width: min(340px, calc(100vw - 16px));
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  padding: 12px;
+}
+
+.selection-note-editor h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+}
+
+.selection-note-quote {
+  max-height: 65px;
+  margin: 0 0 10px;
+  overflow: auto;
+  padding-left: 8px;
+  border-left: 3px solid var(--accent, #43af49);
+  font-size: 12px;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.selection-note-editor label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.selection-note-editor textarea {
+  display: block;
+  width: 100%;
+  min-height: 78px;
+  padding: 8px;
+  resize: vertical;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--control-bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.selection-note-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.selection-note-buttons button {
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--control-bg);
+  cursor: pointer;
+}
+
+.selection-note-buttons button:hover { background: var(--control-hover); }
+
+.selection-note-status {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+#export-selection-notes:disabled {
+  cursor: default;
+  opacity: .4;
+}
+
+@media print {
+  .selection-note-actions,
+  .selection-note-editor { display: none !important; }
+}

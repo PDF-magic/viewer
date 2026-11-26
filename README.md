@@ -12,14 +12,21 @@ A Chrome Manifest V3 extension that replaces the normal PDF tab with a local PDF
 - Renders PDFs locally with bundled PDF.js assets; no remotely hosted executable code is used.
 - Supports dark and light viewing modes, remembers the selected theme, and shows Celestia in dark mode and Luna in light mode.
 - Tracks the page currently centered in the viewport.
+- Remembers the last text clicked or selected on a PDF page; switching away shows a blue text highlight and a left-pointing marker on the right page edge, retained on return until the next page click. The cue follows zoom and page rerenders without saving document text.
 - Copies the original document URL as `#page=<current page>` silently when the mark is clicked.
 - Honors an existing `#page=N` fragment when opening a document.
+- **More PDF tools → Copy link to highlighted text** copies an original-PDF URL containing `#page=N:~:text=...`. Chromium can open these links natively, and PDF-magic resolves the text fragment through its PDF.js search to highlight and scroll to the passage. The PDF needs extractable text; a local `file://` URL is usable only where that path exists.
 - Places Download beside the page-link icon and keeps rotate left/right and print in the **More tools** menu.
 - Keeps the More tools menu open across repeated rotate actions.
 - Offers a default-on **More PDF tools → Join tagged paragraph lines on copy** setting. This uses PDF.js's exposed structure-tree paragraph tags and MCIDs to join soft printed line breaks and respect tagged block reading order in the clipboard; turning it off restores the original line breaks. Plain text copy works without enabling Markdown. PDFs lacking reliable tags retain their native copy behavior. Note: PDF.js does not currently expose /ActualText values stored only in content-stream BDC properties, so this reflows tagged text rather than reading that replacement string verbatim.
+- Offers an opt-in **More PDF tools → Automatically copy selected text** setting. When enabled, finishing a mouse/trackpad text selection in the PDF copies it immediately while leaving the highlight visible. Copy uses the same Markdown and tagged-paragraph preferences as Ctrl/Cmd+C; when disabled, selecting text never changes the clipboard.
 - Offers an opt-in **More PDF tools → Copy selection as Markdown** setting. When enabled, normal Copy on selected PDF text writes Markdown to the clipboard: detected italics use `_underscores_`, bold uses `**asterisks**`, and line/page boundaries are retained. The preference persists across PDFs; copying outside PDF text stays unchanged. Font identification is best-effort (not all PDFs disclose readable font metadata), and image-only scans need OCR text before they can be copied.
 - Prepares compressed previews of every page in the background for fast scrolling, while keeping sharp rendering and selectable text near the current page.
 - Shows a PDF Enhancer button in the top-left section slot when a document has no section navigator; enhanced local copies retain the original web reference URL for link copying and ChatGPT summaries.
+
+## Continuous integration and tests
+
+GitHub Actions runs individually reported feature suites (rendering, navigation, references, footnotes, search, selection, document metadata, appearance, ChatGPT and security), independent Linux/macOS native-host tests, JavaScript syntax checks and a separate extension packaging check. All JavaScript tests must be assigned to exactly one feature suite. See [testing documentation](docs/testing.md) for commands and coverage limits.
 
 ## Load directly in Chrome
 
@@ -62,7 +69,7 @@ To automatically create or reuse a personal fork using an authenticated GitHub C
 
 The installer first reuses a sibling `../enhancer` checkout when one exists. Otherwise it creates a managed checkout under `~/Library/Application Support/PDF Magic/Enhancer` on macOS or `~/.local/share/pdf-magic/enhancer` on Linux. It registers the native bridge under `~/.config/pdf-magic/native` for both Chrome and Brave. When setup runs from a viewer checkout, this stable launcher loads that checkout's current helper on every enhancement, so helper updates take effect automatically on the next request without reinstalling or reloading the extension. Running jobs finish with the version they started with. If the checkout is moved or unavailable, the launcher uses its installed fallback; rerun setup from the new location to relink it. Download-only setup installs a standalone copy and must be rerun to update it.
 
-After setup completes, click Enhance again. The host locates Homebrew tools even when the browser is launched from Finder and keeps OCR logs separate from native-messaging responses.
+After setup completes, click Enhance again. When the selected Enhancer checkout supports `setup-python-env.sh`, the installer creates or repairs `enhancer/.venv` and installs its Python dependencies there. The OCR scripts and native host prefer this isolated Python for tagging, AI review, and PDF metadata stamping; Homebrew's OCRmyPDF and qpdf remain separate executables. Existing older forks without the setup script continue to work with their previous interpreter discovery. The host locates Homebrew tools even when the browser is launched from Finder and keeps OCR logs separate from native-messaging responses.
 
 For web PDFs, the viewer sends the already-loaded document to the host in acknowledged chunks. Enhancement does not make another HTTP download, so it can use PDFs that the browser loaded from sites that reject standalone requests. Local PDFs are read directly from disk. Both enhancement modes use `--force-ocr --ai-review` to re-read every page and review recognized text against page images with the local AI models, including when the PDF already contains text. This rasterizes pages in the enhanced copy and takes longer than preserving existing text. The source remains unchanged. The tagger builds heading structure and section bookmarks from the reviewed text. Cached results from the previous pipeline are regenerated on the next enhancement.
 
@@ -118,3 +125,9 @@ Page previews load progressively without delaying the first readable pages. The 
 ### ChatGPT PDF attachment handoff
 
 Clicking **Summarize with ChatGPT** now passes the already-loaded PDF bytes as an attachment, including for local `file://` and authenticated PDFs. The service worker relays acknowledged chunks in memory; it does not save PDF bytes to extension storage. ChatGPT's upload UI can change: if the attachment is not confirmed, the extension leaves an unsent draft asking for manual attachment rather than submitting a URL-only summary. Full local filesystem paths are not copied into the prompt.
+
+## Keeping PDF tabs open when reloading the extension
+
+The viewer remembers the original URL and physical page of each open PDF in extension-local storage. Reloading an unpacked extension from `chrome://extensions` attempts to reopen extension-owned tabs that Chrome removed, or refreshes surviving tabs in place, including PDFs opened from the local filesystem. The recovered document is fetched from its original source; PDF contents are never stored in the recovery registry. Intentionally closed tabs are removed from the registry. The first reload after adding this feature can only restore tabs that were registered by the updated viewer.
+
+For `file://` PDFs, turn on **Allow access to file URLs** in the extension's Chrome details page. Chrome 118+ forbids extensions from reopening local file URLs without this permission. Files that were moved, deleted, or whose permissions changed cannot be restored. Incognito tabs are not persisted.
