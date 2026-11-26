@@ -104,9 +104,8 @@
     --left-scrollbar-width: 10px;
   }
 
-  html.scrollbar-follows-minimap.minimap-left::-webkit-scrollbar:vertical,
-  html.scrollbar-follows-minimap.minimap-left body::-webkit-scrollbar:vertical {
-    display: none;
+  html.scrollbar-follows-minimap.minimap-left::-webkit-scrollbar,
+  html.scrollbar-follows-minimap.minimap-left body::-webkit-scrollbar {
     width: 0;
   }
 
@@ -127,6 +126,8 @@
   .left-scrollbar::before {
     content: "";
     display: block;
+    /* The scrollbar can occupy the entire content box. */
+    width: 1px;
     height: calc(100% + var(--document-scroll-range, 0px));
   }
 
