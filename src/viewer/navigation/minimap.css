@@ -88,8 +88,68 @@
 }
 
 @media (min-width: 701px) {
-  html.minimap-collapsed:not(.minimap-disabled) {
+  html.minimap-collapsed:not(.minimap-disabled):is(:not(.minimap-left), .scrollbar-follows-minimap) {
     --native-scrollbar-bottom: calc(var(--document-scrubber-height, 0px) + 36px + var(--split-view-bottom-clearance));
+  }
+}
+
+.left-scrollbar {
+  display: none;
+}
+
+@media screen {
+  /* The viewport scrollbar stays on the right in Chromium. Use a native
+     scrollbar on a separate scroller and keep it in sync with the document. */
+  html.scrollbar-follows-minimap.minimap-left {
+    --left-scrollbar-width: 10px;
+  }
+
+  html.scrollbar-follows-minimap.minimap-left::-webkit-scrollbar,
+  html.scrollbar-follows-minimap.minimap-left body::-webkit-scrollbar {
+    width: 0;
+  }
+
+  .scrollbar-follows-minimap.minimap-left body {
+    padding-left: var(--left-scrollbar-width);
+  }
+
+  .scrollbar-follows-minimap.minimap-left .left-scrollbar {
+    position: fixed;
+    inset: var(--native-scrollbar-top) auto var(--native-scrollbar-bottom) 0;
+    z-index: 9;
+    display: block;
+    width: var(--left-scrollbar-width);
+    overflow: hidden auto;
+    background: var(--body-bg);
+  }
+
+  .left-scrollbar::before {
+    content: "";
+    display: block;
+    /* The scrollbar can occupy the entire content box. */
+    width: 1px;
+    height: calc(100% + var(--document-scroll-range, 0px));
+  }
+
+  .left-scrollbar::-webkit-scrollbar {
+    width: var(--left-scrollbar-width);
+  }
+
+  .left-scrollbar::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: var(--accent, #43af49);
+    background-clip: content-box;
+  }
+}
+
+@media screen and (min-width: 701px) {
+  html.scrollbar-follows-minimap.minimap-left:not(.minimap-disabled):not(.minimap-collapsed) {
+    --left-scrollbar-width: 0px;
+  }
+
+  .scrollbar-follows-minimap.minimap-collapsed.minimap-left .minimap-shell {
+    left: var(--left-scrollbar-width);
   }
 }
 
@@ -210,11 +270,11 @@ html.minimap-disabled body::-webkit-scrollbar-thumb {
   height: 100%;
 }
 
-:is(.minimap-local, .minimap-local-active) .minimap-page {
+.minimap-local .minimap-page {
   z-index: 1;
 }
 
-:is(.minimap-local, .minimap-local-active) .minimap-local-thumbnail {
+.minimap-local .minimap-local-thumbnail {
   display: block;
 }
 
@@ -256,7 +316,7 @@ html.minimap-disabled body::-webkit-scrollbar-thumb {
   filter: invert(1) brightness(2.4) contrast(1.1) invert(1);
 }
 
-:is(.minimap-local, .minimap-local-active) .minimap-strip {
+.minimap-local .minimap-strip {
   opacity: 1;
 }
 
@@ -291,6 +351,7 @@ html.minimap-disabled body::-webkit-scrollbar-thumb {
 
 .minimap-left .minimap-controls {
   flex-direction: row-reverse;
+  border-radius: 0 9px 0 0;
 }
 
 .minimap-control {
@@ -318,10 +379,25 @@ html.minimap-disabled body::-webkit-scrollbar-thumb {
   color: var(--minimap-accent);
 }
 
+.minimap-collapse::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-top: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  transform: translateX(-1px) rotate(45deg);
+}
+
+/* Collapse toward the edge and expand toward the document. */
+.minimap-collapsed:not(.minimap-left) .minimap-collapse::before,
+.minimap-left:not(.minimap-collapsed) .minimap-collapse::before {
+  transform: translateX(1px) rotate(-135deg);
+}
+
 .minimap-collapsed .minimap-shell {
   top: auto;
-  /* Fixed-position insets exclude the native scrollbar gutter. */
-  right: calc(100% - 100vw);
+  /* Stay on the layout side of the native scrollbar, not underneath it. */
+  right: 0;
   width: 36px;
   height: 36px;
   min-height: 36px;
@@ -333,6 +409,14 @@ html.minimap-disabled body::-webkit-scrollbar-thumb {
 
 .minimap-collapsed .minimap-controls {
   flex: 1 1 auto;
+  box-sizing: border-box;
+  /* Unlike the expanded strip, the standalone button needs every edge. */
+  border: 1px solid var(--border);
+}
+
+.minimap-collapsed.minimap-left .minimap-shell {
+  right: auto;
+  left: 0;
 }
 
 .minimap-collapsed .minimap-control:not(.minimap-collapse) {
@@ -344,10 +428,10 @@ html.minimap-disabled body::-webkit-scrollbar-thumb {
   flex: 1 1 auto;
 }
 
-/* The bottom-right corner of a split pane may be occupied by host chrome.
-   Raise both expanded and collapsed minimap controls out of that hit area. */
+/* Only the footnote scrubber needs clearance for the split-pane host chrome.
+   In documents without footnotes, anchor the controls at the viewport bottom. */
 @media (max-width: 1200px) {
-  :root {
+  :root:has(#document-scrubber:not([hidden])) {
     --split-view-bottom-clearance: 48px;
   }
 }

@@ -1,6 +1,8 @@
 :root {
   --accent: #43af49;
   --page-border: var(--accent);
+  --selection-bg: color-mix(in srgb, var(--accent) 45%, transparent);
+  --highlight-outline: color-mix(in srgb, var(--accent) 95%, transparent);
 }
 
 .minimap {

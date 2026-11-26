@@ -334,6 +334,23 @@ input {
   padding-left: 14px;
 }
 
+.section-bookmark-toggle {
+  display: block;
+  margin: 4px 12px 10px;
+  padding: 3px 0;
+  border: 0;
+  background: transparent;
+  color: #c3bddb;
+  font: inherit;
+  font-size: 12px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.section-bookmark-toggle[hidden] {
+  display: none;
+}
+
 .section-entry {
   min-width: 0;
 }
@@ -922,6 +939,25 @@ input {
   padding: calc(52px + var(--page-top-gap)) 16px calc(20px + var(--document-scrubber-height));
 }
 
+.viewer[data-page-layout="two-up"] {
+  display: grid;
+  grid-template-columns: repeat(2, var(--zoom-page-width, min(550px, calc((100vw - 48px) / 2))));
+  column-gap: 16px;
+  row-gap: 20px;
+  justify-content: center;
+  align-content: start;
+  align-items: start;
+}
+
+/* Offset the cover into the right column before forming facing-page spreads. */
+.viewer[data-page-layout="two-up"][data-offset-cover="true"] .page[data-page="1"] {
+  grid-column: 2;
+}
+
+.viewer[data-page-layout="two-up"] .status {
+  grid-column: 1 / -1;
+}
+
 .page {
   position: relative;
   isolation: isolate;
@@ -1077,6 +1113,39 @@ input {
   opacity: 1;
 }
 
+/* Keep native-host and OCR errors available after the progress bar closes. */
+.enhance-error-notice {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 21;
+  transform: translateX(-50%);
+  width: min(680px, calc(100vw - 32px));
+  max-height: min(45vh, 300px);
+  overflow-y: auto;
+  padding: 12px 14px;
+  border: 1px solid #c43f3f;
+  border-radius: 8px;
+  background: var(--toast-bg);
+  color: var(--text);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 20%);
+}
+.enhance-error-notice[hidden] { display: none; }
+.enhance-error-notice p {
+  margin: 8px 0 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.enhance-error-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.enhance-error-actions button {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: var(--control-bg);
+  cursor: pointer;
+}
+
 /* Split panes can place a floating host control over the lower-right corner.
    Leave the footnote scrubber's interactive track clear of that corner. */
 @media (max-width: 1200px) {
@@ -1086,13 +1155,9 @@ input {
 }
 
 @media (max-width: 720px) {
+  /* Preserve the page outline and rounded corners in narrow split views. */
   .viewer {
-    padding-inline: 0;
-  }
-
-  .page {
-    width: 100%;
-    border-radius: 0;
+    padding-inline: 8px;
   }
 
   .toolbar {
@@ -1142,6 +1207,10 @@ input {
   .viewer {
     display: block;
     padding: 0;
+  }
+
+  .viewer[data-page-layout="two-up"] {
+    display: block;
   }
 
   .page {
@@ -1276,4 +1345,31 @@ input {
   color: var(--text);
   font-size: 25px;
   cursor: pointer;
+}
+
+/* Raw source-level PDF metadata, kept independent of Sections. */
+#view-raw-metadata[hidden] { display: none; }
+.raw-metadata-dialog {
+  width: min(800px, calc(100vw - 28px));
+  max-height: 86dvh; padding: 0;
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--toolbar-bg); color: var(--text);
+  box-shadow: 0 18px 60px rgb(0 0 0 / 40%);
+}
+.raw-metadata-dialog::backdrop { background: rgb(0 0 0 / 60%); }
+.raw-metadata-card { padding: 18px; }
+.raw-metadata-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.raw-metadata-header h2 { margin: 0; font-size: 19px; }
+#raw-metadata-close { border: 0; background: transparent; color: inherit; cursor: pointer; font-size: 26px; }
+.raw-metadata-card > p { color: var(--muted); font-size: 13px; }
+.raw-metadata-content { overflow: auto; max-height: 65dvh; }
+.raw-metadata-section { margin: 16px 0; }
+.raw-metadata-section h3 { margin: 0 0 7px; font-size: 13px; }
+.raw-metadata-section pre {
+  margin: 0; max-height: 40dvh; overflow: auto;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  border: 1px solid var(--border); border-radius: 7px;
+  padding: 12px; background: var(--control-bg); color: var(--text);
+  user-select: text;
 }

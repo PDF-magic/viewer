@@ -1,6 +1,46 @@
 const STORAGE_PREFIX = "pdf-viewer-chatgpt-summary:";
 const HASH_PARAMETER = "pdf-viewer-summary";
 
+const HANDOFF_STATUS_ID = "pdf-viewer-handoff-status";
+let pendingStatus = null;
+let statusReadyListenerAdded = false;
+
+function showHandoffStatus(label, isError = false) {
+  pendingStatus = { label, isError };
+  if (!document.body) {
+    if (!statusReadyListenerAdded) {
+      statusReadyListenerAdded = true;
+      document.addEventListener("DOMContentLoaded", () => {
+        statusReadyListenerAdded = false;
+        if (pendingStatus) showHandoffStatus(pendingStatus.label, pendingStatus.isError);
+      }, { once: true });
+    }
+    return;
+  }
+  let status = document.getElementById(HANDOFF_STATUS_ID);
+  if (!status) {
+    status = document.createElement("div");
+    status.id = HANDOFF_STATUS_ID;
+    status.setAttribute("role", "status");
+    status.setAttribute("aria-live", "polite");
+    status.style.cssText = [
+      "position:fixed", "top:16px", "right:16px", "max-width:min(340px,calc(100vw - 32px))",
+      "z-index:2147483647", "padding:12px 16px", "border-radius:12px",
+      "font:500 13px/1.5 ui-sans-serif,system-ui,sans-serif",
+      "background:#242428", "color:#f6f6f8", "border:1px solid #66666c",
+      "box-shadow:0 6px 24px #0005", "pointer-events:none",
+    ].join(";");
+    document.body.appendChild(status);
+  }
+  status.textContent = label;
+  status.style.borderColor = isError ? "#f59e9e" : "#66666c";
+}
+
+function clearHandoffStatus() {
+  pendingStatus = null;
+  document.getElementById(HANDOFF_STATUS_ID)?.remove();
+}
+
 function requestIdFromLocation() {
   const hash = window.location.hash.startsWith("#") ? window.location.hash.slice(1) : window.location.hash;
   return new URLSearchParams(hash).get(HASH_PARAMETER);
@@ -157,12 +197,13 @@ function findPdfInput() {
   });
 }
 
-function receivePdf(requestId) {
+function receivePdf(requestId, onProgress) {
   const port = chrome.runtime.connect({ name: "pdf-summary-target:" + requestId });
   return new Promise((resolve, reject) => {
     const chunks = [];
     let expected = -1;
     let received = 0;
+    let lastPercent = -1;
     let filename = "document.pdf";
     let done = false;
     const fail = (error) => {
@@ -179,6 +220,7 @@ function receivePdf(requestId) {
           if (!Number.isSafeInteger(message.byteLength) || message.byteLength < 1 ||
               message.byteLength > 512 * 1024 * 1024) throw new Error("Invalid PDF transfer size");
           expected = message.byteLength;
+          onProgress?.("Transferring PDF into ChatGPT · 0%");
           filename = typeof message.filename === "string" && /\.pdf$/i.test(message.filename)
             ? message.filename.replace(/[\\/]/g, "_") : "document.pdf";
         } else if (message?.type === "chunk") {
@@ -187,6 +229,11 @@ function receivePdf(requestId) {
           received += bytes.length;
           if (received > expected) throw new Error("PDF transfer exceeded declared size");
           chunks.push(bytes);
+          const percent = Math.floor(100 * received / expected);
+          if (percent !== lastPercent) {
+            lastPercent = percent;
+            onProgress?.(`Transferring PDF into ChatGPT · ${percent}%`);
+          }
           port.postMessage({ type: "ack" });
         } else if (message?.type === "end") {
           if (received !== expected || chunks[0]?.[0] !== 37 ||
@@ -206,12 +253,14 @@ function receivePdf(requestId) {
 }
 
 async function attachPdf(file) {
+  showHandoffStatus("Waiting for ChatGPT attachment control…");
   const input = await waitFor(findPdfInput, 20000);
   if (!input) throw new Error("ChatGPT attachment input unavailable");
   const data = new DataTransfer();
   data.items.add(file);
   input.files = data.files;
   input.dispatchEvent(new Event("change", { bubbles: true }));
+  showHandoffStatus("Uploading PDF in ChatGPT…");
   // Wait only until ChatGPT registers the attachment. Its upload can remain
   // in progress: ChatGPT queues the message and sends it once the PDF is ready.
   // Restrict this check to attachment UI, not arbitrary labels or prompt text.
@@ -228,12 +277,17 @@ async function attachPdf(file) {
 async function submitPendingSummary() {
   const requestId = requestIdFromLocation();
   if (!requestId) return;
+  showHandoffStatus("Preparing PDF for ChatGPT…");
   const storageKey = STORAGE_PREFIX + requestId;
   const stored = await chrome.storage.local.get(storageKey);
   const payload = stored[storageKey];
-  if (!payload?.prompt) return;
+  if (!payload?.prompt) {
+    clearHandoffStatus();
+    return;
+  }
   let composer;
   let port;
+  let submitted = false;
   try {
     composer = await waitFor(findComposer, 90000);
     if (!composer) throw new Error("ChatGPT composer unavailable");
@@ -241,10 +295,11 @@ async function submitPendingSummary() {
     // upload. A backgrounded or hydrated page must not lose the prompt.
     setComposerText(composer, payload.prompt);
     if (payload.attachmentRequired) {
-      const pdf = await receivePdf(requestId);
+      const pdf = await receivePdf(requestId, (message) => showHandoffStatus(message));
       port = pdf.port;
       await attachPdf(pdf.file);
     }
+    showHandoffStatus(payload.attachmentRequired ? "PDF attached. Preparing summary…" : "Preparing summary in existing conversation…");
     const sendButton = await waitFor(() => {
       const current = findComposer();
       if (!current) return null;
@@ -260,11 +315,13 @@ async function submitPendingSummary() {
     }, 90000);
     if (!sendButton) throw new Error("ChatGPT send button unavailable");
     sendButton.click();
+    submitted = true;
     if (payload.attachmentRequired && payload.conversationKey) {
       void rememberConversation(payload.conversationKey).catch(() => {});
     }
     port?.postMessage({ type: "finish" });
   } catch (error) {
+    showHandoffStatus("Automatic summary failed; review the draft before sending.", true);
     port?.postMessage({ type: "cancel" });
     if (payload.attachmentRequired && payload.conversationKey) {
       const current = await chrome.storage.local.get(payload.conversationKey);
@@ -281,6 +338,8 @@ async function submitPendingSummary() {
     port?.disconnect();
     await chrome.storage.local.remove(storageKey);
     clearRequestHash();
+    if (submitted) clearHandoffStatus();
+    else window.setTimeout(clearHandoffStatus, 12000);
   }
 }
 

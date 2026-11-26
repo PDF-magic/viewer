@@ -6,11 +6,12 @@ const viewerStyles = readFileSync(new URL("../src/viewer/viewer.css", import.met
 const toolbarStyles = readFileSync(new URL("../src/viewer/navigation/toolbar-layout.css", import.meta.url), "utf8");
 const minimapStyles = readFileSync(new URL("../src/viewer/navigation/minimap.css", import.meta.url), "utf8");
 
-test("narrow PDF pages reach the horizontal viewport edges", () => {
-  assert.match(
-    viewerStyles,
-    /@media \(max-width: 720px\)[\s\S]*?\.viewer\s*\{[\s\S]*?padding-inline:\s*0;[\s\S]*?\}[\s\S]*?\.page\s*\{[\s\S]*?width:\s*100%;[\s\S]*?border-radius:\s*0;[\s\S]*?\}/,
-  );
+test("narrow PDF pages preserve rounded, outlined corners with side clearance", () => {
+  assert.match(viewerStyles, /\.page\s*\{[^}]*border-radius:\s*8px;[^}]*box-shadow:\s*0 0 0 1px var\(--page-border\);/);
+  assert.match(viewerStyles, /\.viewer\s*\{[^}]*padding:\s*calc\(52px \+ var\(--page-top-gap\)\) 16px/);
+  const narrowRules = viewerStyles.split("@media (max-width: 720px) {").at(-1).split("@media (max-width: 560px) {")[0];
+  assert.match(narrowRules, /\.viewer\s*\{\s*padding-inline:\s*8px;/);
+  assert.doesNotMatch(narrowRules, /\.page\s*\{/);
 });
 
 test("rendered page surfaces inherit the rounded page corners", () => {

@@ -26,14 +26,17 @@ test("current-page lookup finds the complete scan note without decoding other pa
   const context = vm.createContext({ appendFootnotesForPage, pageCache: new Map(), lookupRequestId: 1 });
   vm.runInContext(source.slice(source.indexOf("async function pageData("), source.indexOf("function scrollToTarget(")), context);
   const page = pages.find(page => page.n === 181);
+  let cleanupCalls = 0;
   const pdf = { numPages: 532, async getPage(number) {
     assert.equal(number, 181);
     return { getTextContent: async () => ({ items: page.items }), getViewport: () => ({
       width: page.width, height: page.height, convertToViewportPoint: (x, y) => [x, page.height - y] }),
-    getOperatorList() { throw new Error("Drawing data should not be decoded"); } };
+    getOperatorList() { throw new Error("Drawing data should not be decoded"); },
+    cleanup() { cleanupCalls += 1; } };
   } };
   const note = await context.findFootnoteTarget(pdf, 1, 181, 1);
   assert.equal(note.pageNumber, 181);
   assert.equal(note.continues, false);
   assert.match(note.text, /allowed 120 days/);
+  assert.equal(cleanupCalls, 1);
 });

@@ -77,7 +77,13 @@ function setup({ background = false, hydrateDuringUpload = false, attachmentRequ
     removeEventListener(name) { listeners.delete("window-" + name); },
     setTimeout, clearTimeout,
   };
+  const statusElements = new Map();
   const document = {
+    body: { appendChild(element) { statusElements.set(element.id, element); } },
+    getElementById(id) { return statusElements.get(id) || null; },
+    createElement() {
+      return { style: {}, setAttribute() {}, remove() { statusElements.delete(this.id); } };
+    },
     visibilityState: background ? "hidden" : "visible",
     hasFocus: () => !background,
     querySelector(selector) {
@@ -134,6 +140,7 @@ function setup({ background = false, hydrateDuringUpload = false, attachmentRequ
   };
   return {
     state, calls, uploads, ports, flush, getPrompt: () => composer.value, listeners,
+    getStatus: () => statusElements.get("pdf-viewer-handoff-status")?.textContent,
     sendPdf() {
       const port = ports[0];
       assert.ok(port, "target port connected");
@@ -150,6 +157,7 @@ test("inserts prompt before PDF upload, then clicks send while progress is still
   assert.equal(app.getPrompt(), prompt);
   assert.equal(app.uploads.length, 0);
   assert.equal(app.state.submitted, 0);
+  assert.equal(app.getStatus(), "Preparing PDF for ChatGPT…");
   app.sendPdf();
   await app.flush();
   assert.equal(app.uploads.length, 1);
@@ -157,6 +165,7 @@ test("inserts prompt before PDF upload, then clicks send while progress is still
   assert.equal(app.state.submitted, 1);
   assert.equal(app.state.sentPrompt, prompt);
   assert.ok(app.calls.some(([action, msg]) => action === "port" && msg.type === "finish"));
+  assert.equal(app.getStatus(), undefined);
 });
 
 test("background ChatGPT tab can attach and send without layout rects or focus", async () => {
