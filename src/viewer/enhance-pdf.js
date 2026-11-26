@@ -107,6 +107,21 @@ function updateEnhancementProgress(stage, completed, total) {
 }
 
 async function enhanceLoadedPdf(sourceUrl, referenceUrl) {
+  if (new URL(sourceUrl).protocol === "file:") {
+    try {
+      return await requestEnhancement(sourceUrl, referenceUrl, true);
+    } catch (error) {
+      // macOS can let the browser open a file while denying its native helper
+      // access to the same path. Retry with the bytes already in the viewer.
+      if (lastEnhancementStage !== "preparing" || !/^\[Errno (?:1|13)\] /.test(error.message)) {
+        throw error;
+      }
+    }
+  }
+  return await requestEnhancement(sourceUrl, referenceUrl, false);
+}
+
+async function requestEnhancement(sourceUrl, referenceUrl, useLocalPath) {
   const port = chrome.runtime.connectNative(NATIVE_HOST);
   let pending;
   let disconnected = false;
@@ -143,12 +158,12 @@ async function enhanceLoadedPdf(sourceUrl, referenceUrl) {
     });
   }
   try {
-    const session = await pdfDocumentSessionReady;
-    const pdfDocument = session?.document;
     const enhancementMode = "light";
-    if (new URL(sourceUrl).protocol === "file:") {
+    if (useLocalPath) {
       return await request({ action: "enhance-pdf", sourceUrl, referenceUrl, enhancementMode, progress: true });
     }
+    const session = await pdfDocumentSessionReady;
+    const pdfDocument = session?.document;
     if (!pdfDocument) throw new Error("PDF has not finished loading");
     const data = await pdfDocument.getData();
     updateEnhancementProgress("upload", 0, data.length);

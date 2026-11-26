@@ -45,12 +45,15 @@ async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new U
         Promise.resolve().then(async () => {
           try {
             if (["enhance-pdf", "enhance-pdf-finish"].includes(message.action)) {
-              messageListener({ type: "progress", stage: "review", completed: 2, total: 4 });
-              progressSnapshots.push({ label: elements.get("#enhance-progress-label").textContent,
-                value: elements.get("#enhance-progress-bar").value,
-                percentage: elements.get("#enhance-progress-percentage").textContent,
-                hidden: elements.get("#enhance-progress").hidden });
-              messageListener(await sendNativeMessage());
+              const response = await sendNativeMessage(message);
+              if (response.ok) {
+                messageListener({ type: "progress", stage: "review", completed: 2, total: 4 });
+                progressSnapshots.push({ label: elements.get("#enhance-progress-label").textContent,
+                  value: elements.get("#enhance-progress-bar").value,
+                  percentage: elements.get("#enhance-progress-percentage").textContent,
+                  hidden: elements.get("#enhance-progress").hidden });
+              }
+              messageListener(response);
             } else {
               messageListener({ ok: true });
             }
@@ -222,4 +225,24 @@ test("local PDFs use a persistent native connection for progress", async () => {
   assert.equal(messages[0].progress, true);
   assert.equal(messages[0].enhancementMode, "light");
   assert.equal(progressSnapshots[0].value, 50);
+});
+
+test("a denied local path retries with the loaded PDF and opens the enhanced copy", async () => {
+  const sourceUrl = "file:///Users/example/Desktop/local%20source.pdf";
+  const data = new Uint8Array([37, 80, 68, 70, 45]);
+  const { messages, destinations } = await enhancerFixture(async ({ action }) => {
+    if (action === "enhance-pdf") {
+      return { ok: false, error: "[Errno 1] Operation not permitted: '/Users/example/Desktop/local source.pdf'" };
+    }
+    return { ok: true, outputUrl: "file:///tmp/enhanced.pdf" };
+  }, "2", data, sourceUrl);
+
+  assert.deepEqual(messages.map(({ action }) => action), [
+    "enhance-pdf", "enhance-pdf-start", "enhance-pdf-chunk", "enhance-pdf-finish",
+  ]);
+  assert.equal(messages[1].sourceUrl, sourceUrl);
+  assert.equal(messages[1].referenceUrl, messages[0].referenceUrl);
+  assert.equal(messages[1].byteLength, data.length);
+  assert.deepEqual(Buffer.from(messages[2].data, "base64"), Buffer.from(data));
+  assert.deepEqual(destinations, ["chrome-extension://viewer/src/viewer.html?url=file%3A%2F%2F%2Ftmp%2Fenhanced.pdf#page=2"]);
 });
