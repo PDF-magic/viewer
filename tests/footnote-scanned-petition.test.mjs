@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 import vm from "node:vm";
-import { appendFootnotesForPage, footnotesForPage } from "../src/viewer/navigation/footnote-index.js";
+import { appendFootnotesForPage, footnoteRulesForPage, footnotesForPage } from "../src/viewer/navigation/footnote-index.js";
 
 // Unenhanced PDF.js text and separator geometry from the SEC's original
 // stapetition080409.pdf. Several printed labels have no text item at all.
@@ -40,7 +40,7 @@ test("unanchored punctuation below a rule does not establish a note sequence", (
 
 test("tools-menu lookup uses the recovered document sequence for missing labels", async () => {
   const source = readFileSync(new URL("../src/viewer/navigation/footnote-jump.js", import.meta.url), "utf8");
-  const context = vm.createContext({ appendFootnotesForPage,
+  const context = vm.createContext({ appendFootnotesForPage, footnoteRulesForPage,
     candidateForPage: () => undefined, pageCache: new Map(), lookupRequestId: 1 });
   vm.runInContext(source.slice(source.indexOf("async function pageData("), source.indexOf("function scrollToTarget(")), context);
   const pdf = { numPages: pages.length, async getPage(number) {

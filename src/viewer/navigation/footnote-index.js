@@ -90,13 +90,18 @@ export function candidateForPage(items, viewport, number, pageNumber, originPage
       continue;
     }
 
+    const paragraph = fallbackFootnoteParagraph(items, viewport, item,
+      adjacentText ? next : item, number, pageNumber);
     const candidate = {
       pageNumber,
       score,
       xRatio: coordinates.xRatio,
       yRatio: coordinates.yRatio,
       label: text,
-      highlightRegions: [{ pageNumber, ...textRegion({ ...coordinates, height: itemHeight, item }, viewport) }],
+      text: paragraph?.text || remainder,
+      highlightRegions: paragraph?.highlightRegions?.length
+        ? paragraph.highlightRegions
+        : [{ pageNumber, ...textRegion({ ...coordinates, height: itemHeight, item }, viewport) }],
     };
 
     if (!best || candidate.score > best.score) {
@@ -152,6 +157,49 @@ function highlightRegions(entries, viewport, pageNumber) {
     }
   }
   return lines.map(({ baseline, ...region }) => ({ pageNumber, ...region }));
+}
+
+// Fallback candidates can contain only the first PDF.js text item of a note.
+// Follow nearby, same-size lines conservatively so wrapped notes are highlighted
+// and copied in full, without crossing a new note or the printed page footer.
+function fallbackFootnoteParagraph(items, viewport, markerItem, bodyItem, number, pageNumber) {
+  const entries = positionedItems(items, viewport).sort(readingOrder);
+  const marker = entries.find((entry) => entry.item === markerItem);
+  const body = entries.find((entry) => entry.item === bodyItem);
+  if (!marker || !body) return null;
+  const height = body.height || marker.height;
+  if (!height) return null;
+  const firstBaseline = readingBaseline(body);
+  const minX = Math.max(0, Math.min(marker.x, body.x) - height * 4);
+  const maxX = Math.min(viewport.width * 0.96,
+    Math.max(viewport.width * 0.5, body.x + Math.abs(body.item.width || 0) + height * 3));
+  const selected = [];
+  let lastBaseline = firstBaseline;
+
+  for (const entry of entries) {
+    const baseline = readingBaseline(entry);
+    if (baseline < firstBaseline - Math.max(2, height * 0.4)) continue;
+    if (entry.yRatio >= 0.94) break;
+    if (entry.x < minX || entry.x > maxX) continue;
+    const laterLine = baseline > lastBaseline + Math.max(2, height * 0.25);
+    if (laterLine && (baseline - lastBaseline > height * 1.9 ||
+      (entry.x <= marker.x + height &&
+        /^\d{1,3}(?:[.)]|\s|$)/.test(entry.text)))) break;
+    if (entry !== marker && Math.abs(entry.height - height) > height * 0.35) {
+      if (laterLine) break;
+      continue;
+    }
+    if (baseline > firstBaseline + 2 && /^\d+$/.test(entry.text) &&
+      entry.yRatio >= 0.9) break;
+    if (baseline <= firstBaseline + 2 && entry.x < marker.x - 2) continue;
+    selected.push(entry);
+    lastBaseline = Math.max(lastBaseline, baseline);
+  }
+
+  if (!selected.includes(marker)) selected.unshift(marker);
+  const rawText = joinNoteEntries(selected.filter((entry) => entry !== marker || marker === body));
+  const text = (marker === body ? rawText.replace(markerPattern(number), "") : rawText).trim();
+  return { text, highlightRegions: highlightRegions(selected, viewport, pageNumber) };
 }
 
 function readingBaseline(entry) {
@@ -334,7 +382,7 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
       if (edgePageNumber || entry.x > column.left + (column.right - column.left) * 0.45) continue;
       const inlineText = entry.text.slice(match[0].length).trim();
       const adjacent = entries.filter((other) => other !== entry && other.x > entry.x &&
-        other.y >= entry.y - 2 && other.y - entry.y <= Math.max(3, other.height * 0.65) && other.text.length >= 3 && /[A-Za-z\u00c0-\u02af]/u.test(other.text))
+        other.y >= entry.y - 2 && other.y - entry.y <= Math.max(3, other.height * 0.65) && other.text.length >= 3 && /[A-Za-z\u00c0-\u02af0-9]/u.test(other.text))
         .sort((a, b) => a.x - b.x)[0];
       if (!inlineText && !adjacent) continue;
       const baseline = inlineText ? entry.y : adjacent.y;
@@ -383,6 +431,10 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
           other.x < adjacent.x && Math.abs(other.height - adjacent.height) < adjacent.height * 0.1 &&
           /[A-Za-z]/.test(other.text)).length >= 2;
       if (column.rules.length && !rule) continue;
+      // Superscript references beside numeric table cells are not footnote
+      // definitions. Without a separator or wide note block, require prose.
+      if (!inlineText && adjacent && !/\p{L}/u.test(adjacent.text) &&
+        !rule && !wideNoteBlock) continue;
       if (!reference && !wideNoteBlock && !(superscript && rule) && !smallerBlock && !scannedSmallBlock) continue;
       notes.push({ pageNumber, number, xRatio: entry.xRatio, yRatio: entry.yRatio, label: entry.text,
         baseline, scannedSmallBlock, readingY: readingBaseline(inlineText ? entry : adjacent),
@@ -442,7 +494,12 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
       const textEntries = entries.filter((entry) => (note.readingY === undefined ? entry.y : readingBaseline(entry)) >= (note.readingY ?? note.baseline) - 2 &&
         (note.hangingMargin === undefined || entry.x >= note.hangingMargin - 3) &&
         (!resumedBody || entry.y < resumedBody.y - 2) &&
-        (!next || (next.readingY === undefined ? entry.y : readingBaseline(entry)) < (next.readingY ?? next.yRatio * viewport.height) - 2) && isPreviewText(entry, note.textHeight) &&
+        (!next || (next.readingY === undefined ? entry.y : readingBaseline(entry)) < (next.readingY ?? next.yRatio * viewport.height) - 2) &&
+        (isPreviewText(entry, note.textHeight) ||
+          // A calculation-only footnote may contain smaller math operator glyphs.
+          (/^[×xX÷=+−*/-]+$/.test(entry.text) && entries.some((other) =>
+            other !== entry && Math.abs(readingBaseline(other) - readingBaseline(entry)) <= 2 &&
+            isPreviewText(other, note.textHeight)))) &&
         !(/^\d+$/.test(entry.text) && entry.yRatio > 0.92 && !(note.scannedSmallBlock && entries.some(other =>
           other !== entry && /[A-Za-z]/.test(other.text) &&
           Math.abs(readingBaseline(other) - readingBaseline(entry)) < 2)))).sort(readingOrder);
@@ -455,10 +512,29 @@ export function footnotesForPage(items, viewport, pageNumber, rules = [], refere
         (note.hangingMargin === undefined ? entry.yRatio === note.yRatio :
           entry.text === note.inferredMarker && Math.abs(entry.y - note.baseline) <= note.textHeight * 0.8));
       const highlightedEntries = marker && !textEntries.includes(marker) ? [marker, ...textEntries] : textEntries;
-      if (text.length >= 3) result.push({ ...note, markerItemIndex: marker ? items.indexOf(marker.item) : -1, text, endPageNumber: pageNumber, endColumnIndex: column.index,
-        highlightRegions: highlightRegions(highlightedEntries, viewport, pageNumber),
-        continues: !next && textEntries.at(-1)?.yRatio >= 0.88 &&
-          ((note.hangingMargin === undefined && !note.scannedSmallBlock) || !/[.!?]["')\]]?$/.test(text)) });
+      if (text.length >= 3) {
+        let fullText = text;
+        let regions = highlightRegions(highlightedEntries, viewport, pageNumber);
+        // PDF.js can assign larger text heights to wrapped lines. Repair a
+        // truncated final note without crossing the page counter or next note.
+        if (!next && layout.length === 1 && note.yRatio >= 0.65 && textEntries.length <= 2 && marker) {
+          const body = textEntries.find((entry) => entry !== marker && /[A-Za-z]/.test(entry.text));
+          const recovered = body && fallbackFootnoteParagraph(items, viewport,
+            marker.item, body.item, note.number, pageNumber);
+          if (recovered && recovered.text.length > fullText.length &&
+            recovered.highlightRegions.length > regions.length) {
+            fullText = recovered.text;
+            regions = recovered.highlightRegions;
+          }
+        }
+        const reachedBottom = textEntries.at(-1)?.yRatio >= 0.88 ||
+          (fullText !== text && regions.some((region) => region.top + region.height >= 0.88));
+        result.push({ ...note, markerItemIndex: marker ? items.indexOf(marker.item) : -1,
+          text: fullText, endPageNumber: pageNumber, endColumnIndex: column.index,
+          highlightRegions: regions,
+          continues: !next && reachedBottom &&
+            ((note.hangingMargin === undefined && !note.scannedSmallBlock) || !/[.!?]["')\]]?$/.test(fullText)) });
+      }
     }
   }
   return result;
@@ -481,8 +557,8 @@ export function footnoteContinuationForPage(items, viewport, operatorList, previ
   return continuationInColumn(pageLayout(items, viewport, rules)[0], viewport, previousNote, pageNotes);
 }
 
-export function appendFootnotesForPage(index, items, viewport, pageNumber, operatorList, operatorIds, referenceContext) {
-  const rules = footnoteRulesForPage(operatorList, viewport, operatorIds);
+export function appendFootnotesForPage(index, items, viewport, pageNumber, operatorList, operatorIds, referenceContext, cachedRules) {
+  const rules = cachedRules ?? footnoteRulesForPage(operatorList, viewport, operatorIds);
   const previousNumber = [...index].reverse().find((note) => Number.isSafeInteger(note.number))?.number;
   const expectedNumber = Number.isSafeInteger(previousNumber) ? previousNumber + 1 : undefined;
   const pageNotes = footnotesForPage(items, viewport, pageNumber, rules, referenceContext, expectedNumber);
