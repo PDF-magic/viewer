@@ -91,6 +91,7 @@ export const suites = Object.freeze({
   ],
   "chatgpt": [
     "chatgpt-pdf-relay.test.mjs",
+    "chatgpt-summary-handoff.test.mjs",
     "chatgpt-summary-popup.test.mjs"
   ],
   "security": [
