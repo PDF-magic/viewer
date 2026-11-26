@@ -88,8 +88,65 @@
 }
 
 @media (min-width: 701px) {
-  html.minimap-collapsed:not(.minimap-disabled):not(.minimap-left) {
+  html.minimap-collapsed:not(.minimap-disabled):is(:not(.minimap-left), .scrollbar-follows-minimap) {
     --native-scrollbar-bottom: calc(var(--document-scrubber-height, 0px) + 36px + var(--split-view-bottom-clearance));
+  }
+}
+
+.left-scrollbar {
+  display: none;
+}
+
+@media screen {
+  /* The viewport scrollbar stays on the right in Chromium. Use a native
+     scrollbar on a separate scroller and keep it in sync with the document. */
+  html.scrollbar-follows-minimap.minimap-left {
+    --left-scrollbar-width: 10px;
+  }
+
+  html.scrollbar-follows-minimap.minimap-left::-webkit-scrollbar:vertical {
+    display: none;
+  }
+
+  .scrollbar-follows-minimap.minimap-left body {
+    padding-left: var(--left-scrollbar-width);
+  }
+
+  .scrollbar-follows-minimap.minimap-left .left-scrollbar {
+    position: fixed;
+    inset: var(--native-scrollbar-top) auto var(--native-scrollbar-bottom) 0;
+    z-index: 9;
+    display: block;
+    width: var(--left-scrollbar-width);
+    overflow: hidden auto;
+    background: var(--body-bg);
+  }
+
+  .left-scrollbar::before {
+    content: "";
+    display: block;
+    height: calc(100% + var(--document-scroll-range, 0px));
+  }
+
+  .left-scrollbar::-webkit-scrollbar {
+    width: var(--left-scrollbar-width);
+  }
+
+  .left-scrollbar::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: var(--accent, #43af49);
+    background-clip: content-box;
+  }
+}
+
+@media screen and (min-width: 701px) {
+  html.scrollbar-follows-minimap.minimap-left:not(.minimap-disabled):not(.minimap-collapsed) {
+    --left-scrollbar-width: 0px;
+  }
+
+  .scrollbar-follows-minimap.minimap-collapsed.minimap-left .minimap-shell {
+    left: var(--left-scrollbar-width);
   }
 }
 

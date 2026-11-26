@@ -183,6 +183,10 @@
             <span>Enable numbered page tabs</span>
             <input id="page-tabs-opt-in" class="checkbox-input" type="checkbox" />
           </label>
+          <label class="tool-toggle" title="Put the native scrollbar on the same side as the minimap when it is collapsed">
+            <span>Scrollbar follows minimap</span>
+            <input id="scrollbar-follows-minimap" class="checkbox-input" type="checkbox" />
+          </label>
           <div class="menu-separator" role="separator"></div>
           <label class="tool-toggle" title="Show created and modified dates as elapsed time; hover over a date for its UTC timestamp">
             <span>Relative dates</span>
@@ -208,6 +212,8 @@
     <main id="viewer" class="viewer" aria-live="polite">
       <div id="status" class="status">Loading PDF…</div>
     </main>
+
+    <div id="left-scrollbar" class="left-scrollbar" tabindex="-1" aria-hidden="true"></div>
 
     <aside id="minimap-shell" class="minimap-shell" aria-label="Document minimap">
       <div

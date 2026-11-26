@@ -18,11 +18,14 @@ const minimapSwapSideButton = document.querySelector("#minimap-swap-side");
 const minimapCollapseButton = document.querySelector("#minimap-collapse");
 const minimapPageTabsButton = document.querySelector("#minimap-page-tabs-toggle");
 const pageTabsOptIn = document.querySelector("#page-tabs-opt-in");
+const scrollbarFollowsMinimap = document.querySelector("#scrollbar-follows-minimap");
+const leftScrollbar = document.querySelector("#left-scrollbar");
 
 const MINIMAP_STORAGE_KEY = "pdf-viewer-show-minimap";
 const MINIMAP_MODE_STORAGE_KEY = "pdf-viewer-minimap-mode";
 const MINIMAP_SIDE_STORAGE_KEY = "pdf-viewer-minimap-side";
 const MINIMAP_COLLAPSED_STORAGE_KEY = "pdf-viewer-minimap-collapsed";
+const SCROLLBAR_FOLLOWS_MINIMAP_STORAGE_KEY = "pdf-viewer-scrollbar-follows-minimap";
 const PAGE_TABS_STORAGE_KEY = "pdf-viewer-page-tabs";
 const PAGE_TABS_OPT_IN_STORAGE_KEY = "pdf-viewer-page-tabs-opt-in";
 const MINIMAP_RENDER_CONCURRENCY = 4;
@@ -40,6 +43,8 @@ let geometryReady = false;
 let minimapTiles = [];
 let minimapTrackHeight = 0;
 let minimapDisplayMode = "overview";
+let syncedScrollbarTop = 0;
+let documentScrollRange;
 let wheelFrame;
 let wheelTarget;
 let dragging = false;
@@ -221,6 +226,29 @@ function setMinimapCollapsed(collapsed, persist = true) {
   if (!collapsed) {
     scheduleSync();
   }
+}
+
+function setScrollbarFollowsMinimap(enabled, persist = true) {
+  scrollbarFollowsMinimap.checked = enabled;
+  updateMinimapLayout(() => {
+    document.documentElement.classList.toggle("scrollbar-follows-minimap", enabled);
+  });
+  if (persist) {
+    localStorage.setItem(SCROLLBAR_FOLLOWS_MINIMAP_STORAGE_KEY, String(enabled));
+  }
+}
+
+function syncLeftScrollbar() {
+  if (!leftScrollbar?.offsetWidth) return;
+
+  const scroller = document.scrollingElement;
+  const range = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+  if (documentScrollRange !== range) {
+    leftScrollbar.style.setProperty("--document-scroll-range", `${range}px`);
+    documentScrollRange = range;
+  }
+  leftScrollbar.scrollTop = window.scrollY;
+  syncedScrollbarTop = leftScrollbar.scrollTop;
 }
 
 function scheduleSync(layoutChanged = true) {
@@ -947,6 +975,9 @@ minimapCollapseButton?.addEventListener("click", () => {
 });
 minimapPageTabsButton?.addEventListener("click", () => setPageTabsEnabled(!pageTabsEnabled()));
 pageTabsOptIn?.addEventListener("change", () => setPageTabsOptIn(pageTabsOptIn.checked));
+scrollbarFollowsMinimap?.addEventListener("change", () => {
+  setScrollbarFollowsMinimap(scrollbarFollowsMinimap.checked);
+});
 const storedMinimapPreference = localStorage.getItem(MINIMAP_STORAGE_KEY);
 const storedMinimapMode = localStorage.getItem(MINIMAP_MODE_STORAGE_KEY);
 const storedMinimapSide = localStorage.getItem(MINIMAP_SIDE_STORAGE_KEY);
@@ -962,6 +993,9 @@ setMinimapSide(storedMinimapSide === "left" ? "left" : "right", false);
 // that legacy choice to a collapsible sidebar that can always be reopened.
 setMinimapCollapsed(storedMinimapCollapsed === "true" ||
   (storedMinimapCollapsed === null && storedMinimapPreference === "false"), false);
+if (scrollbarFollowsMinimap) {
+  setScrollbarFollowsMinimap(localStorage.getItem(SCROLLBAR_FOLLOWS_MINIMAP_STORAGE_KEY) === "true", false);
+}
 setMinimapEnabled(true);
 setPageTabsOptIn(pageTabsOptedIn, false);
 setPageTabsEnabled(pageTabsOptedIn && storedPageTabs === "true", false);
@@ -975,6 +1009,19 @@ mutationObserver.observe(viewer, { childList: true, subtree: true });
 
 const resizeObserver = new ResizeObserver(scheduleSync);
 resizeObserver.observe(viewer);
+
+if (leftScrollbar) {
+  const scrollbarResizeObserver = new ResizeObserver(syncLeftScrollbar);
+  scrollbarResizeObserver.observe(viewer);
+  scrollbarResizeObserver.observe(leftScrollbar);
+  window.addEventListener("scroll", syncLeftScrollbar, { passive: true });
+  leftScrollbar.addEventListener("scroll", () => {
+    const top = leftScrollbar.scrollTop;
+    if (leftScrollbar.offsetWidth && top !== syncedScrollbarTop) {
+      window.scrollTo({ top, behavior: "instant" });
+    }
+  }, { passive: true });
+}
 
 window.addEventListener("scroll", () => scheduleSync(false), { passive: true });
 // A new gesture in the document takes precedence over an unfinished minimap glide.

@@ -32,6 +32,10 @@ function fixture(count, height = 900, initialPreferences = {}) {
     } };
   const viewport = { style: {} };
   const optIn = { checked: false, addEventListener(type, callback) { listeners[`opt-in-${type}`] = callback; } };
+  const scrollbarPreference = {
+    checked: false,
+    addEventListener(type, callback) { listeners[`scrollbar-preference-${type}`] = callback; },
+  };
   const pageTabsButton = {
     hidden: true,
     setAttribute() {},
@@ -46,7 +50,8 @@ function fixture(count, height = 900, initialPreferences = {}) {
   };
   const elements = { '#viewer': { querySelectorAll: () => pages }, '#minimap': track,
     '#minimap-pages': minimapPageContainer, '#minimap-viewport': viewport,
-    '#page-tabs-opt-in': optIn, '#minimap-page-tabs-toggle': pageTabsButton };
+    '#page-tabs-opt-in': optIn, '#minimap-page-tabs-toggle': pageTabsButton,
+    '#scrollbar-follows-minimap': scrollbarPreference };
   const classes = new Set();
   const document = { querySelector: selector => elements[selector],
     documentElement: { scrollHeight: count * 1420, classList: {
@@ -70,7 +75,7 @@ function fixture(count, height = 900, initialPreferences = {}) {
   vm.runInContext(source, context);
   const sync = () => vm.runInContext('syncMinimap()', context);
   sync();
-  return { window, windowEvents, windowListeners, pages, tiles, track, viewport, optIn, pageTabsButton, classes, storedValues, context, sync, listeners, minimapPageContainer };
+  return { window, windowEvents, windowListeners, pages, tiles, track, viewport, optIn, pageTabsButton, scrollbarPreference, classes, storedValues, context, sync, listeners, minimapPageContainer };
 }
 
 test('switching to local view keeps thumbnails unclipped at the middle and end', () => {
@@ -460,7 +465,7 @@ test('native scrollbar gutter respects toolbar rows, the scrubber, and split-vie
   );
   assert.match(
     styles,
-    /html\.minimap-collapsed:not\(\.minimap-disabled\):not\(\.minimap-left\)\s*\{\s*--native-scrollbar-bottom:\s*calc\(var\(--document-scrubber-height, 0px\) \+ 36px \+ var\(--split-view-bottom-clearance\)\);/,
+    /html\.minimap-collapsed:not\(\.minimap-disabled\):is\(:not\(\.minimap-left\), \.scrollbar-follows-minimap\)\s*\{\s*--native-scrollbar-bottom:\s*calc\(var\(--document-scrubber-height, 0px\) \+ 36px \+ var\(--split-view-bottom-clearance\)\);/,
   );
   assert.match(viewerStyles, /\.document-scrubber\s*\{[\s\S]*?width:\s*100vw;/);
 });
@@ -491,6 +496,26 @@ test('legacy disabled minimap preference migrates to re-expandable collapse', ()
   assert.equal(f.classes.has('minimap-collapsed'), false);
   assert.equal(f.track.tabIndex, 0);
   assert.equal(f.storedValues.get('pdf-viewer-minimap-collapsed'), 'false');
+});
+
+test('scrollbar follows the minimap only when its saved toggle is on', () => {
+  const key = 'pdf-viewer-scrollbar-follows-minimap';
+  const f = fixture(5, 900, { 'pdf-viewer-minimap-side': 'left' });
+  assert.equal(f.scrollbarPreference.checked, false);
+  assert.equal(f.classes.has('scrollbar-follows-minimap'), false);
+  assert.equal(f.storedValues.has(key), false);
+
+  f.scrollbarPreference.checked = true;
+  f.listeners['scrollbar-preference-change']();
+  assert.equal(f.classes.has('scrollbar-follows-minimap'), true);
+  assert.equal(f.storedValues.get(key), 'true');
+
+  const restored = fixture(5, 900, Object.fromEntries(f.storedValues));
+  assert.equal(restored.scrollbarPreference.checked, true);
+  restored.scrollbarPreference.checked = false;
+  restored.listeners['scrollbar-preference-change']();
+  assert.equal(restored.classes.has('scrollbar-follows-minimap'), false);
+  assert.equal(restored.storedValues.get(key), 'false');
 });
 
 test('the document becomes ready before the minimap finishes in the background', () => {
