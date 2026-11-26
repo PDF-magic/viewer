@@ -43,6 +43,7 @@ test('collapsed minimap fit-width accounts for the browser scrollbar and outline
   const viewportWidth = settings.match(/function viewportPageWidth\(\) \{[\s\S]*?\n\}/)[0];
   const classes = new Set(['minimap-collapsed']);
   const pageViewer = { dataset: { pageLayout: 'single' } };
+  const leftScrollbar = { offsetWidth: 0 };
   const context = vm.createContext({
     PAGE_HORIZONTAL_GUTTER: 32,
     window: { innerWidth: 1200 },
@@ -54,6 +55,7 @@ test('collapsed minimap fit-width accounts for the browser scrollbar and outline
         },
       },
       querySelector(selector) {
+        if (selector === '#left-scrollbar') return leftScrollbar;
         return selector === '#viewer'
           ? pageViewer
           : { getBoundingClientRect: () => ({ width: 96 }) };
@@ -69,6 +71,9 @@ test('collapsed minimap fit-width accounts for the browser scrollbar and outline
   assert.equal(vm.runInContext('viewportPageWidth()', context), 1183);
   context.document.documentElement.clientWidth = 1200;
   assert.equal(vm.runInContext('viewportPageWidth()', context), 1198);
+  leftScrollbar.offsetWidth = 10;
+  assert.equal(vm.runInContext('viewportPageWidth()', context), 1188);
+  leftScrollbar.offsetWidth = 0;
 
   classes.add('minimap-disabled');
   assert.equal(vm.runInContext('viewportPageWidth()', context), 1168);

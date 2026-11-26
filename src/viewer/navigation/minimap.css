@@ -88,8 +88,68 @@
 }
 
 @media (min-width: 701px) {
-  html.minimap-collapsed:not(.minimap-disabled) {
+  html.minimap-collapsed:not(.minimap-disabled):is(:not(.minimap-left), .scrollbar-follows-minimap) {
     --native-scrollbar-bottom: calc(var(--document-scrubber-height, 0px) + 36px + var(--split-view-bottom-clearance));
+  }
+}
+
+.left-scrollbar {
+  display: none;
+}
+
+@media screen {
+  /* The viewport scrollbar stays on the right in Chromium. Use a native
+     scrollbar on a separate scroller and keep it in sync with the document. */
+  html.scrollbar-follows-minimap.minimap-left {
+    --left-scrollbar-width: 10px;
+  }
+
+  html.scrollbar-follows-minimap.minimap-left::-webkit-scrollbar,
+  html.scrollbar-follows-minimap.minimap-left body::-webkit-scrollbar {
+    width: 0;
+  }
+
+  .scrollbar-follows-minimap.minimap-left body {
+    padding-left: var(--left-scrollbar-width);
+  }
+
+  .scrollbar-follows-minimap.minimap-left .left-scrollbar {
+    position: fixed;
+    inset: var(--native-scrollbar-top) auto var(--native-scrollbar-bottom) 0;
+    z-index: 9;
+    display: block;
+    width: var(--left-scrollbar-width);
+    overflow: hidden auto;
+    background: var(--body-bg);
+  }
+
+  .left-scrollbar::before {
+    content: "";
+    display: block;
+    /* The scrollbar can occupy the entire content box. */
+    width: 1px;
+    height: calc(100% + var(--document-scroll-range, 0px));
+  }
+
+  .left-scrollbar::-webkit-scrollbar {
+    width: var(--left-scrollbar-width);
+  }
+
+  .left-scrollbar::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: var(--accent, #43af49);
+    background-clip: content-box;
+  }
+}
+
+@media screen and (min-width: 701px) {
+  html.scrollbar-follows-minimap.minimap-left:not(.minimap-disabled):not(.minimap-collapsed) {
+    --left-scrollbar-width: 0px;
+  }
+
+  .scrollbar-follows-minimap.minimap-collapsed.minimap-left .minimap-shell {
+    left: var(--left-scrollbar-width);
   }
 }
 
@@ -291,6 +351,7 @@ html.minimap-disabled body::-webkit-scrollbar-thumb {
 
 .minimap-left .minimap-controls {
   flex-direction: row-reverse;
+  border-radius: 0 9px 0 0;
 }
 
 .minimap-control {
@@ -316,6 +377,21 @@ html.minimap-disabled body::-webkit-scrollbar-thumb {
 
 .minimap-mode[aria-pressed="true"] {
   color: var(--minimap-accent);
+}
+
+.minimap-collapse::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-top: 2px solid currentColor;
+  border-right: 2px solid currentColor;
+  transform: translateX(-1px) rotate(45deg);
+}
+
+/* Collapse toward the edge and expand toward the document. */
+.minimap-collapsed:not(.minimap-left) .minimap-collapse::before,
+.minimap-left:not(.minimap-collapsed) .minimap-collapse::before {
+  transform: translateX(1px) rotate(-135deg);
 }
 
 .minimap-collapsed .minimap-shell {

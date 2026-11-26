@@ -421,7 +421,8 @@ function viewportPageWidth() {
     window.innerWidth > 700 && !root.classList.contains("minimap-disabled")
       ? root.classList.contains("minimap-collapsed") ? 2 : PAGE_HORIZONTAL_GUTTER / 2 + 1
       : PAGE_HORIZONTAL_GUTTER;
-  const availableWidth = root.clientWidth || window.innerWidth;
+  const leftScrollbarWidth = document.querySelector("#left-scrollbar")?.offsetWidth || 0;
+  const availableWidth = (root.clientWidth || window.innerWidth) - leftScrollbarWidth;
   const usableWidth = availableWidth - minimapWidth - horizontalGutter;
   if (document.querySelector("#viewer")?.dataset.pageLayout === "two-up") {
     return Math.max(100, (usableWidth - 16) / 2);
