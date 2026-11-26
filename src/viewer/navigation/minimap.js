@@ -86,13 +86,8 @@ function minimapMode() {
   return document.documentElement.classList.contains("minimap-local") ? "local" : "overview";
 }
 
-function displayedMinimapMode(widthScaledHeight, trackHeight) {
-  return minimapMode() === "local" || widthScaledHeight <= trackHeight ? "local" : "overview";
-}
-
 function localMinimapActive() {
-  return minimapMode() === "local" ||
-    document.documentElement.classList.contains("minimap-local-active");
+  return minimapMode() === "local";
 }
 
 function setMinimapAccessibility() {
@@ -295,13 +290,11 @@ function syncMinimap() {
   const widthScale = thumbnailWidth / pageWidth;
   const widthScaledHeights = pages.map((page) => page.getBoundingClientRect().height * widthScale);
   const widthScaledHeight = widthScaledHeights.reduce((total, height) => total + height, 0);
-  const displayMode = displayedMinimapMode(widthScaledHeight, trackHeight);
-  document.documentElement.classList.toggle(
-    "minimap-local-active",
-    displayMode === "local" && minimapMode() !== "local",
-  );
+  const displayMode = minimapMode();
+  // Overview spans the full track, including short PDFs on tall monitors.
+  // Local mode retains thumbnails at their natural width-scaled height.
   const heightCompression =
-    displayMode === "overview" && widthScaledHeight > trackHeight
+    displayMode === "overview" && widthScaledHeight > 0
       ? trackHeight / widthScaledHeight
       : 1;
   const scale = widthScale * heightCompression;
@@ -526,7 +519,11 @@ async function renderThumbnail(pageNumber, generation, renderWidth = MINIMAP_THU
   }
 
   page.cleanup();
-  return generation === thumbnailGeneration ? canvas : null;
+  if (generation !== thumbnailGeneration) {
+    canvas.width = canvas.height = 0;
+    return null;
+  }
+  return canvas;
 }
 
 function cacheKey() {
@@ -650,6 +647,7 @@ async function renderAllThumbnails(preparedGeneration, preparedCachedStrip) {
       nextPageNumber += 1;
       const canvas = await renderThumbnail(pageNumber, generation);
       if (!canvas || generation !== thumbnailGeneration) {
+        if (canvas) canvas.width = canvas.height = 0;
         return;
       }
 
@@ -658,21 +656,28 @@ async function renderAllThumbnails(preparedGeneration, preparedCachedStrip) {
     }
   }
 
-  await Promise.all(
-    Array.from(
-      { length: Math.min(MINIMAP_RENDER_CONCURRENCY, thumbnailDocument.numPages) },
-      () => renderNextThumbnail(),
-    ),
-  );
+  try {
+    // Wait for every worker before releasing its temporary surfaces, including
+    // when one page fails while other thumbnail renders are still in flight.
+    const results = await Promise.allSettled(
+      Array.from(
+        { length: Math.min(MINIMAP_RENDER_CONCURRENCY, thumbnailDocument.numPages) },
+        () => renderNextThumbnail(),
+      ),
+    );
+    const failure = results.find((result) => result.status === "rejected");
+    if (failure) throw failure.reason;
+    if (generation !== thumbnailGeneration) return;
 
-  if (generation !== thumbnailGeneration) {
-    return;
+    const strip = composeThumbnailStrip(thumbnails);
+    attachThumbnailStrip(strip);
+    scheduleSync();
+    void cacheThumbnailStrip(strip);
+  } finally {
+    for (const canvas of thumbnails) {
+      if (canvas) canvas.width = canvas.height = 0;
+    }
   }
-
-  const strip = composeThumbnailStrip(thumbnails);
-  attachThumbnailStrip(strip);
-  scheduleSync();
-  void cacheThumbnailStrip(strip);
 }
 
 function cancelScheduledThumbnailPreparation() {

@@ -4,6 +4,9 @@ import { pdfDocumentSessionReady } from "../pdf-document-session.js";
 const summarizeButton = document.querySelector("#summarize-chatgpt");
 const STORAGE_PREFIX = "pdf-viewer-chatgpt-summary:";
 const CHATGPT_URL = "https://chatgpt.com/";
+const PREPARING_URL = chrome.runtime.getURL(
+  `${chrome.runtime.getManifest().background?.service_worker?.startsWith("src/") ? "src/" : ""}chatgpt-preparing.html`,
+);
 const defaultTitle = summarizeButton.title;
 // Resolve PDF metadata while the viewer loads, before the user asks for a summary.
 const documentReferenceUrl = resolveDocumentReferenceUrl();
@@ -71,8 +74,15 @@ function registerPdfTransfer(requestId, filename) {
   let awaitingAck;
   const expire = setTimeout(() => port.disconnect(), 120000);
   port.onDisconnect.addListener(() => {
+    // Chrome reports a missing receiver through lastError on disconnect.
+    // Reading it here also prevents an "Unchecked runtime.lastError" warning.
+    const disconnectError = chrome.runtime.lastError?.message;
     stopped = true;
-    if (awaitingAck) awaitingAck.reject(new Error("PDF transfer disconnected"));
+    clearTimeout(expire);
+    if (awaitingAck) {
+      awaitingAck.reject(new Error(disconnectError || "PDF transfer disconnected"));
+      awaitingAck = null;
+    }
   });
   port.onMessage.addListener((message) => {
     if (message?.type === "ack" && awaitingAck) {
@@ -134,7 +144,7 @@ async function openChatGPTSummary() {
   let summaryTab;
   try {
     const popup = await chrome.windows.create({
-      url: "about:blank",
+      url: PREPARING_URL,
       type: "popup",
       focused: true,
       width: popupWidth,
@@ -144,7 +154,7 @@ async function openChatGPTSummary() {
     });
     summaryTab = popup.tabs[0];
   } catch {
-    summaryTab = await chrome.tabs.create({ url: "about:blank", active: true });
+    summaryTab = await chrome.tabs.create({ url: PREPARING_URL, active: true });
   }
 
   let sourcePort;
@@ -176,6 +186,7 @@ async function openChatGPTSummary() {
 summarizeButton.addEventListener("click", async () => {
   dismissSummaryTooltip();
   summarizeButton.disabled = true;
+  summarizeButton.setAttribute("aria-busy", "true");
 
   try {
     await openChatGPTSummary();
@@ -183,5 +194,6 @@ summarizeButton.addEventListener("click", async () => {
     showTemporaryTitle("Could not open ChatGPT");
   } finally {
     summarizeButton.disabled = false;
+    summarizeButton.removeAttribute("aria-busy");
   }
 });

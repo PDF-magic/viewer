@@ -10,7 +10,7 @@
   const sourcePrefix = chrome.runtime.getManifest().background?.service_worker?.startsWith("src/")
     ? "src/"
     : "";
-  const SWEETIE_BOT_PATH = sourcePrefix + "assets/sweetie-bot.png";
+  const SWEETIE_BOT_PATH = sourcePrefix + "assets/sweetiebot.png";
   const isCommentPage = /^\/comments\/.+\.html?$/i.test(window.location.pathname);
 
   const selectionStyles = `
