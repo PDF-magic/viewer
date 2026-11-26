@@ -68,8 +68,19 @@ async function validateManifest(path, expected) {
     }
   }
   for (const script of manifest.content_scripts || []) {
-    if (!script.matches?.every((pattern) => pattern.startsWith("https://"))) {
-      fail(path + ": content scripts must be HTTPS scoped");
+    // Only the conservative HTML darkening integration may run on HTTP.
+    const plainHtmlScripts = [
+      "content/plain-html-detection.js",
+      "content/sec-comment.js",
+    ];
+    const scripts = (script.js || []).map((asset) => asset.replace(/^src\//, ""));
+    const isPlainHtmlIntegration =
+      JSON.stringify(scripts) === JSON.stringify(plainHtmlScripts) &&
+      JSON.stringify(script.matches) === JSON.stringify(["http://*/*", "https://*/*"]) &&
+      !script.css?.length;
+    if (!isPlainHtmlIntegration &&
+        !script.matches?.every((pattern) => pattern.startsWith("https://"))) {
+      fail(path + ": only basic HTML darkening may use HTTP content-script matches");
     }
   }
 

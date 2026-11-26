@@ -25,12 +25,17 @@ test("extension pages reject remote, inline and unsafe-eval executable code", ()
   }
 });
 
-test("page integrations execute only on declared HTTPS sites", () => {
+test("only basic HTML darkening has broad HTTP and HTTPS content-script coverage", () => {
   assert.deepEqual(manifest.content_scripts.map((script) => script.matches), [
-    ["https://www.sec.gov/*"], ["https://chatgpt.com/*"],
+    ["http://*/*", "https://*/*"], ["https://chatgpt.com/*"],
   ]);
+  assert.deepEqual(manifest.content_scripts.map((script) => script.js), [
+    ["src/content/plain-html-detection.js", "src/content/sec-comment.js"],
+    ["src/content/chatgpt-summary.js"],
+  ]);
+  assert.equal(manifest.content_scripts[0].run_at, "document_idle");
+  assert.ok(!manifest.content_scripts[0].css?.length);
   for (const script of manifest.content_scripts) {
-    for (const pattern of script.matches) assert.match(pattern, /^https:\/\//);
     for (const path of [...(script.js || []), ...(script.css || [])]) {
       assert.doesNotThrow(() => readFileSync(new URL("../" + path, import.meta.url)));
     }

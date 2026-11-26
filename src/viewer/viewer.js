@@ -4,6 +4,7 @@ import { abandonPdfDocumentSession, publishPdfDocument } from "./pdf-document-se
 import { referenceUrlFromPdfMetadata, resolveDocumentReferenceUrl } from "./document-reference-url.js";
 import { pdfTextFragmentFromUrl, pdfTextFragmentUrl } from "./sharing/text-fragment.js";
 import { metadataField, pdfMetadataTitle } from "./pdf-metadata-title.js";
+import { installRawMetadataViewer } from "./raw-metadata.js";
 import { doiFromPdfMetadata, doiResolverUrl } from "./metadata-doi.js";
 import { resolvePdfSource } from "./pdf-source.js";
 import { readResumedPage, saveResumedPage } from "./page-resume.js";
@@ -1445,6 +1446,7 @@ function bindControls() {
 
   rotateLeftButton.addEventListener("click", () => void rotatePages(-90));
   rotateRightButton.addEventListener("click", () => void rotatePages(90));
+  void installRawMetadataViewer(pdfDocument, () => setToolsMenuOpen(false));
   printButton.addEventListener("click", () => void printPdf());
   downloadButton.addEventListener("click", () => void downloadPdf());
 

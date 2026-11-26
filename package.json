@@ -8,6 +8,8 @@
     "check": "node scripts/check-extension.mjs",
     "test": "node scripts/test-suites.mjs all",
     "test:feature": "node scripts/test-suites.mjs",
+    "test:document": "node scripts/test-suites.mjs document",
+    "test:appearance": "node scripts/test-suites.mjs appearance",
     "test:selection": "node scripts/test-suites.mjs selection",
     "test:enhance": "node --test tests/enhance-failure.test.mjs tests/enhance-pdf.test.mjs tests/enhancer-setup.test.mjs",
     "test:footnotes": "node scripts/test-suites.mjs footnotes",

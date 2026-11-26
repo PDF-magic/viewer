@@ -80,11 +80,13 @@ export const suites = Object.freeze({
     "document-title.test.mjs",
     "local-file-favicon.test.mjs",
     "metadata-date.test.mjs",
-    "metadata-doi.test.mjs"
+    "metadata-doi.test.mjs",
+    "raw-metadata.test.mjs"
   ],
   "appearance": [
     "accent-color.test.mjs",
     "narrow-viewer-layout.test.mjs",
+    "plain-html-dark-mode.test.mjs",
     "scanned-page-images.test.mjs"
   ],
   "chatgpt": [
