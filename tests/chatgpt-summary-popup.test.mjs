@@ -10,11 +10,13 @@ function setup({ width = 1080, height = 1920, popupFails = false } = {}) {
   let resolveUrl;
   const listeners = new Map();
   const calls = [];
+  let onDisconnect;
+  let lastErrorReads = 0;
   const button = {
     title: "Summarize with ChatGPT",
     attributes: {},
     setAttribute(name, value) { this.attributes[name] = value; },
-    removeAttribute(name) { if (name === "title") this.title = ""; },
+    removeAttribute(name) { if (name === "title") this.title = ""; else delete this.attributes[name]; },
     blur() { this.blurred = true; },
     addEventListener(event, listener) { listeners.set(event, listener); },
   };
@@ -25,10 +27,22 @@ function setup({ width = 1080, height = 1920, popupFails = false } = {}) {
     window: { screen: { availWidth: width, availHeight: height } },
     resolveDocumentReferenceUrl: () => new Promise((resolve) => { resolveUrl = resolve; }),
     chrome: {
-      runtime: { connect(options) {
-        calls.push(["connect", options]);
-        return { onMessage: { addListener() {} }, onDisconnect: { addListener() {} }, disconnect() {} };
-      } },
+      runtime: {
+        getManifest() { return { background: { service_worker: "src/background.js" } }; },
+        getURL(path) { return "chrome-extension://test-extension/" + path; },
+        get lastError() {
+          lastErrorReads += 1;
+          return { message: "Could not establish connection. Receiving end does not exist." };
+        },
+        connect(options) {
+          calls.push(["connect", options]);
+          return {
+            onMessage: { addListener() {} },
+            onDisconnect: { addListener(listener) { onDisconnect = listener; } },
+            disconnect() {},
+          };
+        },
+      },
       windows: { async create(options) {
         calls.push(["popup", options]);
         if (popupFails) throw new Error("Popup unavailable");
@@ -46,7 +60,15 @@ function setup({ width = 1080, height = 1920, popupFails = false } = {}) {
     },
   };
   vm.runInNewContext(source, context);
-  return { click: () => listeners.get("click")(), dispatch: (event) => listeners.get(event)(), resolveUrl, calls, button };
+  return {
+    click: () => listeners.get("click")(),
+    dispatch: (event) => listeners.get(event)(),
+    resolveUrl,
+    calls,
+    button,
+    disconnect: () => onDisconnect?.(),
+    get lastErrorReads() { return lastErrorReads; },
+  };
 }
 
 test("opens the portrait popup before PDF metadata resolves, then stores the prompt before navigation", async () => {
@@ -54,6 +76,8 @@ test("opens the portrait popup before PDF metadata resolves, then stores the pro
   const pendingClick = fixture.click();
   assert.equal(fixture.calls[0][0], "popup");
   assert.equal(fixture.button.disabled, true);
+  assert.equal(fixture.button.attributes["aria-busy"], "true");
+  assert.equal(fixture.calls[0][1].url, "chrome-extension://test-extension/src/chatgpt-preparing.html");
   const { width, height } = fixture.calls[0][1];
   assert.ok(width > 700 && width < 1080);
   assert.ok(height / width <= 1.2 && height < 1000);
@@ -62,6 +86,7 @@ test("opens the portrait popup before PDF metadata resolves, then stores the pro
   assert.deepEqual(fixture.calls.map(([name]) => name), ["popup", "store", "connect", "navigate"]);
   assert.ok(fixture.calls[1][1]["pdf-viewer-chatgpt-summary:request"].prompt.includes("Source URL: https://example.com/original.pdf"));
   assert.equal(fixture.button.disabled, false);
+  assert.equal(fixture.button.attributes["aria-busy"], undefined);
 });
 
 test("clears the native tooltip during popup launch and restores it only on a new hover", async () => {
@@ -97,6 +122,7 @@ test("falls back to a tab when popup creation fails", async () => {
   fixture.resolveUrl("https://example.com/original.pdf");
   await pendingClick;
   assert.deepEqual(fixture.calls.map(([name]) => name), ["popup", "tab", "store", "connect", "navigate"]);
+  assert.equal(fixture.calls[1][1].url, "chrome-extension://test-extension/src/chatgpt-preparing.html");
 });
 
 test("keeps the popup within a small screen", async () => {
@@ -119,4 +145,15 @@ test("local file URLs are not substituted for PDF attachments", async () => {
   assert.ok(data.prompt.includes("Attached local PDF: Short Term Securities - 1918.pdf"));
   assert.ok(!data.prompt.includes("file:///Users/"));
   assert.equal(fixture.calls.find(([action]) => action === "connect")[1].name, "pdf-summary-source:request");
+});
+
+test("consumes Chrome's missing-receiver error on PDF summary disconnection", async () => {
+  const fixture = setup();
+  const pendingClick = fixture.click();
+  fixture.resolveUrl("https://www.sec.gov/files/rules/other/34-16900.pdf");
+  await pendingClick;
+
+  assert.equal(fixture.lastErrorReads, 0);
+  fixture.disconnect();
+  assert.equal(fixture.lastErrorReads, 1);
 });
