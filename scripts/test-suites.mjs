@@ -47,6 +47,7 @@ export const suites = Object.freeze({
     "footnote-click-copy.test.mjs",
     "footnote-continuation-pdf.test.mjs",
     "footnote-cross-references.test.mjs",
+    "footnote-fallback-wrap.test.mjs",
     "footnote-jump.test.mjs",
     "footnote-scanned-hearing.test.mjs",
     "footnote-scanned-petition.test.mjs"
