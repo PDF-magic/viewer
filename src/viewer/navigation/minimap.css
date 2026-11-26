@@ -88,7 +88,7 @@
 }
 
 @media (min-width: 701px) {
-  html.minimap-collapsed:not(.minimap-disabled) {
+  html.minimap-collapsed:not(.minimap-disabled):not(.minimap-left) {
     --native-scrollbar-bottom: calc(var(--document-scrubber-height, 0px) + 36px + var(--split-view-bottom-clearance));
   }
 }

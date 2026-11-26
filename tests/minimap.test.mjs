@@ -460,7 +460,7 @@ test('native scrollbar gutter respects toolbar rows, the scrubber, and split-vie
   );
   assert.match(
     styles,
-    /@media\s*\(min-width:\s*701px\)[\s\S]*?--native-scrollbar-bottom:\s*calc\(var\(--document-scrubber-height, 0px\) \+ 36px \+ var\(--split-view-bottom-clearance\)\);/,
+    /html\.minimap-collapsed:not\(\.minimap-disabled\):not\(\.minimap-left\)\s*\{\s*--native-scrollbar-bottom:\s*calc\(var\(--document-scrubber-height, 0px\) \+ 36px \+ var\(--split-view-bottom-clearance\)\);/,
   );
   assert.match(viewerStyles, /\.document-scrubber\s*\{[\s\S]*?width:\s*100vw;/);
 });
