@@ -71,6 +71,7 @@ export const suites = Object.freeze({
     "paragraph-double-click.test.mjs",
     "selection-gaps.test.mjs",
     "selection-lines.test.mjs",
+    "selection-notes.test.mjs",
     "tagged-paragraph-copy.test.mjs",
     "terminal-punctuation-selection.test.mjs"
   ],
