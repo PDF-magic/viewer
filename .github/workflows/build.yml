@@ -1,22 +1,80 @@
-name: Build extension
+name: PDF Viewer CI
 
 on:
   pull_request:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: pdf-viewer-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
+  quality:
+    name: Quality / syntax and suite inventory
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
-          node-version: 22
-      - run: npm install
+          node-version: "22"
+      - run: npm run check:syntax
+      - run: npm run check:suites
       - run: bash -n native/install-host.sh
-      - run: python3 -m unittest discover -s tests -p 'test_*.py'
-      - run: npm test
+
+  feature-tests:
+    name: Tests / ${{ matrix.feature }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        feature:
+          - rendering
+          - navigation
+          - references
+          - footnotes
+          - search
+          - selection
+          - document
+          - appearance
+          - chatgpt
+          - security
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - run: npm install --no-audit --no-fund
+      - run: node scripts/test-suites.mjs ${{ matrix.feature }}
+
+  native-host:
+    name: Native host / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: python -m unittest discover -s tests -p 'test_*.py' -v
+      # The historical native enhancer tests are not named test_*.py.
+      - run: python tests/native-enhancer.test.py -v
+
+  packaging:
+    name: Packaging / build and manifest integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+      - run: npm install --no-audit --no-fund
       - run: npm run build
       - run: npm run check
       - name: Upload unpacked extension

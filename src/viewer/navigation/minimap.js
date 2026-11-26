@@ -18,11 +18,14 @@ const minimapSwapSideButton = document.querySelector("#minimap-swap-side");
 const minimapCollapseButton = document.querySelector("#minimap-collapse");
 const minimapPageTabsButton = document.querySelector("#minimap-page-tabs-toggle");
 const pageTabsOptIn = document.querySelector("#page-tabs-opt-in");
+const scrollbarFollowsMinimap = document.querySelector("#scrollbar-follows-minimap");
+const leftScrollbar = document.querySelector("#left-scrollbar");
 
 const MINIMAP_STORAGE_KEY = "pdf-viewer-show-minimap";
 const MINIMAP_MODE_STORAGE_KEY = "pdf-viewer-minimap-mode";
 const MINIMAP_SIDE_STORAGE_KEY = "pdf-viewer-minimap-side";
 const MINIMAP_COLLAPSED_STORAGE_KEY = "pdf-viewer-minimap-collapsed";
+const SCROLLBAR_FOLLOWS_MINIMAP_STORAGE_KEY = "pdf-viewer-scrollbar-follows-minimap";
 const PAGE_TABS_STORAGE_KEY = "pdf-viewer-page-tabs";
 const PAGE_TABS_OPT_IN_STORAGE_KEY = "pdf-viewer-page-tabs-opt-in";
 const MINIMAP_RENDER_CONCURRENCY = 4;
@@ -40,6 +43,8 @@ let geometryReady = false;
 let minimapTiles = [];
 let minimapTrackHeight = 0;
 let minimapDisplayMode = "overview";
+let syncedScrollbarTop = 0;
+let documentScrollRange;
 let wheelFrame;
 let wheelTarget;
 let dragging = false;
@@ -86,13 +91,8 @@ function minimapMode() {
   return document.documentElement.classList.contains("minimap-local") ? "local" : "overview";
 }
 
-function displayedMinimapMode(widthScaledHeight, trackHeight) {
-  return minimapMode() === "local" || widthScaledHeight <= trackHeight ? "local" : "overview";
-}
-
 function localMinimapActive() {
-  return minimapMode() === "local" ||
-    document.documentElement.classList.contains("minimap-local-active");
+  return minimapMode() === "local";
 }
 
 function setMinimapAccessibility() {
@@ -228,6 +228,29 @@ function setMinimapCollapsed(collapsed, persist = true) {
   }
 }
 
+function setScrollbarFollowsMinimap(enabled, persist = true) {
+  scrollbarFollowsMinimap.checked = enabled;
+  updateMinimapLayout(() => {
+    document.documentElement.classList.toggle("scrollbar-follows-minimap", enabled);
+  });
+  if (persist) {
+    localStorage.setItem(SCROLLBAR_FOLLOWS_MINIMAP_STORAGE_KEY, String(enabled));
+  }
+}
+
+function syncLeftScrollbar() {
+  if (!leftScrollbar?.offsetWidth) return;
+
+  const scroller = document.scrollingElement;
+  const range = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+  if (documentScrollRange !== range) {
+    leftScrollbar.style.setProperty("--document-scroll-range", `${range}px`);
+    documentScrollRange = range;
+  }
+  leftScrollbar.scrollTop = window.scrollY;
+  syncedScrollbarTop = leftScrollbar.scrollTop;
+}
+
 function scheduleSync(layoutChanged = true) {
   if (layoutChanged) {
     syncLayoutPending = true;
@@ -295,13 +318,11 @@ function syncMinimap() {
   const widthScale = thumbnailWidth / pageWidth;
   const widthScaledHeights = pages.map((page) => page.getBoundingClientRect().height * widthScale);
   const widthScaledHeight = widthScaledHeights.reduce((total, height) => total + height, 0);
-  const displayMode = displayedMinimapMode(widthScaledHeight, trackHeight);
-  document.documentElement.classList.toggle(
-    "minimap-local-active",
-    displayMode === "local" && minimapMode() !== "local",
-  );
+  const displayMode = minimapMode();
+  // Overview spans the full track, including short PDFs on tall monitors.
+  // Local mode retains thumbnails at their natural width-scaled height.
   const heightCompression =
-    displayMode === "overview" && widthScaledHeight > trackHeight
+    displayMode === "overview" && widthScaledHeight > 0
       ? trackHeight / widthScaledHeight
       : 1;
   const scale = widthScale * heightCompression;
@@ -526,7 +547,11 @@ async function renderThumbnail(pageNumber, generation, renderWidth = MINIMAP_THU
   }
 
   page.cleanup();
-  return generation === thumbnailGeneration ? canvas : null;
+  if (generation !== thumbnailGeneration) {
+    canvas.width = canvas.height = 0;
+    return null;
+  }
+  return canvas;
 }
 
 function cacheKey() {
@@ -650,6 +675,7 @@ async function renderAllThumbnails(preparedGeneration, preparedCachedStrip) {
       nextPageNumber += 1;
       const canvas = await renderThumbnail(pageNumber, generation);
       if (!canvas || generation !== thumbnailGeneration) {
+        if (canvas) canvas.width = canvas.height = 0;
         return;
       }
 
@@ -658,21 +684,28 @@ async function renderAllThumbnails(preparedGeneration, preparedCachedStrip) {
     }
   }
 
-  await Promise.all(
-    Array.from(
-      { length: Math.min(MINIMAP_RENDER_CONCURRENCY, thumbnailDocument.numPages) },
-      () => renderNextThumbnail(),
-    ),
-  );
+  try {
+    // Wait for every worker before releasing its temporary surfaces, including
+    // when one page fails while other thumbnail renders are still in flight.
+    const results = await Promise.allSettled(
+      Array.from(
+        { length: Math.min(MINIMAP_RENDER_CONCURRENCY, thumbnailDocument.numPages) },
+        () => renderNextThumbnail(),
+      ),
+    );
+    const failure = results.find((result) => result.status === "rejected");
+    if (failure) throw failure.reason;
+    if (generation !== thumbnailGeneration) return;
 
-  if (generation !== thumbnailGeneration) {
-    return;
+    const strip = composeThumbnailStrip(thumbnails);
+    attachThumbnailStrip(strip);
+    scheduleSync();
+    void cacheThumbnailStrip(strip);
+  } finally {
+    for (const canvas of thumbnails) {
+      if (canvas) canvas.width = canvas.height = 0;
+    }
   }
-
-  const strip = composeThumbnailStrip(thumbnails);
-  attachThumbnailStrip(strip);
-  scheduleSync();
-  void cacheThumbnailStrip(strip);
 }
 
 function cancelScheduledThumbnailPreparation() {
@@ -942,6 +975,9 @@ minimapCollapseButton?.addEventListener("click", () => {
 });
 minimapPageTabsButton?.addEventListener("click", () => setPageTabsEnabled(!pageTabsEnabled()));
 pageTabsOptIn?.addEventListener("change", () => setPageTabsOptIn(pageTabsOptIn.checked));
+scrollbarFollowsMinimap?.addEventListener("change", () => {
+  setScrollbarFollowsMinimap(scrollbarFollowsMinimap.checked);
+});
 const storedMinimapPreference = localStorage.getItem(MINIMAP_STORAGE_KEY);
 const storedMinimapMode = localStorage.getItem(MINIMAP_MODE_STORAGE_KEY);
 const storedMinimapSide = localStorage.getItem(MINIMAP_SIDE_STORAGE_KEY);
@@ -957,6 +993,9 @@ setMinimapSide(storedMinimapSide === "left" ? "left" : "right", false);
 // that legacy choice to a collapsible sidebar that can always be reopened.
 setMinimapCollapsed(storedMinimapCollapsed === "true" ||
   (storedMinimapCollapsed === null && storedMinimapPreference === "false"), false);
+if (scrollbarFollowsMinimap) {
+  setScrollbarFollowsMinimap(localStorage.getItem(SCROLLBAR_FOLLOWS_MINIMAP_STORAGE_KEY) === "true", false);
+}
 setMinimapEnabled(true);
 setPageTabsOptIn(pageTabsOptedIn, false);
 setPageTabsEnabled(pageTabsOptedIn && storedPageTabs === "true", false);
@@ -970,6 +1009,22 @@ mutationObserver.observe(viewer, { childList: true, subtree: true });
 
 const resizeObserver = new ResizeObserver(scheduleSync);
 resizeObserver.observe(viewer);
+
+if (leftScrollbar) {
+  const scrollbarResizeObserver = new ResizeObserver(syncLeftScrollbar);
+  scrollbarResizeObserver.observe(viewer);
+  scrollbarResizeObserver.observe(leftScrollbar);
+  window.addEventListener("scroll", () => {
+    if (window.scrollY !== syncedScrollbarTop) syncLeftScrollbar();
+  }, { passive: true });
+  leftScrollbar.addEventListener("scroll", () => {
+    const top = leftScrollbar.scrollTop;
+    if (leftScrollbar.offsetWidth && top !== syncedScrollbarTop) {
+      syncedScrollbarTop = top;
+      window.scrollTo({ top, behavior: "instant" });
+    }
+  }, { passive: true });
+}
 
 window.addEventListener("scroll", () => scheduleSync(false), { passive: true });
 // A new gesture in the document takes precedence over an unfinished minimap glide.
