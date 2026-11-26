@@ -316,6 +316,34 @@ raise SystemExit(host.main())
                 self.assertEqual(result, directory / "Library/Application Support/PDF Magic/Enhanced/source-enhanced-ocr.pdf")
                 self.assertEqual(result.read_bytes(), source.read_bytes())
 
+    def test_uploaded_local_copy_prefers_source_folder_and_stages_when_denied(self):
+        for denied in (False, True):
+            with self.subTest(denied=denied), tempfile.TemporaryDirectory() as folder:
+                directory = Path(folder).resolve()
+                source_folder = directory / "Desktop"
+                source_folder.mkdir()
+                source = source_folder / "scan.pdf"
+                uploaded = directory / "uploaded.pdf"
+                uploaded.write_bytes(b"%PDF-1.7\nloaded data")
+                (directory / "ocr-scanned-pdf.sh").write_text('cp "$1" "$2"\n')
+                named_temporary_file = tempfile.NamedTemporaryFile
+
+                def create_temporary_file(*args, **kwargs):
+                    if denied and kwargs.get("dir") == source_folder:
+                        raise PermissionError("Desktop access denied")
+                    return named_temporary_file(*args, **kwargs)
+
+                with patch.object(host, "load_config", return_value={"enhancer_dir": folder}), \
+                     patch.object(host.Path, "home", return_value=directory), \
+                     patch.object(host.sys, "platform", "darwin"), \
+                     patch.object(host, "stamp_source_url"), \
+                     patch.object(host.tempfile, "NamedTemporaryFile", side_effect=create_temporary_file):
+                    result = host.enhance_pdf(source.as_uri(), source.as_uri(), uploaded_path=uploaded)
+
+                expected_folder = directory / "Library/Application Support/PDF Magic/Enhanced" if denied else source_folder
+                self.assertEqual(result, expected_folder / "scan-enhanced-ocr.pdf")
+                self.assertEqual(result.read_bytes(), uploaded.read_bytes())
+
     def test_metadata_and_qpdf_logs_use_stderr(self):
         with patch.object(host, "pikepdf_python", return_value=["python3"]), \
              patch.object(host.shutil, "which", return_value="qpdf"), \

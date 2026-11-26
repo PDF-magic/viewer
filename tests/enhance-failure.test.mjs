@@ -18,6 +18,7 @@ function fixture(responseForAction) {
     "enhance-progress", "enhance-progress-bar", "enhance-progress-label",
     "enhance-progress-percentage", "enhance-error-notice",
     "enhance-error-message", "enhance-copy-error", "enhance-dismiss-error",
+    "enhance-save-notice", "enhance-save-message", "enhance-save-copy",
   ];
   for (const id of identifiers) {
     elements.set(`#${id}`, {

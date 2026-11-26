@@ -1114,7 +1114,8 @@ input {
 }
 
 /* Keep native-host and OCR errors available after the progress bar closes. */
-.enhance-error-notice {
+.enhance-error-notice,
+.enhance-save-notice {
   position: fixed;
   left: 50%;
   bottom: 24px;
@@ -1124,14 +1125,15 @@ input {
   max-height: min(45vh, 300px);
   overflow-y: auto;
   padding: 12px 14px;
-  border: 1px solid #c43f3f;
+  border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--toast-bg);
   color: var(--text);
   box-shadow: 0 8px 28px rgb(0 0 0 / 20%);
 }
-.enhance-error-notice[hidden] { display: none; }
-.enhance-error-notice p {
+.enhance-error-notice { border-color: #c43f3f; }
+.enhance-error-notice[hidden], .enhance-save-notice[hidden] { display: none; }
+.enhance-error-notice p, .enhance-save-notice p {
   margin: 8px 0 12px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;

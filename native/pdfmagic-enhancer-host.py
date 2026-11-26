@@ -480,18 +480,27 @@ def enhance_pdf(
 
     with tempfile.TemporaryDirectory(prefix="pdf-magic-enhancer-") as temp_name:
         temporary_directory = Path(temp_name)
-        input_path, is_local = (
-            (uploaded_path, False) if uploaded_path is not None
-            else input_from_url(source_url, temporary_directory)
-        )
-        # Browser-launched helpers can create Downloads files yet be denied
-        # permission to replace them during tagging. Keep web copies in app data.
+        input_path = uploaded_path
+        if input_path is None:
+            input_path, _ = input_from_url(source_url, temporary_directory)
+        # Keep web copies and copies awaiting a browser Save As in app data.
         web_output_directory = (
             Path.home() / "Library/Application Support/PDF Magic/Enhanced"
             if sys.platform == "darwin"
             else Path.home() / ".local/share/pdf-magic/enhanced"
         )
-        output_directory = input_path.parent if is_local else web_output_directory
+        output_directory = web_output_directory
+        source = urlparse(source_url)
+        if source.scheme == "file":
+            source_directory = Path(unquote(source.path)).parent
+            try:
+                # Tagging creates and replaces files in the destination directory.
+                with tempfile.NamedTemporaryFile(prefix=".pdfmagic-", dir=source_directory):
+                    pass
+            except (PermissionError, FileNotFoundError):
+                pass
+            else:
+                output_directory = source_directory
         options = enhancement_options(enhancement_mode)
         def create(report):
             output_path = unique_output(output_directory, safe_stem(source_url))
