@@ -14,6 +14,7 @@ export const suites = Object.freeze({
     "enhancer-setup.test.mjs",
     "first-page-position.test.mjs",
     "highlight-regions.test.mjs",
+    "image-gallery.test.mjs",
     "initial-page.test.mjs",
     "loading-image-setting.test.mjs",
     "loading-screen.test.mjs",
