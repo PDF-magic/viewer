@@ -61,7 +61,7 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "src/assets/sweetiebot.png"
+        "src/assets/robot-summary.png"
       ],
       "matches": [
         "https://www.sec.gov/*"

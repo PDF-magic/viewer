@@ -10,7 +10,7 @@
   const sourcePrefix = chrome.runtime.getManifest().background?.service_worker?.startsWith("src/")
     ? "src/"
     : "";
-  const SWEETIE_BOT_PATH = sourcePrefix + "assets/sweetiebot.png";
+  const SWEETIE_BOT_PATH = sourcePrefix + "assets/robot-summary.png";
   const isSecHost = window.location.protocol === "https:" && /(^|\.)sec\.gov$/i.test(window.location.hostname);
   const isCommentPage = isSecHost && /^\/comments\/.+\.html?$/i.test(window.location.pathname);
   const isRawEdgarPage = globalThis.pdfMagicIsRawEdgarHtmlDocument?.(document, window.location.href) === true;
