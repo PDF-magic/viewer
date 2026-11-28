@@ -35,6 +35,20 @@ class NativeEnhancerTests(unittest.TestCase):
         start.assert_not_called()
         self.assertEqual(events, [])
 
+    def test_macos_starts_the_ollama_app(self):
+        with patch.object(host.sys, "platform", "darwin"), \
+             patch.object(host.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as launch:
+            self.assertTrue(host.start_ollama())
+        self.assertEqual(launch.call_args.args[0], ["/usr/bin/open", "-g", "-a", "Ollama"])
+
+    def test_cli_only_ollama_starts_on_the_review_endpoint(self):
+        with patch.object(host.sys, "platform", "linux"), \
+             patch.object(host.shutil, "which", return_value="/usr/bin/ollama"), \
+             patch.object(host.subprocess, "Popen") as launch:
+            self.assertTrue(host.start_ollama())
+        self.assertEqual(launch.call_args.args[0], ["/usr/bin/ollama", "serve"])
+        self.assertEqual(launch.call_args.kwargs["env"]["OLLAMA_HOST"], "127.0.0.1:11434")
+
     def test_missing_ollama_prompts_to_install_before_running_ocr(self):
         with tempfile.TemporaryDirectory() as folder:
             directory = Path(folder).resolve()
