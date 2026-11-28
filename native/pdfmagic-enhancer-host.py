@@ -174,6 +174,8 @@ def shared_enhancement(input_path: Path, create, progress: bool, directory: Path
             state = read_job(state_path)
             cached = completed_output(state)
             if cached is not None:
+                if after_save is not None:
+                    after_save()
                 return cached
             if waited and state.get("status") == "failed":
                 raise RuntimeError(str(state.get("error") or "Shared PDF enhancement failed"))
