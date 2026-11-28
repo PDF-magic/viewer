@@ -34,7 +34,7 @@ class EnhancerCliTest(unittest.TestCase):
                 patch.object(host, "run_enhancer", side_effect=capture_command),
                 patch.object(host, "rename_for_ocr_title", side_effect=lambda path: path),
                 patch.object(host, "stamp_source_url") as stamp,
-                patch.object(host, "shared_enhancement", side_effect=lambda source, create, progress, output: create(lambda report: None)),
+                patch.object(host, "shared_enhancement", side_effect=lambda source, create, progress, output, cache_key="": create(lambda report: None)),
             ):
                 result = host.enhance_pdf(
                     "https://example.org/document.pdf",

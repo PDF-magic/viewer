@@ -481,6 +481,12 @@ async function openEnhancementOptions(anchor) {
 modelRefresh.addEventListener("click", refreshModels);
 extractModel.addEventListener("change", syncModelControls);
 reviewModel.addEventListener("change", syncModelControls);
+modelName.addEventListener("keydown", event => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    if (!modelsBusy) modelDownload.click();
+  }
+});
 modelDownload.addEventListener("click", async () => {
   const model = modelName.value.trim();
   if (!model || modelsBusy) return;
@@ -508,6 +514,7 @@ modelForm.addEventListener("submit", async event => {
   if (modelStart.disabled || modelsBusy) return;
   const models = { extractModel: extractModel.value, reviewModel: reviewModel.value };
   modelPopover.hidePopover();
+  preferredModels = models;
   try {
     await chrome.storage.local.set({ [MODEL_PREF_KEY]: models });
   } catch { /* Preferences are optional. */ }

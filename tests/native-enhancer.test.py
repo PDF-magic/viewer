@@ -243,6 +243,19 @@ raise SystemExit(host.main())
                 })
             enhance.assert_not_called()
 
+    def test_ollama_model_discovery_and_pull(self):
+        from io import BytesIO
+        with patch.object(host, "urlopen", return_value=BytesIO(b'{"models":[{"name":"vision:latest"},{"name":"vision:latest"},{"name":"other:7b"}]}')) as request:
+            result = host.ollama_models()
+        self.assertEqual(result["models"], ["other:7b", "vision:latest"])
+        request.assert_called_once_with("http://127.0.0.1:11434/api/tags", timeout=8)
+        stream = BytesIO(b'{"status":"downloading","completed":1,"total":2}\n{"status":"success"}\n')
+        with patch.object(host, "urlopen", return_value=stream) as request, patch.object(host, "send_message") as send:
+            host.pull_ollama_model("vision:latest")
+        self.assertEqual(request.call_args.args[0].full_url, "http://127.0.0.1:11434/api/pull")
+        self.assertEqual(json.loads(request.call_args.args[0].data), {"model": "vision:latest", "stream": True})
+        self.assertEqual(send.call_args_list[0].args[0]["completed"], 1)
+
     def test_selected_models_are_forwarded_and_validated(self):
         self.assertEqual(host.enhancement_options("deep", "vision:latest", "other:7b"),
                          ["--force-ocr", "--ai-review", "--extract-model", "vision:latest",
