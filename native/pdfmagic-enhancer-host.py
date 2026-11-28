@@ -22,6 +22,9 @@ from urllib.parse import unquote, urlparse
 from urllib.request import Request, urlopen
 
 PIPELINE_VERSION = 4
+OLLAMA_API = "http://127.0.0.1:11434/api"
+DEFAULT_EXTRACT_MODEL = "deepseek-ocr:latest"
+DEFAULT_REVIEW_MODEL = "sec-ocr-review:latest"
 
 HOST_CONFIG = Path.home() / ".config" / "pdf-magic" / "enhancer-host.json"
 
@@ -83,10 +86,14 @@ def serialized_enhancement(create, report, directory: Path) -> Path:
             fcntl.flock(slot, fcntl.LOCK_UN)
 
 
-def shared_enhancement(input_path: Path, create, progress: bool, directory: Path) -> Path:
+def shared_enhancement(input_path: Path, create, progress: bool, directory: Path, cache_key: str = "") -> Path:
     """Serialize owners by input bytes and let duplicate hosts follow their job."""
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-    identity = document_hash(input_path)
+    def identity_for(digest: str) -> str:
+        return hashlib.sha256(f"{digest}:{cache_key}".encode()).hexdigest() if cache_key else digest
+
+    input_hash = document_hash(input_path)
+    identity = identity_for(input_hash)
     state_path = directory / f"{identity}.json"
     waited = False
     last_event = None
@@ -133,14 +140,15 @@ def shared_enhancement(input_path: Path, create, progress: bool, directory: Path
                 write_job(state_path, state)
                 # An enhanced PDF is also an alias for the completed result.
                 # Never overwrite another job that is already running for it.
-                if output_hash != identity:
-                    with (directory / f"{output_hash}.lock").open("a") as alias_lock:
+                if output_hash != input_hash:
+                    alias_identity = identity_for(output_hash)
+                    with (directory / f"{alias_identity}.lock").open("a") as alias_lock:
                         try:
                             fcntl.flock(alias_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
                         except BlockingIOError:
                             pass
                         else:
-                            write_job(directory / f"{output_hash}.json", state)
+                            write_job(directory / f"{alias_identity}.json", state)
                 return output
             except Exception as error:
                 write_job(state_path, {"status": "failed", "error": str(error)})
@@ -457,12 +465,57 @@ def run_enhancer(command: list[str], progress: bool, report_progress=None) -> No
         raise RuntimeError("".join(logs).strip()[-2000:] or f"PDF enhancement failed (exit {code})")
 
 
-def enhancement_options(mode: str) -> list[str]:
-    if mode in {"light", "deep"}:
-        # Existing text may itself be faulty OCR. Re-read every page and
-        # require image-based AI review before calling it enhanced.
-        return ["--force-ocr", "--ai-review"]
-    raise ValueError(f"unsupported enhancement mode: {mode}")
+def model_name(value: object) -> str:
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}", value):
+        raise ValueError("Enter a valid Ollama model name")
+    return value
+
+
+def ollama_models() -> dict[str, object]:
+    with urlopen(f"{OLLAMA_API}/tags", timeout=8) as response:
+        payload = json.load(response)
+    return {
+        "ok": True,
+        "models": sorted({item["name"] for item in payload["models"]
+                          if isinstance(item.get("name"), str)}),
+        "defaultExtractModel": DEFAULT_EXTRACT_MODEL,
+        "defaultReviewModel": DEFAULT_REVIEW_MODEL,
+    }
+
+
+def pull_ollama_model(name: str) -> None:
+    request = Request(f"{OLLAMA_API}/pull",
+                      data=json.dumps({"model": model_name(name), "stream": True}).encode(),
+                      headers={"Content-Type": "application/json"})
+    with urlopen(request, timeout=120) as response:
+        for line in response:
+            event = json.loads(line)
+            if event.get("error"):
+                raise RuntimeError(str(event["error"]))
+            send_message({"type": "model-progress", "status": str(event.get("status", "")),
+                          "completed": event.get("completed"), "total": event.get("total")})
+            if event.get("status") == "success":
+                return
+    raise RuntimeError("Ollama model download ended before completion")
+
+
+def selected_models(message: dict[str, object]) -> dict[str, str]:
+    return {key: model_name(message[field])
+            for field, key in (("extractModel", "extract_model"), ("reviewModel", "review_model"))
+            if field in message}
+
+
+def enhancement_options(mode: str, extract_model: str | None = None,
+                        review_model: str | None = None) -> list[str]:
+    if mode not in {"light", "deep"}:
+        raise ValueError(f"unsupported enhancement mode: {mode}")
+    # Existing text may itself be faulty OCR. Re-read every page and
+    # require image-based AI review before calling it enhanced.
+    options = ["--force-ocr", "--ai-review"]
+    for flag, name in (("--extract-model", extract_model), ("--review-model", review_model)):
+        if name is not None:
+            options.extend([flag, model_name(name)])
+    return options
 
 
 def enhance_pdf(
@@ -471,6 +524,8 @@ def enhance_pdf(
     uploaded_path: Path | None = None,
     progress: bool = False,
     enhancement_mode: str = "deep",
+    extract_model: str | None = None,
+    review_model: str | None = None,
 ) -> Path:
     config = load_config()
     enhancer_dir = Path(str(config["enhancer_dir"])).expanduser().resolve()
@@ -501,7 +556,7 @@ def enhance_pdf(
                 pass
             else:
                 output_directory = source_directory
-        options = enhancement_options(enhancement_mode)
+        options = enhancement_options(enhancement_mode, extract_model, review_model)
         def create(report):
             output_path = unique_output(output_directory, safe_stem(source_url))
             run_enhancer(
@@ -513,7 +568,8 @@ def enhance_pdf(
             stamp_source_url(output_path, reference_url)
             return output_path
 
-        return shared_enhancement(input_path, create, progress, web_output_directory / ".jobs")
+        cache_key = json.dumps(options[2:]) if len(options) > 2 else ""
+        return shared_enhancement(input_path, create, progress, web_output_directory / ".jobs", cache_key)
 
 
 def enhance_uploaded_pdf(message: dict[str, object]) -> Path:
@@ -554,6 +610,7 @@ def enhance_uploaded_pdf(message: dict[str, object]) -> Path:
             reference_url,
             uploaded_path=path,
             enhancement_mode=enhancement_mode,
+            **selected_models(message),
             **({"progress": True} if message.get("progress") else {}),
         )
 
@@ -603,6 +660,15 @@ def main() -> int:
 
     try:
         message = read_message()
+        if message.get("action") == "list-ollama-models":
+            load_config()
+            send_message(ollama_models())
+            return 0
+        if message.get("action") == "pull-ollama-model":
+            load_config()
+            pull_ollama_model(message.get("model"))
+            send_message({"ok": True})
+            return 0
         if message.get("action") not in {"enhance-pdf", "enhance-pdf-start"}:
             raise ValueError("unsupported native-host action")
 
@@ -617,6 +683,7 @@ def main() -> int:
                 source_url,
                 reference_url,
                 enhancement_mode=str(message.get("enhancementMode") or "deep"),
+                **selected_models(message),
                 **({"progress": True} if message.get("progress") else {}),
             )
         )

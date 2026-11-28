@@ -243,6 +243,30 @@ raise SystemExit(host.main())
                 })
             enhance.assert_not_called()
 
+    def test_selected_models_are_forwarded_and_validated(self):
+        self.assertEqual(host.enhancement_options("deep", "vision:latest", "other:7b"),
+                         ["--force-ocr", "--ai-review", "--extract-model", "vision:latest",
+                          "--review-model", "other:7b"])
+        self.assertEqual(host.selected_models({"reviewModel": "other:7b"}), {"review_model": "other:7b"})
+        with self.assertRaises(ValueError):
+            host.selected_models({"reviewModel": "--force-ocr"})
+
+    def test_model_selection_changes_shared_cache_identity(self):
+        with tempfile.TemporaryDirectory() as folder:
+            directory = Path(folder)
+            source = directory / "source.pdf"
+            source.write_bytes(b"source")
+            calls = []
+            def create(report):
+                calls.append(len(calls))
+                output = directory / f"output-{len(calls)}.pdf"
+                output.write_bytes(f"enhanced {len(calls)}".encode())
+                return output
+            first = host.shared_enhancement(source, create, False, directory / "jobs", "model-a")
+            self.assertEqual(host.shared_enhancement(source, create, False, directory / "jobs", "model-a"), first)
+            self.assertNotEqual(host.shared_enhancement(source, create, False, directory / "jobs", "model-b"), first)
+            self.assertEqual(len(calls), 2)
+
     def test_all_enhancement_modes_reread_text_with_ai(self):
         self.assertEqual(host.enhancement_options("deep"), ["--force-ocr", "--ai-review"])
         self.assertEqual(host.enhancement_options("light"), ["--force-ocr", "--ai-review"])

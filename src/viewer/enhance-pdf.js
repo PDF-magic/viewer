@@ -17,6 +17,19 @@ const setupCheckout = document.querySelector("#enhancer-checkout-path");
 const setupStatus = document.querySelector("#enhancer-setup-status");
 const setupMenuButton = document.querySelector("#open-enhancer-setup");
 const SETUP_PREF_KEY = "pdfmagic-enhancer-setup";
+const MODEL_PREF_KEY = "pdfmagic-enhancer-models";
+const modelPopover = document.querySelector("#enhancer-model-popover");
+const modelForm = document.querySelector("#enhancer-model-form");
+const extractModel = document.querySelector("#enhancer-extract-model");
+const reviewModel = document.querySelector("#enhancer-review-model");
+const modelStatus = document.querySelector("#enhancer-model-status");
+const modelStart = document.querySelector("#enhancer-model-start");
+const modelRefresh = document.querySelector("#enhancer-model-refresh");
+const modelDownload = document.querySelector("#enhancer-model-download");
+const modelName = document.querySelector("#enhancer-model-name");
+let installedModels = [];
+let modelsBusy = false;
+let preferredModels = {};
 const sectionNav = document.querySelector("#section-nav");
 const pageNumberInput = document.querySelector("#page-number");
 const toast = document.querySelector("#toast");
@@ -110,10 +123,10 @@ function updateEnhancementProgress(stage, completed, total) {
   progressLabel.textContent = label;
 }
 
-async function enhanceLoadedPdf(sourceUrl, referenceUrl) {
+async function enhanceLoadedPdf(sourceUrl, referenceUrl, models) {
   if (new URL(sourceUrl).protocol === "file:") {
     try {
-      return await requestEnhancement(sourceUrl, referenceUrl, true);
+      return await requestEnhancement(sourceUrl, referenceUrl, true, models);
     } catch (error) {
       // macOS can let the browser open a file while denying its native helper
       // access to the same path. Retry with the bytes already in the viewer.
@@ -122,10 +135,10 @@ async function enhanceLoadedPdf(sourceUrl, referenceUrl) {
       }
     }
   }
-  return await requestEnhancement(sourceUrl, referenceUrl, false);
+  return await requestEnhancement(sourceUrl, referenceUrl, false, models);
 }
 
-async function requestEnhancement(sourceUrl, referenceUrl, useLocalPath) {
+async function requestEnhancement(sourceUrl, referenceUrl, useLocalPath, models) {
   const port = chrome.runtime.connectNative(NATIVE_HOST);
   let pending;
   let disconnected = false;
@@ -164,14 +177,14 @@ async function requestEnhancement(sourceUrl, referenceUrl, useLocalPath) {
   try {
     const enhancementMode = "light";
     if (useLocalPath) {
-      return await request({ action: "enhance-pdf", sourceUrl, referenceUrl, enhancementMode, progress: true });
+      return await request({ action: "enhance-pdf", sourceUrl, referenceUrl, enhancementMode, ...models, progress: true });
     }
     const session = await pdfDocumentSessionReady;
     const pdfDocument = session?.document;
     if (!pdfDocument) throw new Error("PDF has not finished loading");
     const data = await pdfDocument.getData();
     updateEnhancementProgress("upload", 0, data.length);
-    await request({ action: "enhance-pdf-start", sourceUrl, referenceUrl, byteLength: data.length, enhancementMode, progress: true });
+    await request({ action: "enhance-pdf-start", sourceUrl, referenceUrl, byteLength: data.length, enhancementMode, ...models, progress: true });
     // Acknowledge each chunk so large PDFs do not fill the native-message queue.
     const chunkSize = 256 * 1024;
     for (let offset = 0; offset < data.length; offset += chunkSize) {
@@ -311,7 +324,7 @@ saveCopyButton.addEventListener("click", async () => {
   }
 });
 
-async function enhanceCurrentPdf() {
+async function enhanceCurrentPdf(models = {}) {
   if (pendingSave) {
     saveCopyButton.focus();
     return;
@@ -333,7 +346,7 @@ async function enhanceCurrentPdf() {
     }
 
     const original = source.originalUrl;
-    const response = await enhanceLoadedPdf(original.href, referenceUrl);
+    const response = await enhanceLoadedPdf(original.href, referenceUrl, models);
 
     if (!response?.ok || !response.outputUrl) {
       throw new Error(response?.error || "PDF enhancer did not return a local copy");
@@ -380,9 +393,130 @@ new MutationObserver(syncEnhancerSlot).observe(sectionNav, {
 });
 syncEnhancerSlot();
 
-enhanceButton.addEventListener("click", () => void enhanceCurrentPdf());
+function modelRequest(message, onProgress = () => {}) {
+  return new Promise((resolve, reject) => {
+    const port = chrome.runtime.connectNative(NATIVE_HOST);
+    let settled = false;
+    function finish(callback, value) {
+      if (settled) return;
+      settled = true;
+      callback(value);
+      port.disconnect();
+    }
+    port.onMessage.addListener((response) => {
+      if (response?.type === "model-progress") {
+        onProgress(response);
+        return;
+      }
+      if (response?.ok) finish(resolve, response);
+      else finish(reject, new Error(response?.error || "Ollama request failed"));
+    });
+    port.onDisconnect.addListener(() => {
+      if (!settled) finish(reject, new Error(chrome.runtime.lastError?.message || "PDF enhancer disconnected"));
+    });
+    try {
+      port.postMessage(message);
+    } catch (error) {
+      finish(reject, error);
+    }
+  });
+}
+
+function syncModelControls() {
+  extractModel.disabled = reviewModel.disabled = modelRefresh.disabled = modelDownload.disabled = modelName.disabled = modelsBusy;
+  modelStart.disabled = modelsBusy || !installedModels.includes(extractModel.value) || !installedModels.includes(reviewModel.value);
+}
+
+function fillModelSelect(select, wanted) {
+  const placeholder = installedModels.includes(wanted) ? "Choose a model" : (wanted ? `Not installed: ${wanted}` : "Choose a model");
+  select.replaceChildren(new Option(placeholder, ""), ...installedModels.map(name => new Option(name, name)));
+  select.value = installedModels.includes(wanted) ? wanted : "";
+}
+
+async function refreshModels() {
+  if (modelsBusy) return;
+  const previous = { extractModel: extractModel.value, reviewModel: reviewModel.value };
+  modelsBusy = true;
+  syncModelControls();
+  modelStatus.textContent = "Detecting installed Ollama models…";
+  try {
+    const result = await modelRequest({ action: "list-ollama-models" });
+    installedModels = Array.isArray(result.models) ? result.models.filter(name => typeof name === "string") : [];
+    fillModelSelect(extractModel, previous.extractModel || preferredModels.extractModel || result.defaultExtractModel);
+    fillModelSelect(reviewModel, previous.reviewModel || preferredModels.reviewModel || result.defaultReviewModel);
+    modelStatus.textContent = installedModels.length
+      ? `${installedModels.length} installed model(s). Choose image-capable models for OCR.`
+      : "No Ollama models found. Download a model below.";
+  } catch (error) {
+    installedModels = [];
+    fillModelSelect(extractModel, "");
+    fillModelSelect(reviewModel, "");
+    const message = error?.message || "Unable to detect Ollama models";
+    modelStatus.textContent = `${message}. Make sure Ollama is running, then refresh.`;
+    if (isMissingNativeHost(message)) {
+      modelPopover.hidePopover();
+      await offerEnhancerSetup();
+    }
+  } finally {
+    modelsBusy = false;
+    syncModelControls();
+  }
+}
+
+async function openEnhancementOptions(anchor) {
+  if (pendingSave) {
+    saveCopyButton.focus();
+    return;
+  }
+  const rect = anchor.getBoundingClientRect();
+  modelPopover.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - 368))}px`;
+  modelPopover.style.top = `${Math.max(8, rect.bottom + 6)}px`;
+  modelPopover.showPopover();
+  try {
+    preferredModels = (await chrome.storage.local.get(MODEL_PREF_KEY))[MODEL_PREF_KEY] || {};
+  } catch { /* Session selections still work without storage. */ }
+  await refreshModels();
+}
+
+modelRefresh.addEventListener("click", refreshModels);
+extractModel.addEventListener("change", syncModelControls);
+reviewModel.addEventListener("change", syncModelControls);
+modelDownload.addEventListener("click", async () => {
+  const model = modelName.value.trim();
+  if (!model || modelsBusy) return;
+  modelsBusy = true;
+  syncModelControls();
+  modelStatus.textContent = `Downloading ${model}…`;
+  try {
+    await modelRequest({ action: "pull-ollama-model", model }, (event) => {
+      const percent = Number.isFinite(event.completed) && event.total > 0
+        ? ` · ${Math.min(100, Math.round(event.completed / event.total * 100))}%` : "";
+      modelStatus.textContent = `${event.status || "Downloading"}${percent}`;
+    });
+    modelName.value = "";
+  } catch (error) {
+    modelStatus.textContent = error?.message || "Model download failed";
+    return;
+  } finally {
+    modelsBusy = false;
+    syncModelControls();
+  }
+  await refreshModels();
+});
+modelForm.addEventListener("submit", async event => {
+  event.preventDefault();
+  if (modelStart.disabled || modelsBusy) return;
+  const models = { extractModel: extractModel.value, reviewModel: reviewModel.value };
+  modelPopover.hidePopover();
+  try {
+    await chrome.storage.local.set({ [MODEL_PREF_KEY]: models });
+  } catch { /* Preferences are optional. */ }
+  await enhanceCurrentPdf(models);
+});
+document.querySelector("#enhancer-model-close").addEventListener("click", () => modelPopover.hidePopover());
+enhanceButton.addEventListener("click", () => openEnhancementOptions(enhanceButton));
 sectionEnhanceButton.addEventListener("click", () => {
   sectionPopover.hidden = true;
   sectionToggle.setAttribute("aria-expanded", "false");
-  void enhanceCurrentPdf();
+  return openEnhancementOptions(sectionToggle);
 });

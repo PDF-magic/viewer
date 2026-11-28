@@ -10,15 +10,19 @@ const markup = readFileSync(new URL("../src/viewer.html", import.meta.url), "utf
 async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new Uint8Array([37, 80, 68, 70, 45]), sourceUrl = "https://example.com/source.pdf", documentOverrides = {}, setupOptions = {}) {
   const elements = new Map();
   const clickHandlers = new Map();
-  for (const id of ["enhance-nav", "enhance-pdf", "section-enhance-pdf", "section-popover", "section-toggle", "install-enhancer", "section-nav", "page-number", "toast", "enhance-progress", "enhance-progress-bar", "enhance-progress-label", "enhance-progress-percentage", "enhancer-setup-dialog", "enhancer-setup-form", "enhancer-setup-close", "enhancer-repository-url", "enhancer-checkout-path", "enhancer-setup-status", "open-enhancer-setup", "tools-menu", "tools-button", "enhance-error-notice", "enhance-error-message", "enhance-copy-error", "enhance-dismiss-error"]) {
+  for (const id of ["enhance-nav", "enhance-pdf", "section-enhance-pdf", "section-popover", "section-toggle", "install-enhancer", "section-nav", "page-number", "toast", "enhance-progress", "enhance-progress-bar", "enhance-progress-label", "enhance-progress-percentage", "enhancer-setup-dialog", "enhancer-setup-form", "enhancer-setup-close", "enhancer-repository-url", "enhancer-checkout-path", "enhancer-setup-status", "open-enhancer-setup", "tools-menu", "tools-button", "enhance-error-notice", "enhance-error-message", "enhance-copy-error", "enhance-dismiss-error", "enhancer-model-popover", "enhancer-model-form", "enhancer-extract-model", "enhancer-review-model", "enhancer-model-status", "enhancer-model-start", "enhancer-model-refresh", "enhancer-model-download", "enhancer-model-name", "enhancer-model-close"]) {
     elements.set(`#${id}`, {
       hidden: id !== "enhance-pdf",
       title: "Enhance PDF",
-      value: "1",
+      value: id === "page-number" ? "1" : "",
       setAttribute() {},
       removeAttribute() {},
       addEventListener(type, handler) { if (type === "click") clickHandlers.set(id, handler); if (type === "submit") clickHandlers.set(id + ":submit", handler); },
       showModal() { this.open = true; },
+      showPopover() { this.open = true; },
+      hidePopover() { this.open = false; },
+      getBoundingClientRect() { return { left: 20, bottom: 40 }; },
+      replaceChildren(...children) { this.options = children; },
       close() { this.open = false; },
       classList: { add() {}, remove() {} },
       style: { setProperty() {} },
@@ -51,7 +55,10 @@ async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new U
         messages.push(message);
         Promise.resolve().then(async () => {
           try {
-            if (["enhance-pdf", "enhance-pdf-finish"].includes(message.action)) {
+            if (message.action === "list-ollama-models") {
+              messageListener({ ok: true, models: ["deepseek-ocr:latest", "sec-ocr-review:latest", "other:latest"],
+                defaultExtractModel: "deepseek-ocr:latest", defaultReviewModel: "sec-ocr-review:latest" });
+            } else if (["enhance-pdf", "enhance-pdf-finish"].includes(message.action)) {
               const response = await sendNativeMessage(message);
               if (response.ok) {
                 messageListener({ type: "progress", stage: "review", completed: 2, total: 4 });
@@ -78,9 +85,11 @@ async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new U
     MutationObserver: class { observe() {} },
     downloadSetupZip: (options) => setupDownloads.push(options),
     setTimeout() {}, clearTimeout() {}, URL,
+    Option: class { constructor(text, value) { this.text = text; this.value = value; } },
     btoa: (binary) => Buffer.from(binary, "binary").toString("base64"),
     pdfDocumentSessionReady: Promise.resolve({ document: { getData: async () => data, ...documentOverrides } }),
     window: {
+      innerWidth: 1000,
       location: { href: "chrome-extension://viewer/src/viewer.html?url=https%3A%2F%2Fexample.com%2Fsource.pdf#page=9" },
       confirm: (message) => {
         setupPrompts.push(message);
@@ -113,15 +122,23 @@ test("Enhance appears at the bottom of the sections menu and uses the same actio
   const sectionMarkup = markup.slice(markup.indexOf('id="section-popover"'), markup.indexOf('id="previous-page"'));
   assert.ok(sectionMarkup.indexOf('id="section-enhance-pdf"') > sectionMarkup.indexOf('id="section-metadata"'));
 
-  const { elements, clickHandlers, destinations } = await enhancerFixture(
+  const { elements, clickHandlers, destinations, messages } = await enhancerFixture(
     async () => ({ ok: true, outputUrl: "file:///tmp/enhanced.pdf" }),
   );
   elements.get("#section-popover").hidden = false;
-  clickHandlers.get("section-enhance-pdf")();
+  await clickHandlers.get("section-enhance-pdf")();
   assert.equal(elements.get("#section-popover").hidden, true);
-  assert.equal(elements.get("#section-enhance-pdf").disabled, true);
-  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(elements.get("#enhancer-model-popover").open, true);
+  assert.equal(destinations.length, 1);
+  assert.equal(elements.get("#enhancer-extract-model").value, "deepseek-ocr:latest");
+  assert.equal(elements.get("#enhancer-review-model").value, "sec-ocr-review:latest");
+  elements.get("#enhancer-review-model").value = "other:latest";
+  await clickHandlers.get("enhancer-model-form:submit")({ preventDefault() {} });
+  assert.equal(elements.get("#enhancer-model-popover").open, false);
   assert.equal(destinations.length, 2);
+  const start = messages.filter(message => message.action === "enhance-pdf-start").at(-1);
+  assert.equal(start.extractModel, "deepseek-ocr:latest");
+  assert.equal(start.reviewModel, "other:latest");
   assert.equal(elements.get("#section-enhance-pdf").disabled, false);
 });
 
