@@ -28,6 +28,8 @@
           class="mark-button section-toggle"
           type="button"
           aria-label="Enhance PDF"
+          aria-haspopup="dialog"
+          aria-controls="enhancer-model-popover"
           title="Enhance PDF"
         >✦</button>
         <a
@@ -61,7 +63,7 @@
             <dl id="section-metadata-list" class="section-metadata-list"></dl>
           </section>
           <div class="section-enhance-actions">
-            <button id="section-enhance-pdf" class="section-enhance-button" type="button" aria-label="Enhance PDF" title="Enhance PDF">✦ <span>Enhance PDF</span></button>
+            <button id="section-enhance-pdf" class="section-enhance-button" type="button" aria-haspopup="dialog" aria-controls="enhancer-model-popover" aria-label="Enhance PDF" title="Enhance PDF">✦ <span>Enhance PDF</span></button>
           </div>
         </div>
       </div>
@@ -203,6 +205,30 @@
         </div>
       </div>
     </header>
+
+    <div id="enhancer-model-popover" popover="auto" role="dialog" aria-labelledby="enhancer-model-title">
+      <div class="enhancer-model-heading">
+        <h2 id="enhancer-model-title">Enhance PDF</h2>
+        <button id="enhancer-model-close" type="button" aria-label="Close enhancement options">×</button>
+      </div>
+      <form id="enhancer-model-form">
+        <label for="enhancer-extract-model">OCR extraction model</label>
+        <select id="enhancer-extract-model" required disabled></select>
+        <label for="enhancer-review-model">AI review model</label>
+        <select id="enhancer-review-model" required disabled></select>
+        <div class="enhancer-model-actions">
+          <button id="enhancer-model-refresh" type="button">Refresh models</button>
+          <a href="https://ollama.com/search" target="_blank" rel="noopener noreferrer">Browse Ollama models</a>
+        </div>
+        <label for="enhancer-model-name">Download another model</label>
+        <div class="enhancer-model-actions">
+          <input id="enhancer-model-name" type="text" placeholder="model:tag" spellcheck="false" autocomplete="off" />
+          <button id="enhancer-model-download" type="button">Download</button>
+        </div>
+        <p id="enhancer-model-status" role="status" aria-live="polite">Detecting installed Ollama models…</p>
+        <button id="enhancer-model-start" type="submit" disabled>Start enhancement</button>
+      </form>
+    </div>
 
     <div id="enhance-progress" class="enhance-progress" hidden>
       <div id="enhance-progress-label" class="enhance-progress-label" role="status" aria-live="polite">Preparing enhancement…</div>

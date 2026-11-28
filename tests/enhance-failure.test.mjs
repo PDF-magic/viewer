@@ -19,6 +19,10 @@ function fixture(responseForAction) {
     "enhance-progress-percentage", "enhance-error-notice",
     "enhance-error-message", "enhance-copy-error", "enhance-dismiss-error",
     "enhance-save-notice", "enhance-save-message", "enhance-save-copy",
+    "enhancer-model-popover", "enhancer-model-form", "enhancer-extract-model",
+    "enhancer-review-model", "enhancer-model-status", "enhancer-model-start",
+    "enhancer-model-refresh", "enhancer-model-download", "enhancer-model-name",
+    "enhancer-model-close",
   ];
   for (const id of identifiers) {
     elements.set(`#${id}`, {
