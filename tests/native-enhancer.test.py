@@ -35,6 +35,16 @@ class NativeEnhancerTests(unittest.TestCase):
         start.assert_not_called()
         self.assertEqual(events, [])
 
+    def test_review_reconnect_starts_ollama_and_keeps_reporting_pages(self):
+        command = [sys.executable, "-u", "-c",
+                   "print('PDF_MAGIC_OLLAMA_RETRY model'); print('Reviewed page 4/10')"]
+        events = []
+        with patch.object(host, "ollama_ready", side_effect=[False, True]), \
+             patch.object(host, "start_ollama", return_value=True) as start:
+            host.run_enhancer(command, False, report_progress=events.append)
+        start.assert_called_once_with()
+        self.assertEqual(events, [{"type": "progress", "stage": "review", "completed": 4, "total": 10}])
+
     def test_macos_starts_the_ollama_app(self):
         with patch.object(host.sys, "platform", "darwin"), \
              patch.object(host.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)) as launch:
