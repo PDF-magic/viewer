@@ -30,6 +30,7 @@ class EnhancerCliTest(unittest.TestCase):
 
             with (
                 patch.object(host, "load_config", return_value={"enhancer_dir": str(enhancer_dir)}),
+                patch.object(host, "ollama_ready", return_value=True),
                 patch.object(host, "unique_output", return_value=output_file),
                 patch.object(host, "run_enhancer", side_effect=capture_command),
                 patch.object(host, "rename_for_ocr_title", side_effect=lambda path: path),

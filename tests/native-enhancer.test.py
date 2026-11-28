@@ -18,6 +18,39 @@ spec.loader.exec_module(host)
 
 
 class NativeEnhancerTests(unittest.TestCase):
+    def test_ollama_is_started_after_connection_refusal(self):
+        events = []
+        with patch.object(host, "ollama_ready", side_effect=[False, False, True]), \
+             patch.object(host, "start_ollama", return_value=True) as start, \
+             patch.object(host.time, "sleep"):
+            host.ensure_ollama(events.append)
+        start.assert_called_once_with()
+        self.assertEqual(events, [{"type": "progress", "stage": "ollama"}])
+
+    def test_reachable_ollama_is_reused(self):
+        events = []
+        with patch.object(host, "ollama_ready", return_value=True), \
+             patch.object(host, "start_ollama") as start:
+            host.ensure_ollama(events.append)
+        start.assert_not_called()
+        self.assertEqual(events, [])
+
+    def test_missing_ollama_prompts_to_install_before_running_ocr(self):
+        with tempfile.TemporaryDirectory() as folder:
+            directory = Path(folder).resolve()
+            source = directory / "scan.pdf"
+            source.write_bytes(b"%PDF-1.7\n")
+            (directory / "ocr-scanned-pdf.sh").touch()
+            with patch.object(host, "load_config", return_value={"enhancer_dir": folder}), \
+                 patch.object(host.Path, "home", return_value=directory), \
+                 patch.object(host, "ollama_ready", return_value=False), \
+                 patch.object(host, "start_ollama", return_value=False), \
+                 patch.object(host, "run_enhancer") as run:
+                with self.assertRaisesRegex(RuntimeError, r"Install Ollama from https://ollama\.com/download"):
+                    host.enhance_pdf(source.as_uri(), source.as_uri())
+            run.assert_not_called()
+            self.assertFalse((directory / "scan-enhanced-ocr.pdf").exists())
+
     def test_duplicate_processes_share_progress_and_one_result(self):
         with tempfile.TemporaryDirectory() as folder:
             directory = Path(folder)
@@ -185,6 +218,7 @@ spec = importlib.util.spec_from_file_location('host', {str(HOST)!r})
 host = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(host)
 host.load_config = lambda: {{'enhancer_dir': {folder!r}}}
+host.ollama_ready = lambda: True
 host.Path.home = lambda: host.Path({folder!r})
 host.stamp_source_url = lambda *_: None
 raise SystemExit(host.main())
@@ -264,6 +298,7 @@ spec = importlib.util.spec_from_file_location('host', {str(HOST)!r})
 host = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(host)
 host.load_config = lambda: {{'enhancer_dir': {folder!r}}}
+host.ollama_ready = lambda: True
 host.Path.home = lambda: host.Path({folder!r})
 host.stamp_source_url = lambda *_: None
 raise SystemExit(host.main())
@@ -293,6 +328,7 @@ raise SystemExit(host.main())
             source = directory / "scan.pdf"
             source.write_bytes(b"%PDF-1.7")
             with patch.object(host, "load_config", return_value={"enhancer_dir": folder}), \
+                 patch.object(host, "ollama_ready", return_value=True), \
                  patch.object(host, "input_from_url", return_value=(source, True)), \
                  patch.object(host.Path, "home", return_value=directory):
                 with self.assertRaisesRegex(RuntimeError, "digitally signed"):
@@ -305,6 +341,7 @@ raise SystemExit(host.main())
             source.write_bytes(b"%PDF-1.7\nloaded data")
             (directory / "ocr-scanned-pdf.sh").write_text('cp "$1" "$2"\n')
             with patch.object(host, "load_config", return_value={"enhancer_dir": folder}), \
+                 patch.object(host, "ollama_ready", return_value=True), \
                  patch.object(host.Path, "home", return_value=directory), \
                  patch.object(host.sys, "platform", "darwin"), \
                  patch.object(host, "stamp_source_url"), \
@@ -334,6 +371,7 @@ raise SystemExit(host.main())
                     return named_temporary_file(*args, **kwargs)
 
                 with patch.object(host, "load_config", return_value={"enhancer_dir": folder}), \
+                     patch.object(host, "ollama_ready", return_value=True), \
                      patch.object(host.Path, "home", return_value=directory), \
                      patch.object(host.sys, "platform", "darwin"), \
                      patch.object(host, "stamp_source_url"), \
