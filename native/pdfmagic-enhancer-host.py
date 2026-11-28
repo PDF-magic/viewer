@@ -142,10 +142,12 @@ def serialized_enhancement(create, report, directory: Path) -> Path:
             fcntl.flock(slot, fcntl.LOCK_UN)
 
 
-def shared_enhancement(input_path: Path, create, progress: bool, directory: Path, *, after_save=None) -> Path:
+def shared_enhancement(
+    input_path: Path, create, progress: bool, directory: Path, *, input_hash: str | None = None, after_save=None,
+) -> Path:
     """Serialize owners by input bytes and let duplicate hosts follow their job."""
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-    identity = document_hash(input_path)
+    identity = input_hash or document_hash(input_path)
     state_path = directory / f"{identity}.json"
     waited = False
     last_event = None
@@ -576,7 +578,8 @@ def enhance_pdf(
                 output_directory = source_directory
         options = enhancement_options(enhancement_mode)
         jobs = web_output_directory / ".jobs"
-        checkpoint = jobs / f"{document_hash(input_path)}.review-v{PIPELINE_VERSION}"
+        input_hash = document_hash(input_path)
+        checkpoint = jobs / f"{input_hash}.review-v{PIPELINE_VERSION}"
 
         def create(report):
             ensure_ollama(report)
@@ -591,7 +594,7 @@ def enhance_pdf(
             return output_path
 
         return shared_enhancement(
-            input_path, create, progress, jobs,
+            input_path, create, progress, jobs, input_hash=input_hash,
             after_save=lambda: shutil.rmtree(checkpoint, ignore_errors=True),
         )
 
