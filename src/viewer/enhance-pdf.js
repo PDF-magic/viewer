@@ -26,6 +26,7 @@ const progressLabel = document.querySelector("#enhance-progress-label");
 const progressPercentage = document.querySelector("#enhance-progress-percentage");
 const errorNotice = document.querySelector("#enhance-error-notice");
 const errorMessage = document.querySelector("#enhance-error-message");
+const installOllamaLink = document.querySelector("#enhance-install-ollama");
 const copyErrorButton = document.querySelector("#enhance-copy-error");
 const dismissErrorButton = document.querySelector("#enhance-dismiss-error");
 const saveNotice = document.querySelector("#enhance-save-notice");
@@ -214,6 +215,7 @@ function showEnhancementFailure(message) {
   };
   const stage = stageLabels[lastEnhancementStage] || "Enhancing PDF";
   errorMessage.textContent = `${stage}: ${message}`;
+  installOllamaLink.hidden = !message.startsWith("Install Ollama from ");
   errorNotice.hidden = false;
 }
 

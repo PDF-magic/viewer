@@ -10,7 +10,7 @@ const markup = readFileSync(new URL("../src/viewer.html", import.meta.url), "utf
 async function enhancerFixture(sendNativeMessage, pageNumber = "1", data = new Uint8Array([37, 80, 68, 70, 45]), sourceUrl = "https://example.com/source.pdf", documentOverrides = {}, setupOptions = {}) {
   const elements = new Map();
   const clickHandlers = new Map();
-  for (const id of ["enhance-nav", "enhance-pdf", "section-enhance-pdf", "section-popover", "section-toggle", "install-enhancer", "section-nav", "page-number", "toast", "enhance-progress", "enhance-progress-bar", "enhance-progress-label", "enhance-progress-percentage", "enhancer-setup-dialog", "enhancer-setup-form", "enhancer-setup-close", "enhancer-repository-url", "enhancer-checkout-path", "enhancer-setup-status", "open-enhancer-setup", "tools-menu", "tools-button", "enhance-error-notice", "enhance-error-message", "enhance-copy-error", "enhance-dismiss-error"]) {
+  for (const id of ["enhance-nav", "enhance-pdf", "section-enhance-pdf", "section-popover", "section-toggle", "install-enhancer", "section-nav", "page-number", "toast", "enhance-progress", "enhance-progress-bar", "enhance-progress-label", "enhance-progress-percentage", "enhancer-setup-dialog", "enhancer-setup-form", "enhancer-setup-close", "enhancer-repository-url", "enhancer-checkout-path", "enhancer-setup-status", "open-enhancer-setup", "tools-menu", "tools-button", "enhance-error-notice", "enhance-error-message", "enhance-install-ollama", "enhance-copy-error", "enhance-dismiss-error"]) {
     elements.set(`#${id}`, {
       hidden: id !== "enhance-pdf",
       title: "Enhance PDF",

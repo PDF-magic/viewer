@@ -17,7 +17,7 @@ function fixture(responseForAction) {
     "section-nav", "page-number", "toast",
     "enhance-progress", "enhance-progress-bar", "enhance-progress-label",
     "enhance-progress-percentage", "enhance-error-notice",
-    "enhance-error-message", "enhance-copy-error", "enhance-dismiss-error",
+    "enhance-error-message", "enhance-install-ollama", "enhance-copy-error", "enhance-dismiss-error",
     "enhance-save-notice", "enhance-save-message", "enhance-save-copy",
   ];
   for (const id of identifiers) {
@@ -50,7 +50,7 @@ function fixture(responseForAction) {
           messages.push(message);
           Promise.resolve().then(async () => {
             try {
-              onMessage(await responseForAction(message.action));
+              onMessage(await responseForAction(message.action, onMessage));
             } catch (error) {
               runtime.lastError = { message: error.message };
               onDisconnect();
@@ -112,11 +112,26 @@ test("OCR failure remains readable and can be copied or dismissed", async () => 
   assert.equal(scenario.elements.get("#enhance-progress").hidden, true);
   assert.equal(scenario.elements.get("#enhance-error-notice").hidden, false);
   assert.match(scenario.elements.get("#enhance-error-message").textContent, /Running OCR: OCRmyPDF: Tesseract returned exit 7/);
+  assert.equal(scenario.elements.get("#enhance-install-ollama").hidden, true);
   assert.deepEqual(scenario.updates, []);
   await scenario.clicks.get("enhance-copy-error")();
   assert.match(scenario.copies[0], /Tesseract returned exit 7/);
   scenario.clicks.get("enhance-dismiss-error")();
   assert.equal(scenario.elements.get("#enhance-error-notice").hidden, true);
+});
+
+test("a missing Ollama installation shows the download link and leaves the PDF open", async () => {
+  const scenario = fixture(async (action, send) => {
+    if (action !== "enhance-pdf-finish") return { ok: true };
+    send({ type: "progress", stage: "ollama" });
+    return { ok: false, error: "Install Ollama from https://ollama.com/download, start it, then retry Enhance PDF." };
+  });
+  await scenario.run();
+  assert.equal(scenario.elements.get("#enhance-error-notice").hidden, false);
+  assert.equal(scenario.elements.get("#enhance-install-ollama").hidden, false);
+  assert.match(scenario.elements.get("#enhance-error-message").textContent,
+    /^Starting Ollama: Install Ollama/);
+  assert.deepEqual(scenario.updates, []);
 });
 
 test("upload rejection preserves the stage at which the 0% progress failed", async () => {

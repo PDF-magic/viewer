@@ -1139,6 +1139,7 @@ input {
   overflow-wrap: anywhere;
 }
 .enhance-error-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.enhance-error-actions a { align-self: center; color: inherit; }
 .enhance-error-actions button {
   padding: 6px 10px;
   border: 1px solid var(--border);
