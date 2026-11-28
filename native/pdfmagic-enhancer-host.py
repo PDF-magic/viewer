@@ -142,7 +142,7 @@ def serialized_enhancement(create, report, directory: Path) -> Path:
             fcntl.flock(slot, fcntl.LOCK_UN)
 
 
-def shared_enhancement(input_path: Path, create, progress: bool, directory: Path) -> Path:
+def shared_enhancement(input_path: Path, create, progress: bool, directory: Path, *, after_save=None) -> Path:
     """Serialize owners by input bytes and let duplicate hosts follow their job."""
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     identity = document_hash(input_path)
@@ -190,6 +190,8 @@ def shared_enhancement(input_path: Path, create, progress: bool, directory: Path
                 output_hash = document_hash(output)
                 state = {"status": "complete", "pipelineVersion": PIPELINE_VERSION, "output": str(output), "outputHash": output_hash}
                 write_job(state_path, state)
+                if after_save is not None:
+                    after_save()
                 # An enhanced PDF is also an alias for the completed result.
                 # Never overwrite another job that is already running for it.
                 if output_hash != identity:
@@ -492,7 +494,7 @@ def progress_from_log(line: str) -> dict[str, object] | None:
     return None
 
 
-def run_enhancer(command: list[str], progress: bool, report_progress=None) -> None:
+def run_enhancer(command: list[str], progress: bool, report_progress=None, *, checkpoint: Path | None = None) -> None:
     if not progress and report_progress is None:
         result = subprocess.run(command, stdout=sys.stderr, stderr=subprocess.PIPE, text=True)
         if result.returncode:
@@ -500,11 +502,18 @@ def run_enhancer(command: list[str], progress: bool, report_progress=None) -> No
         return
     logs = deque(maxlen=80)
     environment = {**os.environ, "PYTHONUNBUFFERED": "1"}
+    if checkpoint is not None:
+        environment["PDF_MAGIC_REVIEW_CHECKPOINT"] = str(checkpoint)
     with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                           text=True, bufsize=1, env=environment) as process:
         for line in process.stdout:
             logs.append(line)
             print(line, file=sys.stderr, end="")
+            if line.startswith("PDF_MAGIC_OLLAMA_RETRY "):
+                try:
+                    ensure_ollama(lambda _: None)
+                except RuntimeError as error:
+                    print(error, file=sys.stderr)
             event = progress_from_log(line)
             if event:
                 if report_progress is not None:
@@ -564,19 +573,25 @@ def enhance_pdf(
             else:
                 output_directory = source_directory
         options = enhancement_options(enhancement_mode)
+        jobs = web_output_directory / ".jobs"
+        checkpoint = jobs / f"{document_hash(input_path)}.review-v{PIPELINE_VERSION}"
+
         def create(report):
             ensure_ollama(report)
             output_path = unique_output(output_directory, safe_stem(source_url))
             run_enhancer(
                 ["/bin/bash", str(enhancer), str(input_path), str(output_path), *options],
-                progress, report_progress=report,
+                progress, report_progress=report, checkpoint=checkpoint,
             )
             report({"type": "progress", "stage": "finalizing"})
             output_path = rename_for_ocr_title(output_path)
             stamp_source_url(output_path, reference_url)
             return output_path
 
-        return shared_enhancement(input_path, create, progress, web_output_directory / ".jobs")
+        return shared_enhancement(
+            input_path, create, progress, jobs,
+            after_save=lambda: shutil.rmtree(checkpoint, ignore_errors=True),
+        )
 
 
 def enhance_uploaded_pdf(message: dict[str, object]) -> Path:
