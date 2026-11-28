@@ -5,8 +5,10 @@ from __future__ import annotations
 
 import base64
 from collections import deque
+from contextlib import closing
 import fcntl
 import hashlib
+from http.client import HTTPConnection, HTTPException
 import json
 import os
 from pathlib import Path
@@ -24,6 +26,63 @@ from urllib.request import Request, urlopen
 PIPELINE_VERSION = 4
 
 HOST_CONFIG = Path.home() / ".config" / "pdf-magic" / "enhancer-host.json"
+OLLAMA_HOST = "127.0.0.1:11434"
+OLLAMA_STARTUP_TIMEOUT = 20
+
+
+def ollama_ready() -> bool:
+    try:
+        with closing(HTTPConnection(OLLAMA_HOST, timeout=1)) as connection:
+            connection.request("GET", "/api/version")
+            response = connection.getresponse()
+            if response.status == 200:
+                version = json.loads(response.read(4096))
+                if isinstance(version, dict) and version.get("version"):
+                    return True
+    except ConnectionRefusedError:
+        return False
+    except (OSError, HTTPException, ValueError):
+        pass
+    raise RuntimeError(f"Ollama did not respond at {OLLAMA_HOST}. Check that the local Ollama service is running, then retry Enhance PDF.")
+
+
+def start_ollama() -> bool:
+    if sys.platform == "darwin":
+        result = subprocess.run(
+            ["/usr/bin/open", "-g", "-a", "Ollama"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=5,
+        )
+        if result.returncode == 0:
+            return True
+
+    executable = shutil.which("ollama")
+    if executable is None:
+        return False
+    subprocess.Popen(
+        [executable, "serve"], env={**os.environ, "OLLAMA_HOST": OLLAMA_HOST},
+        stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    return True
+
+
+def ensure_ollama(report) -> None:
+    if ollama_ready():
+        return
+    report({"type": "progress", "stage": "ollama"})
+    try:
+        started = start_ollama()
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise RuntimeError("Could not start Ollama. Open Ollama or run `ollama serve`, then retry Enhance PDF.") from error
+    if not started:
+        raise RuntimeError("Install Ollama from https://ollama.com/download, start it, then retry Enhance PDF.")
+
+    deadline = time.monotonic() + OLLAMA_STARTUP_TIMEOUT
+    while time.monotonic() < deadline:
+        if ollama_ready():
+            return
+        time.sleep(0.25)
+    raise RuntimeError(f"Ollama did not become ready at {OLLAMA_HOST}. Open Ollama or run `ollama serve`, then retry Enhance PDF.")
 
 
 def document_hash(path: Path) -> str:
@@ -454,7 +513,10 @@ def run_enhancer(command: list[str], progress: bool, report_progress=None) -> No
                     send_message(event)
         code = process.wait()
     if code:
-        raise RuntimeError("".join(logs).strip()[-2000:] or f"PDF enhancement failed (exit {code})")
+        details = "".join(logs).strip()
+        if re.search(r"^RuntimeError: Ollama request failed .*Connection refused", details, re.MULTILINE):
+            raise RuntimeError("Ollama stopped responding during text review. Retry Enhance PDF to start it again.")
+        raise RuntimeError(details[-2000:] or f"PDF enhancement failed (exit {code})")
 
 
 def enhancement_options(mode: str) -> list[str]:
@@ -503,6 +565,7 @@ def enhance_pdf(
                 output_directory = source_directory
         options = enhancement_options(enhancement_mode)
         def create(report):
+            ensure_ollama(report)
             output_path = unique_output(output_directory, safe_stem(source_url))
             run_enhancer(
                 ["/bin/bash", str(enhancer), str(input_path), str(output_path), *options],
